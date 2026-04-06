@@ -62,7 +62,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-nav-btn{background:var(--surface2);border:none;border-radius:8px;color:var(--text2);padding:.35rem .65rem;font-size:1rem;cursor:pointer;font-family:inherit;line-height:1}
 .cal-title{font-size:.95rem;font-weight:700;color:var(--text);flex:1;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.2rem}
-.cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);padding:.1rem 0;font-weight:600}
+.cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);font-weight:600;padding:.15rem 0}
 .cal-cell{height:calc((100vw - 0.8rem - 12px) / 7);border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
 .cal-cell.empty{height:calc((100vw - 0.8rem - 12px) / 7);opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
@@ -366,8 +366,8 @@ tr:last-child td{border-bottom:none}
     <div style="font-size:.8rem;color:var(--text3);margin-bottom:.75rem" id="work-info"></div>
     <div id="session-list"></div>
     <button class="btn btn-ghost btn-full" style="margin-bottom:.75rem" onclick="addSession()">＋ 施術を追加</button>
-    <div class="fg"><label>雑費（円）</label>
-      <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="calcTotal2()" placeholder="0">
+    <div class="fg"><label>雑費（円）<span style="font-size:.7rem;color:var(--text3)">（自動：0本=¥0 / 1〜2本=¥1,000 / 3本〜=¥2,000）</span></label>
+      <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="this.dataset.manual='true';calcTotal2()" placeholder="0">
     </div>
     <div class="sal-hero" style="margin-bottom:.75rem">
       <div class="sal-lbl">本日の集計</div>
@@ -436,6 +436,20 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ②バック</div><input type="number" class="fee-input" id="f-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
     <button class="btn btn-gold btn-full" onclick="saveFee()" id="btn-save-fee" style="margin-bottom:.75rem">保存する</button>
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-bottom:.75rem">
+      <div class="fee-sec-title">💰 雑費自動計算設定</div>
+      <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">施術本数に応じて雑費を自動計算します</div>
+      <div class="fee-row">
+        <div class="fee-lbl">自動計算</div>
+        <select class="fi2" id="f-misc-enabled" style="width:auto;font-size:.82rem">
+          <option value="1">する</option>
+          <option value="0">しない（手動入力）</option>
+        </select>
+      </div>
+      <div class="fee-row"><div><div class="fee-lbl">0本の雑費</div></div><input type="number" class="fee-input" id="f-misc-0" min="0" step="100" value="0"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">1〜2本の雑費</div></div><input type="number" class="fee-input" id="f-misc-1" min="0" step="100" value="1000"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">3本〜の雑費</div></div><input type="number" class="fee-input" id="f-misc-3" min="0" step="100" value="2000"><span class="fee-unit">円</span></div>
+    </div>
     <div style="border-top:1px solid var(--border);padding-top:.75rem">
       <div class="fee-sec-title">🏷️ 割引設定</div>
       <div id="fee-disc-list" style="margin-bottom:.5rem"></div>
@@ -580,7 +594,7 @@ const ROOM_COLORS = {
   '金山ルーム':  {bg:'#fefce8',tx:'#854d0e',bd:'#fef08a',card:'#fef9c3'},
 }
 function getRoomColor(room){return ROOM_COLORS[room]||{bg:'var(--pbg)',tx:'var(--ptx)',bd:'var(--pbd)',card:'var(--pbg)'}}
-const DEFAULT_FEE = {back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500,shop_shimei_free:0,shop_shimei_net:1000,shop_shimei_hon:2000,shop_op_gokueki:2000,shop_op_isho:3000,shop_op_isho2:3000}
+const DEFAULT_FEE = {back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500,shop_shimei_free:0,shop_shimei_net:1000,shop_shimei_hon:2000,shop_op_gokueki:2000,shop_op_isho:3000,shop_op_isho2:3000,misc_0:0,misc_1:1000,misc_3:2000,misc_enabled:true}
 
 // 営業時間プルダウン用（11:00〜翌2:00）
 function buildTimeOptions(selectedVal=''){
@@ -1114,7 +1128,10 @@ async function openWorkSheet(shiftId,castName,date,castId){
   sheetDiscs=discs||[]
   const{data:w}=await sb.from('works').select('*').eq('cast_id',castId).eq('date',date).single()
   document.getElementById('session-list').innerHTML=''
-  document.getElementById('w-misc').value='0'
+  // 雑費の自動計算設定
+  const autoMisc=sheetFee.misc_enabled!==false
+  if(autoMisc) document.getElementById('w-misc').value=sheetFee.misc_0??0
+  else document.getElementById('w-misc').value='0'
   if(w&&w.sessions&&w.sessions.length){
     if(w.misc) document.getElementById('w-misc').value=w.misc
     w.sessions.forEach(s=>addSession(s))
@@ -1214,7 +1231,18 @@ function getOptPrice(name){
 
 function calcTotal2(){
   let totalBack=0,totalSales=0,discFromBack=0,discFromShop=0
-  document.querySelectorAll('.session-block').forEach(block=>{
+  const blocks=document.querySelectorAll('.session-block')
+  const sessionCount=blocks.length
+  // 雑費の自動計算
+  const autoMisc=sheetFee.misc_enabled!==false
+  if(autoMisc){
+    let autoMiscAmt=0
+    if(sessionCount===0) autoMiscAmt=sheetFee.misc_0??0
+    else if(sessionCount<=2) autoMiscAmt=sheetFee.misc_1??1000
+    else autoMiscAmt=sheetFee.misc_3??2000
+    document.getElementById('w-misc').value=autoMiscAmt
+  }
+  blocks.forEach(block=>{
     const cid=parseInt(block.querySelector('.s-course').value)
     const stype=block.querySelector('.s-shimei').value
     totalBack+=getCourseBack(cid)+getShimeiBack(stype)
@@ -1240,8 +1268,6 @@ function calcTotal2(){
   bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
   if(discFromBack>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（委託金引き）</span><span class="sal-rv neg">-${fmt(discFromBack)}</span></div>`
   if(discFromShop>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（店落ち引き）</span><span class="sal-rv neg">-${fmt(discFromShop)}</span></div>`
-  const payment=document.getElementById('w-payment')?.value||'cash'
-  bd+=`<div class="sal-row"><span class="sal-rl">お支払い</span><span class="sal-rv">${payment==='card'?'💳 カード':'💴 現金'}</span></div>`
   document.getElementById('w-breakdown').innerHTML=bd
 }
 // 旧calcTotal互換
@@ -1417,6 +1443,15 @@ async function openFeeSheet(castId,name){
   if(op3El) op3El.value=f.op_isho2??500
   // 割引リスト読み込み
   await renderFeeDiscList()
+  // 雑費設定読み込み
+  const miscEnabledEl=document.getElementById('f-misc-enabled')
+  const misc0El=document.getElementById('f-misc-0')
+  const misc1El=document.getElementById('f-misc-1')
+  const misc3El=document.getElementById('f-misc-3')
+  if(miscEnabledEl) miscEnabledEl.value=f.misc_enabled===false?'0':'1'
+  if(misc0El) misc0El.value=f.misc_0??0
+  if(misc1El) misc1El.value=f.misc_1??1000
+  if(misc3El) misc3El.value=f.misc_3??2000
   document.getElementById('fee-overlay').classList.add('on')
 }
 
@@ -1455,11 +1490,13 @@ async function saveFee(){
   const btn=document.getElementById('btn-save-fee')
   btn.disabled=true;btn.textContent='保存中...'
   const g=id=>parseInt(document.getElementById(id)?.value)||0
+  const miscEnabled=document.getElementById('f-misc-enabled')?.value!=='0'
   const payload={
     cast_id:feeCastId2,
     back_50:g('f-b50'),back_80:g('f-b80'),back_100:g('f-b100'),back_130:g('f-b130'),back_ext30:g('f-bext'),
     shimei_free:g('f-shimei-free'),shimei_net:g('f-shimei-net'),shimei_hon:g('f-shimei-hon'),
-    op_gokueki:g('f-op1'),op_isho:g('f-op2'),op_isho2:g('f-op3')
+    op_gokueki:g('f-op1'),op_isho:g('f-op2'),op_isho2:g('f-op3'),
+    misc_enabled:miscEnabled,misc_0:g('f-misc-0'),misc_1:g('f-misc-1'),misc_3:g('f-misc-3')
   }
   const{data:ex}=await sb.from('cast_fees').select('id').eq('cast_id',feeCastId2).single()
   if(ex)await sb.from('cast_fees').update(payload).eq('cast_id',feeCastId2)
