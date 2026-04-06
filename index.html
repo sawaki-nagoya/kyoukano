@@ -1444,7 +1444,7 @@ async function addCast(){
   if(error){err.textContent='エラー：'+error.message;return}
   const{data:newCast}=await sb.from('casts').select('id').eq('name',name).order('id',{ascending:false}).limit(1)
   if(newCast&&newCast[0]){
-    await sb.from('cast_fees').insert({cast_id:newCast[0].id,back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500})
+    await sb.from('cast_fees').insert({cast_id:newCast[0].id,back_50:DEFAULT_FEE.back_50,back_80:DEFAULT_FEE.back_80,back_100:DEFAULT_FEE.back_100,back_130:DEFAULT_FEE.back_130,back_ext30:DEFAULT_FEE.back_ext30,shimei_free:DEFAULT_FEE.shimei_free,shimei_net:DEFAULT_FEE.shimei_net,shimei_hon:DEFAULT_FEE.shimei_hon,op_gokueki:DEFAULT_FEE.op_gokueki,op_isho:DEFAULT_FEE.op_isho,op_isho2:DEFAULT_FEE.op_isho2})
   }
   toast('追加しました！')
   closeSheet('cast')
