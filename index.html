@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>今日カノ</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#f5f5f7;--surface:#fff;--surface2:#f2f2f7;
+  --accent:#b8893a;--accent-l:#d4aa60;--accent-f:#fdf6ec;
+  --text:#1c1c1e;--text2:#3a3a3c;--text3:#8e8e93;--border:#e5e5ea;
+  --green:#34c759;--gbg:#f0fdf4;--gbd:#bbf7d0;--gtx:#15803d;
+  --red:#ff3b30;--rbg:#fff1f0;--rbd:#fecaca;--rtx:#dc2626;
+  --blue:#007aff;--bbg:#eff6ff;--bbd:#bfdbfe;--btx:#1d4ed8;
+  --purple:#8b5cf6;--pbg:#f5f3ff;--pbd:#ddd6fe;--ptx:#6d28d9;
+  --r:12px;--rs:8px;--sh:0 1px 4px rgba(0,0,0,.06);--shl:0 4px 20px rgba(0,0,0,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:var(--bg);overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;font-size:16px;color:var(--text);line-height:1.5;-webkit-text-size-adjust:100%}
+
+/* SCREENS */
+.screen{display:none;min-height:100vh;flex-direction:column}
+.screen.on{display:flex}
+
+/* LOGIN */
+.login-wrap{align-items:center;justify-content:center;padding:2rem 1.5rem;background:var(--bg)}
+.login-box{width:100%;max-width:360px}
+.login-logo{font-family:Georgia,serif;font-size:2rem;letter-spacing:.25em;color:var(--accent);margin-bottom:.2rem;text-align:center}
+.login-sub{font-size:.72rem;letter-spacing:.15em;color:var(--text3);margin-bottom:2.5rem;text-align:center}
+.lbl{font-size:.82rem;color:var(--text2);font-weight:600;display:block;margin-bottom:.4rem}
+.linput{width:100%;background:var(--surface);border:1.5px solid var(--border);color:var(--text);border-radius:var(--r);padding:.9rem 1rem;font-size:1rem;font-family:inherit;outline:none;margin-bottom:1rem;-webkit-appearance:none;transition:border-color .2s}
+.linput:focus{border-color:var(--accent)}
+.linput option{background:var(--surface)}
+.btn-login{width:100%;border:none;border-radius:var(--r);padding:1rem;font-size:1rem;font-weight:700;letter-spacing:.06em;cursor:pointer;font-family:inherit;-webkit-appearance:none;color:#fff}
+.btn-login:active{opacity:.85}
+.btn-login:disabled{opacity:.5}
+.lerr{font-size:.8rem;color:var(--rtx);margin-top:.5rem;text-align:center;min-height:1.2em}
+.back-btn{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text3);padding:.2rem .5rem;margin-bottom:1.5rem;display:block}
+
+/* APP SHELL */
+.app-hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.app-logo{font-family:Georgia,serif;font-size:1rem;letter-spacing:.2em;color:var(--accent)}
+.hdr-r{display:flex;align-items:center;gap:.5rem}
+.badge{font-size:.72rem;padding:3px 10px;border-radius:99px;background:var(--accent-f);color:var(--accent);font-weight:600}
+.btn-sm{font-size:.72rem;color:var(--text3);background:var(--surface2);border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-family:inherit}
+
+/* TAB BAR */
+.tbar{display:flex;background:var(--surface);border-top:1px solid var(--border);position:fixed;bottom:0;left:0;right:0;z-index:50;padding-bottom:env(safe-area-inset-bottom);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbar::-webkit-scrollbar{display:none}
+.tbar-btn{flex:1;min-width:70px;padding:.55rem .2rem .45rem;font-size:.58rem;color:var(--text3);background:none;border:none;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;transition:color .15s;white-space:nowrap}
+.tbar-icon{font-size:1.3rem;line-height:1}
+.tbar-btn.on{color:var(--accent)}
+
+.app-body{flex:1;overflow-y:auto;padding:.6rem .6rem 0;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+.panel{display:none}
+.panel.on{display:block}
+
+/* CALENDAR */
+.cal-nav{display:flex;align-items:center;margin-bottom:.38rem}
+.cal-nav-btn{background:var(--surface2);border:none;border-radius:8px;color:var(--text2);padding:.45rem .75rem;font-size:1rem;cursor:pointer;font-family:inherit;line-height:1}
+.cal-title{font-size:1rem;font-weight:700;color:var(--text);flex:1;text-align:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.4rem}
+.cal-hdr{font-size:.58rem;text-align:center;color:var(--text3);padding:.18rem 0;font-weight:600}
+.cal-cell{height:calc((100vw - 1.2rem) / 7);max-height:44px;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.72rem;font-weight:500;color:var(--text2);position:relative}
+.cal-cell.empty,.cal-cell.past{opacity:.3;cursor:default}
+.cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
+.cal-cell.requested{background:var(--bbg);border-color:var(--bbd);color:var(--btx)}
+.cal-cell.approved{background:var(--gbg);border-color:var(--gbd);color:var(--gtx)}
+.cal-cell.rejected{background:var(--rbg);border-color:var(--rbd);color:var(--rtx);opacity:.6}
+.cal-cell.selected{background:var(--accent-f);border-color:var(--accent);color:var(--accent);font-weight:700}
+.cal-dot{width:4px;height:4px;border-radius:50%;background:currentColor;position:absolute;bottom:3px}
+.cal-legend{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.35rem}
+.leg{display:flex;align-items:center;gap:.25rem;font-size:.65rem;color:var(--text3)}
+.leg-dot{width:7px;height:7px;border-radius:50%}
+
+/* CARDS */
+.card{background:var(--surface);border-radius:var(--r);padding:1rem;margin-bottom:.75rem;box-shadow:var(--sh)}
+.card-title{font-size:.7rem;font-weight:700;color:var(--accent);letter-spacing:.08em;text-transform:uppercase;margin-bottom:.75rem}
+.fg{margin-bottom:.75rem}
+.fg:last-child{margin-bottom:0}
+.fg label{font-size:.78rem;color:var(--text3);font-weight:600;display:block;margin-bottom:.3rem}
+.fi2{width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:var(--rs);padding:.72rem .9rem;font-size:1rem;font-family:inherit;outline:none;-webkit-appearance:none;transition:border-color .2s}
+.fi2:focus{border-color:var(--accent);background:var(--surface)}
+.fi2 option{background:var(--surface)}
+
+/* BUTTONS */
+.btn{border:none;border-radius:var(--rs);padding:.7rem 1rem;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit;-webkit-appearance:none}
+.btn:active{opacity:.8}
+.btn-gold{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--accent-f);color:var(--accent);border:1.5px solid var(--accent)}
+.btn-green{background:var(--gbg);color:var(--gtx);border:1.5px solid var(--gbd)}
+.btn-red{background:var(--rbg);color:var(--rtx);border:1.5px solid var(--rbd)}
+.btn-purple{background:var(--pbg);color:var(--ptx);border:1.5px solid var(--pbd)}
+.btn-blue{background:var(--bbg);color:var(--btx);border:1.5px solid var(--bbd)}
+.btn-gray{background:var(--surface2);color:var(--text2);border:1.5px solid var(--border)}
+.btn-full{width:100%}
+.btn-sm2{padding:.42rem .75rem;font-size:.75rem}
+.btn-xs{padding:.3rem .55rem;font-size:.68rem}
+
+/* SECTION */
+.sec{font-size:.7rem;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin:.75rem 0 .5rem}
+
+/* LIST */
+.item{background:var(--surface);border-radius:var(--r);padding:.85rem 1rem;margin-bottom:.55rem;box-shadow:var(--sh);display:flex;align-items:flex-start;gap:.65rem}
+.ib{flex:1;min-width:0}
+.it{font-size:.92rem;font-weight:600;color:var(--text);margin-bottom:.15rem}
+.is{font-size:.76rem;color:var(--text3)}
+.ir{display:flex;flex-direction:column;align-items:flex-end;gap:.25rem;flex-shrink:0}
+.iv{font-size:.92rem;font-weight:700;color:var(--gtx)}
+.tags{display:flex;flex-wrap:wrap;gap:.25rem;margin-top:.25rem}
+.tag{font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid}
+.tg{background:var(--accent-f);color:var(--accent);border-color:var(--accent)}
+.tb{background:var(--gbg);color:var(--gtx);border-color:var(--gbd)}
+.tr2{background:var(--rbg);color:var(--rtx);border-color:var(--rbd)}
+.tn{background:var(--bbg);color:var(--btx);border-color:var(--bbd)}
+.tp{background:var(--pbg);color:var(--ptx);border-color:var(--pbd)}
+
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:.75rem}
+.kpi{background:var(--surface);border-radius:var(--r);padding:.75rem .5rem;text-align:center;box-shadow:var(--sh)}
+.kpi-l{font-size:.58rem;color:var(--text3);font-weight:600;margin-bottom:.15rem}
+.kpi-v{font-size:1rem;font-weight:700;color:var(--text)}
+
+/* SALARY */
+.sal-hero{background:linear-gradient(135deg,#fffbf4,var(--accent-f));border:1.5px solid var(--accent);border-radius:var(--r);padding:1.1rem;margin-bottom:.75rem}
+.sal-lbl{font-size:.7rem;font-weight:700;color:var(--accent);margin-bottom:.15rem}
+.sal-amt{font-size:1.9rem;font-weight:700;color:var(--text);line-height:1.2;margin-bottom:.5rem}
+.sal-row{display:flex;justify-content:space-between;font-size:.8rem;padding:.28rem 0;border-bottom:1px solid rgba(184,137,58,.15)}
+.sal-row:last-child{border-bottom:none}
+.sal-rl{color:var(--text3)}
+.sal-rv{font-weight:600;color:var(--text)}
+.sal-rv.neg{color:var(--rtx)}
+.sal-rv.total{color:var(--gtx);font-size:.95rem}
+
+/* TABLE */
+.tbl{background:var(--surface);border-radius:var(--r);overflow:hidden;margin-bottom:.75rem;box-shadow:var(--sh)}
+table{width:100%;border-collapse:collapse;font-size:.8rem}
+th{font-size:.62rem;color:var(--text3);font-weight:700;padding:.5rem .65rem;background:var(--surface2);border-bottom:1px solid var(--border);text-align:left}
+td{padding:.6rem .65rem;border-bottom:1px solid var(--border);color:var(--text)}
+tr:last-child td{border-bottom:none}
+
+/* ROOM */
+.room-grid{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.75rem}
+.room-card{background:var(--surface);border-radius:var(--r);padding:.85rem;border:1.5px solid var(--border);min-height:80px;box-shadow:var(--sh)}
+.room-card.on{background:var(--gbg);border-color:var(--gbd)}
+.room-lbl{font-size:.62rem;font-weight:700;color:var(--text3);margin-bottom:.3rem}
+.room-cast{font-size:.95rem;font-weight:700;color:var(--gtx)}
+.room-time{font-size:.65rem;color:var(--text3);margin-top:.1rem}
+.room-empty{font-size:.8rem;color:var(--text3)}
+
+/* OVERLAY */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:flex-end;justify-content:center}
+.overlay.on{display:flex}
+.sheet{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-height:90vh;overflow-y:auto;padding:1rem 1rem calc(1.5rem + env(safe-area-inset-bottom))}
+.sh-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:.2rem auto .8rem}
+.sh-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:1rem}
+.sh-close{float:right;background:var(--surface2);border:none;border-radius:50%;width:28px;height:28px;font-size:1rem;color:var(--text3);cursor:pointer;line-height:28px;text-align:center;margin-top:-.1rem}
+
+/* TOAST */
+.toast{position:fixed;top:1rem;left:50%;transform:translateX(-50%) translateY(-80px);background:rgba(28,28,30,.9);color:#fff;font-size:.84rem;font-weight:500;padding:.55rem 1.2rem;border-radius:99px;z-index:999;transition:transform .3s;white-space:nowrap;pointer-events:none}
+.toast.on{transform:translateX(-50%) translateY(0)}
+.spin{text-align:center;color:var(--text3);font-size:.82rem;padding:2rem 0}
+.empty{text-align:center;color:var(--text3);font-size:.82rem;padding:2.5rem 0}
+
+/* WORK ROW */
+.work-row{background:var(--surface2);border-radius:var(--rs);padding:.75rem;margin-bottom:.55rem}
+.work-grid{display:grid;grid-template-columns:1fr 56px;gap:.4rem;margin-bottom:.4rem}
+.work-grid2{display:grid;grid-template-columns:1fr auto;gap:.4rem;align-items:end}
+.work-del{background:var(--rbg);border:1.5px solid var(--rbd);color:var(--rtx);border-radius:6px;padding:.42rem .55rem;font-size:.8rem;cursor:pointer;line-height:1}
+
+/* OPTION ROW */
+.opt-row{display:grid;grid-template-columns:1fr 56px auto;gap:.4rem;align-items:end;margin-bottom:.4rem}
+
+/* CAST MGMT */
+.cast-row{padding:.8rem 0;border-bottom:1px solid var(--border)}
+.cast-row:last-child{border-bottom:none}
+.cast-nm{font-size:.92rem;font-weight:600;margin-bottom:.4rem}
+.cast-btns{display:flex;flex-wrap:wrap;gap:.35rem}
+
+/* FEE */
+.fee-sec{margin-bottom:1rem}
+.fee-sec-title{font-size:.8rem;font-weight:700;color:var(--text2);margin-bottom:.4rem;padding-bottom:.3rem;border-bottom:1px solid var(--border)}
+.fee-row{display:flex;align-items:center;padding:.45rem 0;border-bottom:1px solid var(--border)}
+.fee-row:last-child{border-bottom:none}
+.fee-lbl{flex:1;font-size:.86rem}
+.fee-sub{font-size:.68rem;color:var(--text3);margin-top:.05rem}
+.fee-input{width:90px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:var(--rs);padding:.4rem .55rem;font-size:.92rem;font-family:inherit;outline:none;text-align:right;-webkit-appearance:none}
+.fee-input:focus{border-color:var(--accent)}
+.fee-unit{font-size:.75rem;color:var(--text3);margin-left:.3rem;width:14px}
+
+/* 施術セット */
+.session-block{background:var(--surface2);border-radius:var(--r);padding:.85rem;margin-bottom:.65rem;border:1.5px solid var(--border)}
+.session-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
+.session-no{font-size:.78rem;font-weight:700;color:var(--accent)}
+.session-del{background:var(--rbg);border:1.5px solid var(--rbd);color:var(--rtx);border-radius:6px;padding:.28rem .55rem;font-size:.72rem;cursor:pointer}
+.session-label{font-size:.7rem;color:var(--text3);font-weight:600;margin-bottom:.25rem}
+</style>
+</head>
+<body>
+
+<!-- ===== LOGIN TOP ===== -->
+<div class="screen login-wrap on" id="s-top">
+  <div class="login-box">
+    <div class="login-logo">KYOUKANO</div>
+    <div class="login-sub">シフト・給与管理</div>
+    <div style="display:grid;gap:.75rem">
+      <button class="btn-login" style="background:var(--accent)" onclick="showLogin('owner')">🏠 店舗ログイン</button>
+      <button class="btn-login" style="background:#3a3a3c" onclick="showLogin('cast')">👤 セラピストログイン</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LOGIN OWNER ===== -->
+<div class="screen login-wrap" id="s-owner-login">
+  <div class="login-box">
+    <button class="back-btn" onclick="showLogin('top')">‹</button>
+    <div class="login-logo" style="font-size:1.5rem;margin-bottom:.1rem">店舗ログイン</div>
+    <div class="login-sub">KYOUKANO 管理者</div>
+    <label class="lbl">オーナーPIN（4桁）</label>
+    <input class="linput" type="password" id="owner-pin" maxlength="4" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doOwnerLogin()">
+    <button class="btn-login" style="background:var(--accent)" onclick="doOwnerLogin()" id="btn-owner">ログイン</button>
+    <div class="lerr" id="owner-err"></div>
+  </div>
+</div>
+
+<!-- ===== LOGIN CAST ===== -->
+<div class="screen login-wrap" id="s-cast-login">
+  <div class="login-box">
+    <button class="back-btn" onclick="showLogin('top')">‹</button>
+    <div class="login-logo" style="font-size:1.5rem;margin-bottom:.1rem">セラピストログイン</div>
+    <div class="login-sub">KYOUKANO</div>
+    <label class="lbl">名前</label>
+    <select class="linput" id="cast-sel"><option value="">読み込み中...</option></select>
+    <label class="lbl">PIN（4桁）</label>
+    <input class="linput" type="password" id="cast-pin" maxlength="4" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doCastLogin()">
+    <button class="btn-login" style="background:#3a3a3c" onclick="doCastLogin()" id="btn-cast">ログイン</button>
+    <div class="lerr" id="cast-err"></div>
+  </div>
+</div>
+
+<!-- ===== APP ===== -->
+<div class="screen" id="s-app">
+  <div class="app-hdr">
+    <div class="app-logo">KYOUKANO</div>
+    <div class="hdr-r">
+      <span class="badge" id="hdr-name">-</span>
+      <button class="btn-sm" onclick="doLogout()">ログアウト</button>
+    </div>
+  </div>
+  <div class="app-body">
+
+    <!-- キャスト：シフト申請 -->
+    <!-- カレンダーパネル -->
+    <div class="panel on" id="p-shift">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calMove(-1)">‹</button>
+        <div class="cal-title" id="cal-title">-</div>
+        <button class="cal-nav-btn" onclick="calMove(1)">›</button>
+      </div>
+      <div class="cal-legend">
+        <div class="leg"><div class="leg-dot" style="background:var(--blue)"></div>申請中</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--green)"></div>承認済</div>
+        <div class="leg"><div class="leg-dot" style="background:var(--red)"></div>却下</div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+    <!-- シフト一覧パネル -->
+    <div class="panel" id="p-shift-list">
+      <div style="font-size:1rem;font-weight:700;margin-bottom:.75rem" id="shift-list-month">-</div>
+      <div id="shift-list-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+    <!-- キャスト：給与確認 -->
+    <div class="panel" id="p-salary">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="salMove(-1)">‹</button>
+        <div class="cal-title" id="sal-title">-</div>
+        <button class="cal-nav-btn" onclick="salMove(1)">›</button>
+      </div>
+      <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.75rem;gap:3px">
+        <button id="sal-tab-total" onclick="salTab('total')" style="flex:1;padding:.45rem;font-size:.8rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">月トータル</button>
+        <button id="sal-tab-daily" onclick="salTab('daily')" style="flex:1;padding:.45rem;font-size:.8rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">日別明細</button>
+      </div>
+      <div id="sal-total-area"><div class="spin">読み込み中...</div></div>
+      <div id="sal-daily-area" style="display:none"></div>
+    </div>
+
+    <!-- 店舗：シフト管理 -->
+    <div class="panel" id="p-owner-shift">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="ownerCalMove(-1)">‹</button>
+        <div class="cal-title" id="owner-cal-title">-</div>
+        <button class="cal-nav-btn" onclick="ownerCalMove(1)">›</button>
+      </div>
+      <div id="owner-shift-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+    <!-- 店舗：本日状況 -->
+    <div class="panel" id="p-today">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div style="font-size:1rem;font-weight:700">本日の出勤状況</div>
+        <div style="font-size:.78rem;color:var(--text3)" id="today-lbl">-</div>
+      </div>
+      <div class="sec">ルーム</div>
+      <div class="room-grid" id="room-grid"></div>
+      <div class="sec">承認済みシフト</div>
+      <div id="today-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+    <!-- 店舗：給与精算 -->
+    <div class="panel" id="p-owner-salary">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="ownerSalMove(-1)">‹</button>
+        <div class="cal-title" id="owner-sal-title">-</div>
+        <button class="cal-nav-btn" onclick="ownerSalMove(1)">›</button>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-l">月間売上</div><div class="kpi-v" id="o-sales">-</div></div>
+        <div class="kpi"><div class="kpi-l">バック総額</div><div class="kpi-v" id="o-back">-</div></div>
+        <div class="kpi"><div class="kpi-l">施術件数</div><div class="kpi-v" id="o-count">-</div></div>
+      </div>
+      <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+    <!-- 店舗：キャスト管理 -->
+    <div class="panel" id="p-owner-cast">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div style="font-size:1rem;font-weight:700">キャスト管理</div>
+        <button class="btn btn-gold btn-sm2" onclick="openAddCast()">＋ 追加</button>
+      </div>
+      <div id="cast-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
+  </div>
+  <div class="tbar" id="tbar">
+    <!-- キャスト用 -->
+    <button class="tbar-btn on cast-tab" onclick="tab('shift')"><span class="tbar-icon">📅</span>シフト申請</button>
+    <button class="tbar-btn cast-tab" onclick="tab('shift-list')"><span class="tbar-icon">📋</span>シフト一覧</button>
+    <button class="tbar-btn cast-tab" onclick="tab('salary')"><span class="tbar-icon">💴</span>給与確認</button>
+    <!-- 店舗用 -->
+    <button class="tbar-btn owner-tab" onclick="tab('owner-shift')"><span class="tbar-icon">📋</span>シフト管理</button>
+    <button class="tbar-btn owner-tab" onclick="tab('today')"><span class="tbar-icon">🏠</span>本日</button>
+    <button class="tbar-btn owner-tab" onclick="tab('owner-salary')"><span class="tbar-icon">💰</span>給与精算</button>
+    <button class="tbar-btn owner-tab" onclick="tab('owner-cast')"><span class="tbar-icon">👥</span>キャスト</button>
+  </div>
+</div>
+
+<!-- ===== 施術入力シート ===== -->
+<div class="overlay" id="work-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('work')">✕</button>
+    <div class="sh-title" id="work-title">給与入力</div>
+    <div style="font-size:.8rem;color:var(--text3);margin-bottom:.75rem" id="work-info"></div>
+    <div id="session-list"></div>
+    <button class="btn btn-ghost btn-full" style="margin-bottom:.75rem" onclick="addSession()">＋ 施術を追加</button>
+    <div class="fg"><label>雑費（円）</label>
+      <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="calcTotal2()" placeholder="0">
+    </div>
+    <div class="sal-hero" style="margin-bottom:.75rem">
+      <div class="sal-lbl">本日の手取り</div>
+      <div class="sal-amt" id="w-total">¥0</div>
+      <div id="w-breakdown"></div>
+    </div>
+    <button class="btn btn-gold btn-full" onclick="saveWork()" id="btn-save-work">保存する</button>
+  </div>
+</div>
+
+<!-- ===== ルーム指定シート ===== -->
+<div class="overlay" id="room-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('room')">✕</button>
+    <div class="sh-title" id="room-title">ルームを指定</div>
+    <div style="font-size:.82rem;color:var(--text3);margin-bottom:1rem" id="room-info"></div>
+    <div class="fg"><label>ルーム</label>
+      <select class="fi2" id="room-sel">
+        <option value="">未指定</option>
+        <option value="堀田Aルーム">堀田Aルーム</option>
+        <option value="堀田Bルーム">堀田Bルーム</option>
+        <option value="堀田Cルーム">堀田Cルーム</option>
+        <option value="金山ルーム">金山ルーム</option>
+      </select>
+    </div>
+    <button class="btn btn-gold btn-full" onclick="saveRoom()" id="btn-save-room">保存する</button>
+  </div>
+</div>
+
+<!-- ===== キャスト追加シート ===== -->
+<div class="overlay" id="cast-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('cast')">✕</button>
+    <div class="sh-title">キャストを追加</div>
+    <div class="fg"><label>名前</label><input type="text" class="fi2" id="new-name" placeholder="例：さくら"></div>
+    <div class="fg"><label>PIN（4桁）</label><input type="password" class="fi2" id="new-pin" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+    <div style="font-size:.76rem;color:var(--text3);background:var(--surface2);border-radius:var(--rs);padding:.65rem .85rem;margin-bottom:.75rem;line-height:1.6">バック設定は追加後に「バック設定」から変更できます</div>
+    <button class="btn btn-gold btn-full" onclick="addCast()">追加する</button>
+    <div class="lerr" id="cast-add-err"></div>
+  </div>
+</div>
+
+<!-- ===== バック設定シート ===== -->
+<div class="overlay" id="fee-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('fee')">✕</button>
+    <div class="sh-title" id="fee-title">バック設定</div>
+    <div style="font-size:.76rem;color:var(--text3);margin-bottom:.75rem">各項目のバック金額（円）を設定</div>
+    <div class="fee-sec">
+      <div class="fee-sec-title">🎯 コースバック</div>
+      <div class="fee-row"><div><div class="fee-lbl">50分コース</div><div class="fee-sub">¥13,000</div></div><input type="number" class="fee-input" id="f-b50" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">80分コース</div><div class="fee-sub">¥16,000</div></div><input type="number" class="fee-input" id="f-b80" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">100分コース</div><div class="fee-sub">¥18,000</div></div><input type="number" class="fee-input" id="f-b100" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">130分コース</div><div class="fee-sub">¥22,000</div></div><input type="number" class="fee-input" id="f-b130" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div><div class="fee-lbl">延長30分</div><div class="fee-sub">¥6,000</div></div><input type="number" class="fee-input" id="f-bext" min="0" step="100"><span class="fee-unit">円</span></div>
+    </div>
+    <div class="fee-sec">
+      <div class="fee-sec-title">⭐ 指名・オプションバック</div>
+      <div class="fee-row"><div class="fee-lbl">指名バック</div><input type="number" class="fee-input" id="f-shimei" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">極液バック</div><input type="number" class="fee-input" id="f-op1" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">衣装チェンジバック</div><input type="number" class="fee-input" id="f-op2" min="0" step="100"><span class="fee-unit">円</span></div>
+    </div>
+    <button class="btn btn-gold btn-full" onclick="saveFee()" id="btn-save-fee">保存する</button>
+  </div>
+</div>
+
+<!-- ===== シフト訂正シート（店舗用） ===== -->
+<div class="overlay" id="shift-edit-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('shift-edit')">✕</button>
+    <div class="sh-title" id="shift-edit-title">シフトを訂正</div>
+    <div class="fg"><label>開始時間</label><select class="fi2" id="se-start"></select></div>
+    <div class="fg"><label>終了時間</label><select class="fi2" id="se-end"></select></div>
+    <div class="fg"><label>メモ</label><input type="text" class="fi2" id="se-note" placeholder="任意"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-top:.5rem">
+      <button class="btn btn-gold" onclick="saveShiftEdit()">保存する</button>
+      <button class="btn btn-red" onclick="deleteShift()">削除する</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- シフト申請シート -->
+<div class="overlay" id="shift-req-overlay">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <button class="sh-close" onclick="closeSheet('shift-req')">✕</button>
+    <div class="sh-title" id="shift-req-title">出勤希望を申請</div>
+    <div id="shift-req-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+const SUPABASE_URL = 'https://qgcgkrcrfzonmmygcdju.supabase.co'
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE'
+const OWNER_PIN = '2580'
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+const ROOMS = ['堀田Aルーム','堀田Bルーム','堀田Cルーム','金山ルーム']
+const ROOM_COLORS = {
+  '堀田Aルーム': {bg:'#fff0f6',tx:'#be185d',bd:'#fbcfe8',card:'#fce7f3'},
+  '堀田Bルーム': {bg:'#eff6ff',tx:'#1d4ed8',bd:'#bfdbfe',card:'#dbeafe'},
+  '堀田Cルーム': {bg:'#f0fdf4',tx:'#15803d',bd:'#bbf7d0',card:'#dcfce7'},
+  '金山ルーム':  {bg:'#fefce8',tx:'#854d0e',bd:'#fef08a',card:'#fef9c3'},
+}
+function getRoomColor(room){return ROOM_COLORS[room]||{bg:'var(--pbg)',tx:'var(--ptx)',bd:'var(--pbd)',card:'var(--pbg)'}}
+const DEFAULT_FEE = {back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500}
+
+// 営業時間プルダウン用（11:00〜翌2:00）
+function buildTimeOptions(selectedVal=''){
+  const times=[]
+  // 11:00〜23:30
+  for(let h=11;h<=23;h++) for(let m=0;m<60;m+=30) times.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`)
+  // 00:00〜02:00
+  for(let h=0;h<=2;h++) for(let m=0;m<60;m+=30){
+    if(h===2&&m>0) break
+    times.push(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`)
+  }
+  return times.map(t=>`<option value="${t}" ${t===selectedVal?'selected':''}>${t}</option>`).join('')
+}
+
+let me=null, courses=[], opts=[]
+let calMonth=ym(new Date()), salMonth=ym(new Date())
+let ownerCalMonth=ym(new Date()), ownerSalMonth=ym(new Date())
+let selectedDate=null, myShifts=[]
+let sheetCastId=null, sheetCastName='', sheetDate='', sheetFee={...DEFAULT_FEE}, sheetDiscs=[]
+let roomShiftId=null, feeCastId=null, discCastId=null, editShiftId=null
+
+function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function fmt(n){return '¥'+Math.round(n||0).toLocaleString()}
+function addMonth(y,d){const[yr,m]=y.split('-').map(Number);const nd=new Date(yr,m-1+d,1);return nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')}
+function nextYM(y){return addMonth(y,1)}
+function jpDate(s){const[y,m,d]=s.split('-');return parseInt(m)+'月'+parseInt(d)+'日'}
+function today(){return new Date().toISOString().slice(0,10)}
+function toast(msg,dur=1800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),dur)}
+function closeSheet(id){document.getElementById(id+'-overlay').classList.remove('on')}
+
+// ── ログイン ──
+function showLogin(type){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
+  if(type==='top') document.getElementById('s-top').classList.add('on')
+  else if(type==='owner') document.getElementById('s-owner-login').classList.add('on')
+  else if(type==='cast') document.getElementById('s-cast-login').classList.add('on')
+}
+
+async function init(){
+  const{data:casts}=await sb.from('casts').select('id,name').eq('active',true).order('sort_order',{ascending:true})
+  const html='<option value="">選んでください</option>'+(casts||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
+  document.getElementById('cast-sel').innerHTML=html
+  const{data:cs}=await sb.from('courses').select('*').order('price')
+  const{data:op}=await sb.from('options').select('*').order('id')
+  courses=cs||[]; opts=op||[]
+}
+
+async function doOwnerLogin(){
+  const pin=document.getElementById('owner-pin').value
+  const err=document.getElementById('owner-err')
+  err.textContent=''
+  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
+  if(pin!==OWNER_PIN){err.textContent='PINが正しくありません';return}
+  const btn=document.getElementById('btn-owner')
+  btn.disabled=true; btn.textContent='確認中...'
+  btn.disabled=false; btn.textContent='ログイン'
+  me={id:0,name:'店舗',is_owner:true}; startApp()
+}
+
+async function doCastLogin(){
+  const cid=document.getElementById('cast-sel').value
+  const pin=document.getElementById('cast-pin').value
+  const err=document.getElementById('cast-err')
+  err.textContent=''
+  if(!cid){err.textContent='名前を選んでください';return}
+  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
+  const btn=document.getElementById('btn-cast')
+  btn.disabled=true; btn.textContent='確認中...'
+  const{data:c,error}=await sb.from('casts').select('*').eq('id',cid).eq('pin',pin).single()
+  btn.disabled=false; btn.textContent='ログイン'
+  if(error||!c){err.textContent='PINが正しくありません';return}
+  me={...c,is_owner:false}; startApp()
+}
+
+function startApp(){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
+  document.getElementById('s-app').classList.add('on')
+  document.getElementById('hdr-name').textContent=me.is_owner?'店舗 👑':me.name
+  // タブ表示切り替え
+  document.querySelectorAll('.cast-tab').forEach(b=>b.style.display=me.is_owner?'none':'flex')
+  document.querySelectorAll('.owner-tab').forEach(b=>b.style.display=me.is_owner?'flex':'none')
+  document.querySelectorAll('.tbar-btn').forEach(b=>b.classList.remove('on'))
+  if(me.is_owner){
+    document.querySelector('.owner-tab').classList.add('on')
+    tab('owner-shift')
+  } else {
+    document.querySelector('.cast-tab').classList.add('on')
+    tab('shift')
+  }
+}
+
+function doLogout(){
+  me=null; myShifts=[]
+  document.getElementById('owner-pin').value=''
+  document.getElementById('cast-pin').value=''
+  document.getElementById('owner-err').textContent=''
+  document.getElementById('cast-err').textContent=''
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
+  document.getElementById('s-top').classList.add('on')
+}
+
+let salTabMode='total'
+function salTab(mode){
+  salTabMode=mode
+  const on='flex:1;padding:.45rem;font-size:.8rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
+  const off='flex:1;padding:.45rem;font-size:.8rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
+  document.getElementById('sal-tab-total').style.cssText=mode==='total'?on:off
+  document.getElementById('sal-tab-daily').style.cssText=mode==='daily'?on:off
+  document.getElementById('sal-total-area').style.display=mode==='total'?'block':'none'
+  document.getElementById('sal-daily-area').style.display=mode==='daily'?'block':'none'
+}
+function tab(name){
+  document.querySelectorAll('.tbar-btn').forEach(b=>b.classList.remove('on'))
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'))
+  const map={'shift':'.cast-tab:nth-child(1)','salary':'.cast-tab:nth-child(2)','owner-shift':'.owner-tab:nth-child(1)','today':'.owner-tab:nth-child(2)','owner-salary':'.owner-tab:nth-child(3)','owner-cast':'.owner-tab:nth-child(4)'}
+  document.querySelector(map[name])?.classList.add('on')
+  document.getElementById('p-'+name)?.classList.add('on')
+  if(name==='shift')        loadCal()
+  if(name==='salary')       loadMySalary()
+  if(name==='owner-shift')  loadOwnerCal()
+  if(name==='today')        loadToday()
+  if(name==='owner-salary') loadOwnerSalary()
+  if(name==='owner-cast')   loadCastMgmt()
+}
+
+// ── キャスト：シフト申請 ──
+function calMove(d){calMonth=addMonth(calMonth,d);loadCal()}
+async function loadCal(){
+  const[y,m]=calMonth.split('-').map(Number)
+  document.getElementById('cal-title').textContent=y+'年'+m+'月'
+  const{data:shifts}=await sb.from('shifts').select('*').eq('cast_id',me.id).gte('date',calMonth+'-01').lt('date',nextYM(calMonth)+'-01')
+  myShifts=shifts||[]; renderCal()
+}
+function renderCal(){
+  const[y,m]=calMonth.split('-').map(Number)
+  const first=new Date(y,m-1,1).getDay()
+  const last=new Date(y,m,0).getDate()
+  const td=today()
+  const sm={}; myShifts.forEach(s=>sm[s.date]=s)
+  const days=['日','月','火','水','木','金','土']
+  let html=days.map((d,i)=>`<div class="cal-hdr" style="${i===0?'color:var(--rtx)':i===6?'color:var(--btx)':''}">${d}</div>`).join('')
+  for(let i=0;i<first;i++) html+=`<div class="cal-cell empty"></div>`
+  for(let d=1;d<=last;d++){
+    const ds=calMonth+'-'+String(d).padStart(2,'0')
+    const s=sm[ds]; const isPast=ds<td
+    let cls='cal-cell'+(isPast?' past':' ')
+    if(!isPast){
+      if(s) cls+=(s.status==='requested'?' requested':s.status==='approved'?' approved':' rejected')
+      if(ds===selectedDate) cls+=' selected'
+      else if(ds===td) cls+=' today'
+    }
+    html+=`<div class="${cls}" onclick="${isPast?'':'selectDay(\''+ds+'\')'}">${d}${s?'<div class="cal-dot"></div>':''}</div>`
+  }
+  document.getElementById('cal-grid').innerHTML=html
+  renderShiftStatus()
+}
+
+function selectDay(ds){
+  selectedDate=ds
+  const s=myShifts.find(x=>x.date===ds)
+  const[y,m,d]=ds.split('-')
+  const dn=['日','月','火','水','木','金','土'][new Date(ds).getDay()]
+  const dateStr=parseInt(m)+'月'+parseInt(d)+'日（'+dn+'）'
+
+  if(s && s.status!=='rejected'){
+    // 申請済み：情報を表示のみ
+    const roomTag=s.room?`<span class="tag tp">${s.room}</span>`:''
+    const stTag=s.status==='approved'?'<span class="tag tb">承認済</span>':'<span class="tag tn">申請中</span>'
+    document.getElementById('shift-form-area').innerHTML=`
+      <div class="card">
+        <div class="card-title">${dateStr}</div>
+        <div style="font-size:.92rem;font-weight:600;margin-bottom:.3rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</div>
+        ${s.note?`<div style="font-size:.78rem;color:var(--text3);margin-bottom:.4rem">${s.note}</div>`:''}
+        <div class="tags">${stTag}${roomTag}</div>
+        <div style="margin-top:.75rem">
+          <button class="btn btn-gray btn-sm2" onclick="cancelSelectedDay()">閉じる</button>
+        </div>
+      </div>`
+  } else {
+    // 未申請 or 却下：申請フォームを表示
+    document.getElementById('shift-form-area').innerHTML=`
+      <div class="card">
+        <div class="card-title">出勤希望を申請</div>
+        <div style="font-size:.92rem;font-weight:600;margin-bottom:.75rem">${dateStr}</div>
+        <div class="fg"><label>出勤開始時間</label>
+          <select class="fi2" id="f-start">${buildTimeOptions('13:00')}</select>
+        </div>
+        <div class="fg"><label>退勤時間</label>
+          <select class="fi2" id="f-end">${buildTimeOptions('22:00')}</select>
+        </div>
+        <div class="fg"><label>メモ（任意）</label>
+          <input type="text" class="fi2" id="f-note" placeholder="例：早上がり希望">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+          <button class="btn btn-gold" onclick="submitShift()">申請する</button>
+          <button class="btn btn-ghost" onclick="cancelSelectedDay()">キャンセル</button>
+        </div>
+      </div>`
+  }
+  renderCal()
+}
+
+function cancelSelectedDay(){
+  selectedDate=null
+  document.getElementById('shift-form-area').innerHTML=''
+  renderCal()
+}
+
+async function submitShift(){
+  if(!selectedDate) return
+  const start=document.getElementById('f-start').value
+  const end=document.getElementById('f-end').value
+  const note=document.getElementById('f-note')?.value||''
+  const existing=myShifts.find(s=>s.date===selectedDate)
+  const payload={cast_id:me.id,date:selectedDate,start_time:start,end_time:end,note,status:'requested'}
+  let err
+  if(existing){const r=await sb.from('shifts').update(payload).eq('id',existing.id);err=r.error}
+  else{const r=await sb.from('shifts').insert(payload);err=r.error}
+  if(err){toast('エラーが発生しました');return}
+  toast('申請しました！')
+  document.getElementById('shift-form-area').innerHTML=''
+  selectedDate=null; loadCal()
+}
+
+function renderShiftStatus(){}
+async function loadShiftList(){
+  if(!me||me.is_owner) return
+  const[y,m]=calMonth.split('-').map(Number)
+  const lbl=document.getElementById('shift-list-month')
+  if(lbl) lbl.textContent=y+'年'+m+'月のシフト'
+  // 常に最新データを取得
+  const{data:shifts}=await sb.from('shifts').select('*').eq('cast_id',me.id).gte('date',calMonth+'-01').lt('date',nextYM(calMonth)+'-01')
+  myShifts=shifts||[]
+  const list=[...myShifts.filter(s=>s.status==='approved'),...myShifts.filter(s=>s.status==='requested')].sort((a,b)=>a.date.localeCompare(b.date))
+  const area=document.getElementById('shift-list-area')
+  if(!list.length){area.innerHTML='<div class="empty">この月のシフトはありません</div>';return}
+  let html=''
+  list.forEach(s=>{
+    const rc=getRoomColor(s.room)
+    const roomTag=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc.bg};color:${rc.tx};border-color:${rc.bd}">${s.room}</span>`:''
+    html+=`<div class="item">
+      <div class="ib">
+        <div class="it">${jpDate(s.date)}</div>
+        <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
+        <div class="tags">${roomTag}</div>
+      </div>
+      <div class="ir"><span class="tag ${s.status==='approved'?'tb':'tn'}">${s.status==='approved'?'承認済':'申請中'}</span></div>
+    </div>`
+  })
+  area.innerHTML=html
+}
+
+// ── キャスト：給与確認 ──
+function salMove(d){salMonth=addMonth(salMonth,d);loadMySalary()}
+async function loadMySalary(){
+  const[y,m]=salMonth.split('-').map(Number)
+  document.getElementById('sal-title').textContent=y+'年'+m+'月'
+  const{data:works}=await sb.from('works').select('*').eq('cast_id',me.id).gte('date',salMonth+'-01').lt('date',nextYM(salMonth)+'-01').order('date')
+  const totalArea=document.getElementById('sal-total-area')
+  const dailyArea=document.getElementById('sal-daily-area')
+  if(!works||!works.length){
+    if(totalArea) totalArea.innerHTML='<div class="empty">この月の記録はまだありません</div>'
+    if(dailyArea) dailyArea.innerHTML=''
+    return
+  }
+  const totalBack=works.reduce((s,w)=>s+(w.back||0),0)
+  const totalMisc=works.reduce((s,w)=>s+(w.misc||0),0)
+  const totalNet=works.reduce((s,w)=>s+(w.net||w.back||0),0)
+  const totalSales=works.reduce((s,w)=>s+(w.sales||0),0)
+  const count=works.reduce((s,w)=>s+(w.count||0),0)
+  const shopDrop=totalSales-totalNet
+  if(totalArea) totalArea.innerHTML=`<div class="sal-hero">
+    <div class="sal-lbl">${me.name} — ${parseInt(m)}月の給与</div>
+    <div class="sal-amt">${fmt(totalNet)}</div>
+    <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(totalSales)}</span></div>
+    <div class="sal-row"><span class="sal-rl">バック（給与）</span><span class="sal-rv">${fmt(totalBack)}</span></div>
+    <div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(totalMisc)}</span></div>
+    <div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(totalNet)}</span></div>
+    <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>
+    <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${count}件</span></div>
+  </div>`
+  let dailyHtml=''
+  works.forEach(w=>{
+    const sessions=w.sessions||[]
+    let sessionLines=''
+    sessions.forEach((s,i)=>{
+      const parts=[]
+      if(s.course_name) parts.push(s.course_name)
+      if(s.shimei_type) parts.push(s.shimei_type)
+      if(s.options&&s.options.length) s.options.forEach(o=>parts.push(o.name))
+      if(s.discounts&&s.discounts.length) s.discounts.forEach(d=>parts.push('割引:'+d.name))
+      sessionLines+=`<div style="font-size:.78rem;padding:.15rem 0;border-bottom:1px solid var(--border)">${i+1}本目：${parts.join('：')}</div>`
+    })
+    if(!sessions.length){
+      const d=(w.details||[]).map(x=>`<div style="font-size:.78rem;padding:.15rem 0;border-bottom:1px solid var(--border)">${x.name}${x.count>1?'×'+x.count:''}</div>`).join('')
+      sessionLines=d
+    }
+    dailyHtml+=`<div class="card" style="margin-bottom:.55rem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.4rem">
+        <div style="font-size:.95rem;font-weight:700">${jpDate(w.date)}</div>
+        <div style="text-align:right">
+          <div style="font-size:1.3rem;font-weight:700;color:var(--gtx)">${fmt(w.net||w.back)}</div>
+          <div style="font-size:.65rem;color:var(--text3)">${w.count}本</div>
+        </div>
+      </div>
+      <div>${sessionLines}</div>
+      ${w.misc?`<div style="font-size:.72rem;color:var(--rtx);margin-top:.3rem;text-align:right">雑費 -${fmt(w.misc)}</div>`:''}
+    </div>`
+  })
+  if(dailyArea) dailyArea.innerHTML=dailyHtml
+}
+
+// ── 店舗：シフト管理 ──
+function ownerCalMove(d){ownerCalMonth=addMonth(ownerCalMonth,d);loadOwnerCal()}
+async function loadOwnerCal(){
+  const[y,m]=ownerCalMonth.split('-').map(Number)
+  document.getElementById('owner-cal-title').textContent=y+'年'+m+'月'
+  const{data:pending}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date,cast_id')
+  const{data:approved}=await sb.from('shifts').select('*, casts(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date,cast_id')
+  const area=document.getElementById('owner-shift-area')
+  let html=''
+  if(pending&&pending.length){
+    html+=`<div class="sec">承認待ち（${pending.length}件）</div>`
+    pending.forEach(s=>{
+      html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.55rem">
+        <div class="ib">
+          <div class="it">${jpDate(s.date)} — ${s.casts?.name||'?'}</div>
+          <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
+          <button class="btn btn-green btn-xs" onclick="approveShift(${s.id})">✓ 承認</button>
+          <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id})">✕ 却下</button>
+          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${s.date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
+        </div>
+      </div>`
+    })
+  } else html+=`<div class="empty">承認待ちのシフトはありません</div>`
+
+  if(approved&&approved.length){
+    html+=`<div class="sec" style="margin-top:.5rem">承認済みシフト</div>`
+    const bd={}; approved.forEach(s=>{if(!bd[s.date])bd[s.date]=[];bd[s.date].push(s)})
+    Object.entries(bd).sort().forEach(([date,ss])=>{
+      html+=`<div class="card" style="margin-bottom:.6rem"><div style="font-size:.88rem;font-weight:700;margin-bottom:.5rem">${jpDate(date)}</div>`
+      ss.forEach(s=>{
+        const rc3=getRoomColor(s.room)
+        const rt=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc3.bg};color:${rc3.tx};border-color:${rc3.bd}">${s.room}</span>`:''
+        html+=`<div style="padding:.45rem 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.35rem">
+            <div>
+              <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
+              <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
+              <div class="tags" style="margin-top:.2rem">${rt}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.35rem">
+            <button class="btn btn-purple btn-xs" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム</button>
+            <button class="btn btn-gold btn-xs" onclick="openWorkSheet(${s.id},'${s.casts?.name||'?'}','${date}',${s.cast_id})">給与入力</button>
+            <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
+          </div>
+        </div>`
+      })
+      html+=`</div>`
+    })
+  }
+  area.innerHTML=html
+}
+
+async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
+async function rejectShift(id){if(!confirm('却下しますか？'))return;await sb.from('shifts').update({status:'rejected'}).eq('id',id);toast('却下しました');loadOwnerCal()}
+
+function openShiftEdit(id,name,date,start,end,note){
+  editShiftId=id
+  document.getElementById('shift-edit-title').textContent=name+' のシフトを訂正'
+  document.getElementById('se-start').innerHTML=buildTimeOptions(start)
+  document.getElementById('se-end').innerHTML=buildTimeOptions(end)
+  document.getElementById('se-note').value=note
+  document.getElementById('shift-edit-overlay').classList.add('on')
+}
+async function saveShiftEdit(){
+  const start=document.getElementById('se-start').value
+  const end=document.getElementById('se-end').value
+  const note=document.getElementById('se-note').value
+  const{error}=await sb.from('shifts').update({start_time:start,end_time:end,note}).eq('id',editShiftId)
+  if(error){toast('エラーが発生しました');return}
+  toast('シフトを訂正しました');closeSheet('shift-edit');loadOwnerCal()
+}
+async function deleteShift(){
+  if(!confirm('このシフトを削除しますか？'))return
+  await sb.from('shifts').delete().eq('id',editShiftId)
+  toast('削除しました');closeSheet('shift-edit');loadOwnerCal()
+}
+
+// ── 店舗：本日状況 ──
+async function loadToday(){
+  const td=today();const[y,m,d]=td.split('-')
+  document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'
+  const{data:shifts}=await sb.from('shifts').select('*, casts(name)').eq('date',td).eq('status','approved').order('start_time')
+  // ルームに複数人を対応
+  const rm={}
+  ;(shifts||[]).forEach(s=>{
+    if(s.room){if(!rm[s.room])rm[s.room]=[];rm[s.room].push(s)}
+  })
+  let rh=''
+  ROOMS.forEach(r=>{
+    const ss=rm[r]
+    const rc=getRoomColor(r)
+    if(ss&&ss.length){
+      const names=ss.map(s=>`<div style="font-size:${ss.length>1?'.8rem':'.9rem'};font-weight:700;color:${rc.tx}">${s.casts?.name||'?'}<span style="font-size:.6rem;font-weight:400;margin-left:.3rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span></div>`).join('')
+      rh+=`<div class="room-card" style="background:${rc.card};border-color:${rc.bd}"><div class="room-lbl" style="color:${rc.tx}">${r}</div>${names}</div>`
+    } else {
+      rh+=`<div class="room-card"><div class="room-lbl">${r}</div><div class="room-empty">空き</div></div>`
+    }
+  })
+  document.getElementById('room-grid').innerHTML=rh
+  const area=document.getElementById('today-area')
+  if(!shifts||!shifts.length){area.innerHTML='<div class="empty">本日の承認済みシフトはありません</div>';return}
+  let html=''
+  shifts.forEach(s=>{
+    const rc2=getRoomColor(s.room)
+    const rt=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc2.bg};color:${rc2.tx};border-color:${rc2.bd}">${s.room}</span>`:`<span class="tag tr2">ルーム未指定</span>`
+    html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.55rem">
+      <div class="ib">
+        <div class="it">${s.casts?.name||'?'}</div>
+        <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
+        <div class="tags">${rt}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <button class="btn btn-purple btn-sm2" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム指定</button>
+        <button class="btn btn-gold btn-sm2" onclick="openWorkSheet(${s.id},'${s.casts?.name||'?'}','${td}',${s.cast_id})">給与入力</button>
+      </div>
+    </div>`
+  })
+  area.innerHTML=html
+}
+
+function openRoom(shiftId,castName,timeStr,currentRoom){
+  roomShiftId=shiftId
+  document.getElementById('room-title').textContent=castName+' のルーム'
+  document.getElementById('room-info').textContent=timeStr
+  document.getElementById('room-sel').value=currentRoom||''
+  document.getElementById('room-overlay').classList.add('on')
+}
+async function saveRoom(){
+  const btn=document.getElementById('btn-save-room')
+  btn.disabled=true;btn.textContent='保存中...'
+  const{error}=await sb.from('shifts').update({room:document.getElementById('room-sel').value}).eq('id',roomShiftId)
+  btn.disabled=false;btn.textContent='保存する'
+  if(error){toast('エラーが発生しました');return}
+  toast('ルームを指定しました！');closeSheet('room');loadToday();loadOwnerCal()
+}
+
+// ── 給与入力（セット方式） ──
+async function openWorkSheet(shiftId,castName,date,castId){
+  sheetCastId=castId;sheetCastName=castName;sheetDate=date
+  document.getElementById('work-title').textContent=castName+' の給与入力'
+  document.getElementById('work-info').textContent=jpDate(date)
+  const{data:fee}=await sb.from('cast_fees').select('*').eq('cast_id',castId).single()
+  sheetFee=fee?{...DEFAULT_FEE,...fee}:{...DEFAULT_FEE}
+  const{data:discs}=await sb.from('cast_discounts').select('*').eq('cast_id',castId).order('sort_order')
+  sheetDiscs=discs||[]
+  const{data:w}=await sb.from('works').select('*').eq('cast_id',castId).eq('date',date).single()
+  document.getElementById('session-list').innerHTML=''
+  document.getElementById('w-misc').value='0'
+  if(w&&w.sessions&&w.sessions.length){
+    if(w.misc) document.getElementById('w-misc').value=w.misc
+    w.sessions.forEach(s=>addSession(s))
+  } else {
+    addSession()
+  }
+  calcTotal2()
+  document.getElementById('work-overlay').classList.add('on')
+}
+function closeSheet(id){document.getElementById(id+'-overlay').classList.remove('on')}
+
+function addSession(data=null){
+  const currentNo=document.querySelectorAll('.session-block').length+1
+  const idx=Date.now()+Math.random()
+  const div=document.createElement('div')
+  div.className='session-block'
+  div.id='session-'+idx
+  const courseOpts=courses.map(c=>`<option value="${c.id}" ${data?.course_id===c.id?'selected':''}>${c.name}</option>`).join('')
+  const shimeiTypes=['フリー','ネット指名','本指名']
+  const shimeiOpts=shimeiTypes.map(t=>`<option value="${t}" ${data?.shimei_type===t?'selected':''}>${t}</option>`).join('')
+  const fixedOpts=[{id:'gokueki',name:'極液'},{id:'isho1',name:'衣装チェンジ①'},{id:'isho2',name:'衣装チェンジ②'}]
+  const opItems=fixedOpts.map(o=>{
+    const checked=data?.options?.some(x=>x.name===o.name)?'checked':''
+    return `<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0"><input type="checkbox" class="op-check" data-name="${o.name}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--accent)"> ${o.name}</label>`
+  }).join('')
+  const discItems=sheetDiscs.length?sheetDiscs.map(d=>{
+    const checked=data?.discounts?.some(x=>x.id===d.id)?'checked':''
+    return `<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0"><input type="checkbox" class="disc-check" data-id="${d.id}" data-name="${d.name}" data-amount="${d.amount}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--red)"> ${d.name}（-${fmt(d.amount)}）</label>`
+  }).join(''):'<div style="font-size:.76rem;color:var(--text3)">割引設定なし</div>'
+
+  div.innerHTML=`
+    <div class="session-hdr">
+      <span class="session-no">${currentNo}本目</span>
+      <button class="session-del" onclick="removeSession(this)">削除</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-bottom:.5rem">
+      <div><div class="session-label">コース</div><select class="fi2 s-course" onchange="calcTotal2()">${courseOpts}</select></div>
+      <div><div class="session-label">指名</div><select class="fi2 s-shimei" onchange="calcTotal2()">${shimeiOpts}</select></div>
+    </div>
+    <div style="margin-bottom:.4rem"><div class="session-label">オプション</div>${opItems}</div>
+    <div><div class="session-label">割引</div>${discItems}</div>`
+  document.getElementById('session-list').appendChild(div)
+  calcTotal2()
+}
+function removeSession(btn){
+  btn.closest('.session-block').remove()
+  document.querySelectorAll('.session-block').forEach((b,i)=>{
+    const no=b.querySelector('.session-no');if(no) no.textContent=(i+1)+'本目'
+  })
+  calcTotal2()
+}
+
+function getShimeiBack(type){
+  if(type==='フリー') return sheetFee.shimei_free||DEFAULT_FEE.shimei_free
+  if(type==='ネット指名') return sheetFee.shimei_net||DEFAULT_FEE.shimei_net
+  if(type==='本指名') return sheetFee.shimei_hon||DEFAULT_FEE.shimei_hon
+  return 0
+}
+function getCourseBack(courseId){
+  const c=courses.find(x=>x.id===courseId);if(!c) return 0
+  if(c.name.includes('50分')) return sheetFee.back_50||DEFAULT_FEE.back_50
+  if(c.name.includes('80分')) return sheetFee.back_80||DEFAULT_FEE.back_80
+  if(c.name.includes('100分')) return sheetFee.back_100||DEFAULT_FEE.back_100
+  if(c.name.includes('130分')) return sheetFee.back_130||DEFAULT_FEE.back_130
+  if(c.name.includes('延長')) return sheetFee.back_ext30||DEFAULT_FEE.back_ext30
+  return 0
+}
+function getOptBack2(name){
+  if(name==='極液') return sheetFee.op_gokueki||DEFAULT_FEE.op_gokueki
+  if(name==='衣装チェンジ①') return sheetFee.op_isho||DEFAULT_FEE.op_isho
+  if(name==='衣装チェンジ②') return sheetFee.op_isho2||DEFAULT_FEE.op_isho2
+  return 0
+}
+
+function calcTotal2(){
+  let totalBack=0,totalDisc=0
+  document.querySelectorAll('.session-block').forEach(block=>{
+    const cid=parseInt(block.querySelector('.s-course').value)
+    const stype=block.querySelector('.s-shimei').value
+    totalBack+=getCourseBack(cid)+getShimeiBack(stype)
+    block.querySelectorAll('.op-check:checked').forEach(cb=>totalBack+=getOptBack2(cb.dataset.name))
+    block.querySelectorAll('.disc-check:checked').forEach(cb=>totalDisc+=parseInt(cb.dataset.amount)||0)
+  })
+  const misc=parseInt(document.getElementById('w-misc').value)||0
+  const net=totalBack-totalDisc-misc
+  document.getElementById('w-total').textContent=fmt(net)
+  let bd=''
+  if(totalBack>0) bd+=`<div class="sal-row"><span class="sal-rl">バック合計</span><span class="sal-rv">${fmt(totalBack)}</span></div>`
+  if(totalDisc>0) bd+=`<div class="sal-row"><span class="sal-rl">割引合計</span><span class="sal-rv neg">-${fmt(totalDisc)}</span></div>`
+  if(misc>0) bd+=`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(net)}</span></div>`
+  document.getElementById('w-breakdown').innerHTML=bd
+}
+// 旧calcTotal互換
+function calcTotal(){calcTotal2()}
+
+async function saveWork(){
+  const btn=document.getElementById('btn-save-work')
+  btn.disabled=true;btn.textContent='保存中...'
+  const misc=parseInt(document.getElementById('w-misc').value)||0
+  const sessions=[];let totalSales=0,totalBack=0,totalDisc=0,totalCount=0
+  document.querySelectorAll('.session-block').forEach(block=>{
+    const cid=parseInt(block.querySelector('.s-course').value)
+    const stype=block.querySelector('.s-shimei').value
+    const c=courses.find(x=>x.id===cid);if(!c) return
+    const cback=getCourseBack(cid)
+    const sback=getShimeiBack(stype)
+    const options=[]
+    let optBack=0
+    block.querySelectorAll('.op-check:checked').forEach(cb=>{
+      const ob=getOptBack2(cb.dataset.name)
+      options.push({name:cb.dataset.name,back:ob})
+      optBack+=ob
+    })
+    const discounts=[]
+    let discAmt=0
+    block.querySelectorAll('.disc-check:checked').forEach(cb=>{
+      const amt=parseInt(cb.dataset.amount)||0
+      discounts.push({id:parseInt(cb.dataset.id),name:cb.dataset.name,amount:amt})
+      discAmt+=amt
+    })
+    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,disc_amount:discAmt,sales:c.price})
+    totalSales+=c.price;totalBack+=cback+sback+optBack;totalDisc+=discAmt;totalCount++
+  })
+  const net=totalBack-totalDisc-misc
+  const payload={cast_id:sheetCastId,date:sheetDate,sessions,sales:totalSales,back:totalBack,count:totalCount,misc,net,details:sessions.map(s=>({course_id:s.course_id,name:s.course_name,count:1,sales:s.sales,back:s.course_back}))}
+  const{data:ex}=await sb.from('works').select('id').eq('cast_id',sheetCastId).eq('date',sheetDate).single()
+  let err
+  if(ex){const r=await sb.from('works').update(payload).eq('id',ex.id);err=r.error}
+  else{const r=await sb.from('works').insert(payload);err=r.error}
+  btn.disabled=false;btn.textContent='保存する'
+  if(err){toast('エラーが発生しました');return}
+  toast('保存しました！');closeSheet('work')
+}
+
+init()
+</script>
+</body>
+</html>
+
