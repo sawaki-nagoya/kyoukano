@@ -53,9 +53,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .tbar-icon{font-size:1.3rem;line-height:1}
 .tbar-btn.on{color:var(--accent)}
 
-.app-body{flex:1;overflow-y:auto;padding:.6rem .6rem 0;padding-bottom:calc(70px + env(safe-area-inset-bottom))}
+.app-body{flex:1;overflow-y:auto;padding:.5rem .5rem 0;padding-bottom:calc(65px + env(safe-area-inset-bottom))}
 .panel{display:none}
-.panel.on{display:block}
+.panel.on{display:block;min-height:0}
 
 /* CALENDAR */
 .cal-nav{display:flex;align-items:center;margin-bottom:.2rem}
@@ -204,7 +204,7 @@ tr:last-child td{border-bottom:none}
 <div class="screen login-wrap on" id="s-top">
   <div class="login-box">
     <div class="login-logo">KYOUKANO</div>
-    <div class="login-sub">シフト・給与管理</div>
+    <div class="login-sub">シフト・委託金管理</div>
     <div style="display:grid;gap:.75rem">
       <button class="btn-login" style="background:var(--accent)" onclick="showLogin('owner')">🏠 店舗ログイン</button>
       <button class="btn-login" style="background:#3a3a3c" onclick="showLogin('cast')">👤 セラピストログイン</button>
@@ -272,7 +272,7 @@ tr:last-child td{border-bottom:none}
       <div id="shift-list-area"><div class="spin">読み込み中...</div></div>
     </div>
 
-    <!-- キャスト：給与確認 -->
+    <!-- キャスト：委託金確認 -->
     <div class="panel" id="p-salary">
       <div class="cal-nav">
         <button class="cal-nav-btn" onclick="salMove(-1)">‹</button>
@@ -309,7 +309,7 @@ tr:last-child td{border-bottom:none}
       <div id="today-area"><div class="spin">読み込み中...</div></div>
     </div>
 
-    <!-- 店舗：給与精算 -->
+    <!-- 店舗：委託金精算 -->
     <div class="panel" id="p-owner-salary">
       <div class="cal-nav">
         <button class="cal-nav-btn" onclick="ownerSalMove(-1)">‹</button>
@@ -341,11 +341,11 @@ tr:last-child td{border-bottom:none}
     <!-- キャスト用 -->
     <button class="tbar-btn on cast-tab" onclick="tab('shift')"><span class="tbar-icon">📅</span>シフト申請</button>
     <button class="tbar-btn cast-tab" onclick="tab('shift-list')"><span class="tbar-icon">📋</span>シフト一覧</button>
-    <button class="tbar-btn cast-tab" onclick="tab('salary')"><span class="tbar-icon">💴</span>給与確認</button>
+    <button class="tbar-btn cast-tab" onclick="tab('salary')"><span class="tbar-icon">💴</span>委託金確認</button>
     <!-- 店舗用 -->
     <button class="tbar-btn owner-tab" onclick="tab('owner-shift')"><span class="tbar-icon">📋</span>シフト管理</button>
     <button class="tbar-btn owner-tab" onclick="tab('today')"><span class="tbar-icon">🏠</span>本日</button>
-    <button class="tbar-btn owner-tab" onclick="tab('owner-salary')"><span class="tbar-icon">💰</span>給与精算</button>
+    <button class="tbar-btn owner-tab" onclick="tab('owner-salary')"><span class="tbar-icon">💰</span>委託金精算</button>
     <button class="tbar-btn owner-tab" onclick="tab('owner-cast')"><span class="tbar-icon">👥</span>キャスト</button>
   </div>
 </div>
@@ -355,7 +355,7 @@ tr:last-child td{border-bottom:none}
   <div class="sheet">
     <div class="sh-handle"></div>
     <button class="sh-close" onclick="closeSheet('work')">✕</button>
-    <div class="sh-title" id="work-title">給与入力</div>
+    <div class="sh-title" id="work-title">委託金入力</div>
     <div style="font-size:.8rem;color:var(--text3);margin-bottom:.75rem" id="work-info"></div>
     <div id="session-list"></div>
     <button class="btn btn-ghost btn-full" style="margin-bottom:.75rem" onclick="addSession()">＋ 施術を追加</button>
@@ -363,8 +363,7 @@ tr:last-child td{border-bottom:none}
       <input type="number" class="fi2" id="w-misc" value="0" min="0" step="100" onchange="calcTotal2()" placeholder="0">
     </div>
     <div class="sal-hero" style="margin-bottom:.75rem">
-      <div class="sal-lbl">本日の手取り</div>
-      <div class="sal-amt" id="w-total">¥0</div>
+      <div class="sal-lbl">本日の集計</div>
       <div id="w-breakdown"></div>
     </div>
     <button class="btn btn-gold btn-full" onclick="saveWork()" id="btn-save-work">保存する</button>
@@ -781,7 +780,7 @@ async function loadShiftList(){
   area.innerHTML=html
 }
 
-// ── キャスト：給与確認 ──
+// ── キャスト：委託金確認 ──
 function salMove(d){salMonth=addMonth(salMonth,d);loadMySalary()}
 async function loadMySalary(){
   const[y,m]=salMonth.split('-').map(Number)
@@ -801,12 +800,12 @@ async function loadMySalary(){
   const count=works.reduce((s,w)=>s+(w.count||0),0)
   const shopDrop=totalSales-totalNet
   if(totalArea) totalArea.innerHTML=`<div class="sal-hero">
-    <div class="sal-lbl">${me.name} — ${parseInt(m)}月の給与</div>
+    <div class="sal-lbl">${me.name} — ${parseInt(m)}月の委託金</div>
     <div class="sal-amt">${fmt(totalNet)}</div>
     <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(totalSales)}</span></div>
-    <div class="sal-row"><span class="sal-rl">バック（給与）</span><span class="sal-rv">${fmt(totalBack)}</span></div>
+    <div class="sal-row"><span class="sal-rl">委託金合計</span><span class="sal-rv">${fmt(totalBack)}</span></div>
     <div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(totalMisc)}</span></div>
-    <div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(totalNet)}</span></div>
+    <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(totalNet)}</span></div>
     <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>
     <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${count}件</span></div>
   </div>`
@@ -833,7 +832,7 @@ async function loadMySalary(){
         <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
         <div class="sal-row"><span class="sal-rl">バック</span><span class="sal-rv">${fmt(w.back||0)}</span></div>
         ${w.misc?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(w.misc)}</span></div>`:''}
-        <div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(w.net||w.back)}</span></div>
+        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(w.net||w.back)}</span></div>
         <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt((w.sales||0)-(w.net||w.back||0))}</span></div>
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}本</span></div>
       </div>
@@ -853,19 +852,29 @@ async function loadOwnerCal(){
   const area=document.getElementById('owner-shift-area')
   let html=''
   if(pending&&pending.length){
+    // 日付ごとにグループ化
+    const pd={}; pending.forEach(s=>{if(!pd[s.date])pd[s.date]=[];pd[s.date].push(s)})
     html+=`<div class="sec">承認待ち（${pending.length}件）</div>`
-    pending.forEach(s=>{
-      html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.55rem">
-        <div class="ib">
-          <div class="it">${jpDate(s.date)} — ${s.casts?.name||'?'}</div>
-          <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
-          <button class="btn btn-green btn-xs" onclick="approveShift(${s.id})">✓ 承認</button>
-          <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id})">✕ 却下</button>
-          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${s.date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
-        </div>
-      </div>`
+    Object.entries(pd).sort().forEach(([date,ss])=>{
+      html+=`<div class="card" style="margin-bottom:.6rem">
+        <div style="font-size:.88rem;font-weight:700;margin-bottom:.4rem">${jpDate(date)}</div>`
+      ss.forEach(s=>{
+        html+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+            <div>
+              <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
+              <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
+              ${s.note?`<div style="font-size:.7rem;color:var(--text3)">${s.note}</div>`:''}
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">
+            <button class="btn btn-green btn-xs" onclick="approveShift(${s.id})">✓ 承認</button>
+            <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id})">✕ 却下</button>
+            <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${s.date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
+          </div>
+        </div>`
+      })
+      html+=`</div>`
     })
   } else html+=`<div class="empty">承認待ちのシフトはありません</div>`
 
@@ -959,7 +968,7 @@ async function loadToday(){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <button class="btn btn-purple btn-sm2" onclick="openRoom(${s.id},'${s.casts?.name||'?'}','${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}','${s.room||''}')">ルーム指定</button>
-        <button class="btn btn-gold btn-sm2" onclick="openWorkSheet(${s.id},'${s.casts?.name||'?'}','${td}',${s.cast_id})">給与入力</button>
+        <button class="btn btn-gold btn-sm2" onclick="openWorkSheet(${s.id},'${s.casts?.name||'?'}','${td}',${s.cast_id})">委託金入力</button>
       </div>
     </div>`
   })
@@ -982,10 +991,10 @@ async function saveRoom(){
   toast('ルームを指定しました！');closeSheet('room');loadToday();loadOwnerCal()
 }
 
-// ── 給与入力（セット方式） ──
+// ── 委託金入力（セット方式） ──
 async function openWorkSheet(shiftId,castName,date,castId){
   sheetCastId=castId;sheetCastName=castName;sheetDate=date
-  document.getElementById('work-title').textContent=castName+' の給与入力'
+  document.getElementById('work-title').textContent=castName+' の委託金入力'
   document.getElementById('work-info').textContent=jpDate(date)
   const{data:fee}=await sb.from('cast_fees').select('*').eq('cast_id',castId).single()
   sheetFee=fee?{...DEFAULT_FEE,...fee}:{...DEFAULT_FEE}
@@ -1082,14 +1091,12 @@ function calcTotal2(){
   const misc=parseInt(document.getElementById('w-misc').value)||0
   const net=totalBack-totalDisc-misc
   const shopDrop=totalSales-net
-  document.getElementById('w-total').textContent=fmt(net)
   let bd=''
-  if(totalSales>0) bd+=`<div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(totalSales)}</span></div>`
-  if(totalBack>0) bd+=`<div class="sal-row"><span class="sal-rl">バック合計</span><span class="sal-rv">${fmt(totalBack)}</span></div>`
-  if(totalDisc>0) bd+=`<div class="sal-row"><span class="sal-rl">割引合計</span><span class="sal-rv neg">-${fmt(totalDisc)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl">総売上</span><span class="sal-rv">${fmt(totalSales)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl">委託金合計</span><span class="sal-rv tot">${fmt(net)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
+  if(totalDisc>0) bd+=`<div class="sal-row"><span class="sal-rl">割引</span><span class="sal-rv neg">-${fmt(totalDisc)}</span></div>`
   if(misc>0) bd+=`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`
-  bd+=`<div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(net)}</span></div>`
-  if(totalSales>0) bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
   document.getElementById('w-breakdown').innerHTML=bd
 }
 // 旧calcTotal互換
@@ -1140,16 +1147,26 @@ async function loadCastMgmt(){
   area.innerHTML='<div class="spin">読み込み中...</div>'
   const{data:casts}=await sb.from('casts').select('*').order('sort_order')
   if(!casts||!casts.length){area.innerHTML='<div class="empty">キャストがいません</div>';return}
-  area.innerHTML=casts.map(c=>`
+  const active=casts.filter(c=>c.active)
+  const inactive=casts.filter(c=>!c.active)
+  const castRow=(c)=>`
     <div class="cast-row">
-      <div class="cast-nm">${c.name} ${c.active?'':'<span class="tag tr2">退店</span>'}</div>
+      <div class="cast-nm">${c.name}</div>
       <div class="cast-btns">
-        <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">バック設定</button>
+        ${c.active?`
+        <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">委託金設定</button>
         <button class="btn btn-purple btn-xs" onclick="openDiscSheet(${c.id},'${c.name}')">割引設定</button>
         <button class="btn btn-gray btn-xs" onclick="changePIN(${c.id},'${c.name}')">PIN変更</button>
-        <button class="btn ${c.active?'btn-red':'btn-green'} btn-xs" onclick="toggleActive(${c.id},${c.active})">${c.active?'退店':'復帰'}</button>
+        <button class="btn btn-red btn-xs" onclick="toggleActive(${c.id},true)">退店</button>
+        `:`
+        <button class="btn btn-green btn-xs" onclick="toggleActive(${c.id},false)">復帰</button>
+        `}
       </div>
-    </div>`).join('')
+    </div>`
+  let html=''
+  if(active.length) html+=`<div class="sec" style="margin-top:0">在籍中（${active.length}名）</div>`+active.map(castRow).join('')
+  if(inactive.length) html+=`<div class="sec" style="margin-top:.75rem;color:var(--rtx)">退店済（${inactive.length}名）</div>`+inactive.map(castRow).join('')
+  area.innerHTML=html
 }
 
 async function openAddCast(){
@@ -1280,7 +1297,7 @@ async function deleteDisc(id){
   toast('削除しました')
 }
 
-// ── 店舗給与精算 ──
+// ── 店舗委託金精算 ──
 function ownerSalMove(d){ownerSalMonth=addMonth(ownerSalMonth,d);loadOwnerSalary()}
 
 async function loadOwnerSalary(){
@@ -1318,7 +1335,7 @@ async function loadOwnerSalary(){
       <div class="sal-hero">
         <div class="sal-row"><span class="sal-rl">売上</span><span class="sal-rv">${fmt(d.sales)}</span></div>
         <div class="sal-row"><span class="sal-rl">バック</span><span class="sal-rv">${fmt(d.back)}</span></div>
-        <div class="sal-row"><span class="sal-rl">手取り</span><span class="sal-rv tot">${fmt(d.net)}</span></div>
+        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(d.net)}</span></div>
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${d.count}件</span></div>
       </div>
       ${d.works.map((w,wi)=>{
@@ -1327,7 +1344,7 @@ async function loadOwnerSalary(){
         return `<div style="border-top:1px solid var(--border);padding:.5rem 0;margin-top:.5rem">
           <div style="font-size:.8rem;font-weight:600">${jpDate(w.date)}</div>
           ${detail}
-          <div style="font-size:.8rem;color:var(--gtx);margin-top:.25rem">手取り：${fmt(w.net||w.back)}</div>
+          <div style="font-size:.8rem;color:var(--gtx);margin-top:.25rem">委託金：${fmt(w.net||w.back)}</div>
           <div style="display:flex;gap:.35rem;margin-top:.35rem">
             <button class="btn btn-blue btn-xs" onclick="openWorkSheet('${w.id}','${name}','${w.date}',${w.cast_id})">修正</button>
             <button class="btn btn-red btn-xs" onclick="deleteWork(${w.id})">削除</button>
