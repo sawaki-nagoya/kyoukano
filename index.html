@@ -62,7 +62,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-nav-btn{background:var(--surface2);border:none;border-radius:8px;color:var(--text2);padding:.35rem .65rem;font-size:1rem;cursor:pointer;font-family:inherit;line-height:1}
 .cal-title{font-size:.95rem;font-weight:700;color:var(--text);flex:1;text-align:center}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.2rem}
-.cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);font-weight:600;padding:.15rem 0}
+.cal-hdr{height:calc((100vw - 0.8rem - 12px) / 7);font-size:.55rem;text-align:center;color:var(--text3);font-weight:600;display:flex;align-items:center;justify-content:center}
 .cal-cell{height:calc((100vw - 0.8rem - 12px) / 7);border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
 .cal-cell.empty{height:calc((100vw - 0.8rem - 12px) / 7);opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
