@@ -134,6 +134,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .sal-rv.neg{color:var(--rtx)}
 .sal-rv.total{color:var(--gtx);font-size:.95rem}
 
+/* CAL TABLE RESET */
+.cal-table{border-collapse:separate!important;border-spacing:2px!important}
+.cal-table th,.cal-table td{border:none!important;background:none!important;padding:0!important;color:inherit!important}
+
 /* TABLE */
 .tbl{background:var(--surface);border-radius:var(--r);overflow:hidden;margin-bottom:.75rem;box-shadow:var(--sh)}
 table{width:100%;border-collapse:collapse;font-size:.8rem}
@@ -740,7 +744,7 @@ function renderCal(){
   const firstDow=(first+6)%7
   const cellSize='calc((100vw - 0.8rem - 14px) / 7)'
   // テーブル方式で描画（間隔問題を根本解決）
-  let html=`<table style="width:100%;border-collapse:separate;border-spacing:2px;table-layout:fixed"><thead><tr>`
+  let html=`<table class="cal-table" style="width:100%;table-layout:fixed"><thead><tr>`
   days.forEach((d,i)=>{
     const color=i===6?'color:var(--rtx)':''
     html+=`<th style="text-align:center;font-size:.55rem;color:var(--text3);font-weight:600;padding:.1rem 0;width:${cellSize};${color}">${d}</th>`
@@ -772,7 +776,8 @@ function renderCal(){
     const cursor=isPast?'default':'pointer'
     const onclick=isPast?'':'selectDay(\''+ds+'\')'
     const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'承認済':'却下'):''
-    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusText?`<span style="font-size:.42rem;line-height:1">${statusText}</span>`:''}</div>`
+    const timeText=s&&s.start_time?s.start_time.slice(0,5):''
+    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${timeText?`<span style="font-size:.4rem;line-height:1.1">${timeText}</span>`:''}${statusText?`<span style="font-size:.4rem;line-height:1.1">${statusText}</span>`:''}</div>`
     html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-size:.68rem;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
     col++
   }
@@ -954,7 +959,7 @@ async function loadOwnerCal(){
   const days=['月','火','水','木','金','土','日']
   const firstDow2=(first+6)%7
   const cellSize2='calc((100vw - 0.8rem - 14px) / 7)'
-  let cal=`<table style="width:100%;border-collapse:separate;border-spacing:2px;table-layout:fixed"><thead><tr>`
+  let cal=`<table class="cal-table" style="width:100%;table-layout:fixed"><thead><tr>`
   days.forEach((d,i)=>{
     const color=i===6?'color:var(--rtx)':''
     cal+=`<th style="text-align:center;font-size:.55rem;color:var(--text3);font-weight:600;padding:.1rem 0;${color}">${d}</th>`
@@ -973,8 +978,8 @@ async function loadOwnerCal(){
     else if(hasPending){bg2='var(--bbg)';border2='1.5px solid var(--bbd)';color2='var(--btx)'}
     else if(hasApproved){bg2='var(--gbg)';border2='1.5px solid var(--gbd)';color2='var(--gtx)'}
     if(!color2){color2=dow2===0?'var(--rtx)':dow2===6?'var(--btx)':'var(--text2)'}
-    const statusLabel=hasPending?'申請中':hasApproved?'承認済':''
-    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusLabel?`<span style="font-size:.42rem;line-height:1">${statusLabel}</span>`:''}</div>`
+    const statusLabel=hasPending?`申${pendingDates[ds]}件`:hasApproved?`承${approvedDates[ds]}件`:''
+    const inner2=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusLabel?`<span style="font-size:.4rem;line-height:1.1">${statusLabel}</span>`:''}</div>`
     cal+=`<td onclick="ownerSelectDay('${ds}')" style="height:${cellSize2};border-radius:5px;font-size:.68rem;color:${color2};background:${bg2};border:${border2||'1.5px solid transparent'};cursor:pointer;padding:0">${inner2}</td>`
     col2++
   }
