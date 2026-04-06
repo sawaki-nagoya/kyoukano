@@ -61,10 +61,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .cal-nav{display:flex;align-items:center;margin-bottom:.2rem}
 .cal-nav-btn{background:var(--surface2);border:none;border-radius:8px;color:var(--text2);padding:.35rem .65rem;font-size:1rem;cursor:pointer;font-family:inherit;line-height:1}
 .cal-title{font-size:.95rem;font-weight:700;color:var(--text);flex:1;text-align:center}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:.2rem}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);grid-auto-rows:calc((100vw - 0.8rem - 12px) / 7);max-height:calc(((100vw - 0.8rem - 12px) / 7) * 7 + 42px);gap:2px;margin-bottom:.2rem}
 .cal-hdr{font-size:.55rem;text-align:center;color:var(--text3);padding:.1rem 0;font-weight:600}
-.cal-cell{height:calc((100vh - 210px) / 7);min-height:0;max-height:48px;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
-.cal-cell.empty{height:calc((100vh - 210px) / 7);min-height:0;max-height:48px;opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
+.cal-cell{border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;border:1.5px solid transparent;font-size:.68rem;font-weight:500;color:var(--text2);position:relative}
+.cal-cell.empty{opacity:0;cursor:default}.cal-cell.past{opacity:.3;cursor:default}
 .cal-cell.today{border-color:var(--accent);color:var(--accent);font-weight:700}
 .cal-cell.requested{background:var(--bbg);border-color:var(--bbd);color:var(--btx)}
 .cal-cell.approved{background:var(--gbg);border-color:var(--gbd);color:var(--gtx)}
@@ -504,6 +504,12 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">延長30分</div><input type="number" class="fee-input" id="st-ext" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
     <div class="fee-sec">
+      <div class="fee-sec-title">👤 指名料金</div>
+      <div class="fee-row"><div class="fee-lbl">フリー指名</div><input type="number" class="fee-input" id="st-shimei-free" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">ネット指名</div><input type="number" class="fee-input" id="st-shimei-net" min="0" step="100"><span class="fee-unit">円</span></div>
+      <div class="fee-row"><div class="fee-lbl">本指名</div><input type="number" class="fee-input" id="st-shimei-hon" min="0" step="100"><span class="fee-unit">円</span></div>
+    </div>
+    <div class="fee-sec">
       <div class="fee-sec-title">⭐ オプション料金</div>
       <div class="fee-row"><div class="fee-lbl">極液</div><input type="number" class="fee-input" id="st-op1" min="0" step="100"><span class="fee-unit">円</span></div>
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ①</div><input type="number" class="fee-input" id="st-op2" min="0" step="100"><span class="fee-unit">円</span></div>
@@ -580,7 +586,7 @@ const ROOM_COLORS = {
   '金山ルーム':  {bg:'#fefce8',tx:'#854d0e',bd:'#fef08a',card:'#fef9c3'},
 }
 function getRoomColor(room){return ROOM_COLORS[room]||{bg:'var(--pbg)',tx:'var(--ptx)',bd:'var(--pbd)',card:'var(--pbg)'}}
-const DEFAULT_FEE = {back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500}
+const DEFAULT_FEE = {back_50:5850,back_80:7200,back_100:8460,back_130:10340,back_ext30:2400,shimei_free:0,shimei_net:300,shimei_hon:500,op_gokueki:500,op_isho:500,op_isho2:500,shop_shimei_free:0,shop_shimei_net:1000,shop_shimei_hon:2000,shop_op_gokueki:2000,shop_op_isho:3000,shop_op_isho2:3000}
 
 // 営業時間プルダウン用（11:00〜翌2:00）
 function buildTimeOptions(selectedVal=''){
@@ -595,7 +601,7 @@ function buildTimeOptions(selectedVal=''){
   return times.map(t=>`<option value="${t}" ${t===selectedVal?'selected':''}>${t}</option>`).join('')
 }
 
-let me=null, courses=[], opts=[]
+let me=null, courses=[], opts=[], storeSettings={}
 let calMonth=ym(new Date()), salMonth=ym(new Date())
 let ownerCalMonth=ym(new Date()), ownerSalMonth=ym(new Date())
 let selectedDate=null, myShifts=[]
@@ -625,7 +631,8 @@ async function init(){
   document.getElementById('cast-sel').innerHTML=html
   const{data:cs}=await sb.from('courses').select('*').order('price')
   const{data:op}=await sb.from('options').select('*').order('id')
-  courses=cs||[]; opts=op||[]
+  const{data:ss}=await sb.from('store_settings').select('*').single()
+  courses=cs||[]; opts=op||[]; storeSettings=ss||{}
 }
 
 async function doOwnerLogin(){
@@ -733,7 +740,9 @@ function renderCal(){
       if(ds===selectedDate) cls+=' selected'
       else if(ds===td) cls+=' today'
     }
-    html+=`<div class="${cls}" onclick="${isPast?'':'selectDay(\''+ds+'\')'}">${d}${s?'<div class="cal-dot"></div>':''}</div>`
+    const dow=new Date(ds).getDay()
+    const dayColor=(!cls.includes('requested')&&!cls.includes('approved')&&!cls.includes('rejected')&&!cls.includes('selected')&&!cls.includes('today'))?(dow===0?'color:var(--rtx)':dow===6?'color:var(--btx)':''):''
+    html+=`<div class="${cls}" style="${dayColor}" onclick="${isPast?'':'selectDay(\''+ds+'\')'}">${d}${s?'<div class="cal-dot"></div>':''}</div>`
   }
   document.getElementById('cal-grid').innerHTML=html
   renderShiftStatus()
@@ -1143,6 +1152,7 @@ function addSession(data=null){
     return `<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0"><input type="checkbox" class="disc-check" data-id="${d.id}" data-name="${d.name}" data-amount="${d.amount}" data-dtype="${d.disc_type||'back'}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--red)"> ${d.name}（-${fmt(d.amount)}）<span style="font-size:.65rem;color:${typeColor}">${typeLabel}</span></label>`
   }).join(''):'<div style="font-size:.76rem;color:var(--text3)">割引設定なし</div>'
 
+  const paymentOpts=['現金','カード'].map(p=>`<option value="${p}" ${data?.payment===p?'selected':''}>${p}</option>`).join('')
   div.innerHTML=`
     <div class="session-hdr">
       <span class="session-no">${currentNo}本目</span>
@@ -1152,6 +1162,7 @@ function addSession(data=null){
       <div><div class="session-label">コース</div><select class="fi2 s-course" onchange="calcTotal2()">${courseOpts}</select></div>
       <div><div class="session-label">指名</div><select class="fi2 s-shimei" onchange="calcTotal2()">${shimeiOpts}</select></div>
     </div>
+    <div style="margin-bottom:.4rem"><div class="session-label">支払い方法</div><select class="fi2 s-payment" onchange="calcTotal2()"><option value="現金">💴 現金</option><option value="カード">💳 カード</option></select></div>
     <div style="margin-bottom:.4rem"><div class="session-label">オプション</div>${opItems}</div>
     <div><div class="session-label">割引</div>${discItems}</div>`
   document.getElementById('session-list').appendChild(div)
@@ -1171,6 +1182,13 @@ function getShimeiBack(type){
   if(type==='本指名') return sheetFee.shimei_hon||DEFAULT_FEE.shimei_hon
   return 0
 }
+// 店舗側の指名料（お客様支払い額）
+function getShimeiPrice(type){
+  if(type==='フリー') return storeSettings.shimei_free||0
+  if(type==='ネット指名') return storeSettings.shimei_net||1000
+  if(type==='本指名') return storeSettings.shimei_hon||2000
+  return 0
+}
 function getCourseBack(courseId){
   const c=courses.find(x=>x.id===courseId);if(!c) return 0
   if(c.name.includes('50分')) return sheetFee.back_50||DEFAULT_FEE.back_50
@@ -1186,6 +1204,11 @@ function getOptBack2(name){
   if(name==='衣装チェンジ②') return sheetFee.op_isho2||DEFAULT_FEE.op_isho2
   return 0
 }
+// 店舗側のオプション料（お客様支払い額）
+function getOptPrice(name){
+  const o=opts.find(x=>x.name===name)
+  return o?o.price||0:0
+}
 
 function calcTotal2(){
   let totalBack=0,totalSales=0,discFromBack=0,discFromShop=0
@@ -1200,7 +1223,10 @@ function calcTotal2(){
       else discFromBack+=amt
     })
     const c=courses.find(x=>x.id===cid)
+    // 総売上 = コース料金 + 指名料（店舗側） + オプション料（店舗側）
     if(c) totalSales+=c.price||0
+    totalSales+=getShimeiPrice(stype)
+    block.querySelectorAll('.op-check:checked').forEach(cb=>totalSales+=getOptPrice(cb.dataset.name))
   })
   const misc=parseInt(document.getElementById('w-misc').value)||0
   const net=totalBack-discFromBack-misc
@@ -1245,8 +1271,13 @@ async function saveWork(){
       if(dtype==='shop') discFromShop+=amt
       else discFromBack+=amt
     })
-    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,sales:c.price})
-    totalSales+=c.price;totalBack+=cback+sback+optBack;totalCount++
+    const payment=block.querySelector('.s-payment')?.value||'現金'
+    const shimeiPrice=getShimeiPrice(stype)
+    let optSaleTotal=0
+    options.forEach(o=>{ optSaleTotal+=getOptPrice(o.name) })
+    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal
+    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,sales:sessionSales,payment})
+    totalSales+=sessionSales;totalBack+=cback+sback+optBack;totalCount++
   })
   const net=totalBack-discFromBack-misc
   const shopDrop=totalSales-net-discFromShop
@@ -1556,6 +1587,13 @@ async function openStoreSettings(){
     const op2=ops.find(o=>o.name==='衣装チェンジ①'||o.name==='衣装チェンジ');if(op2) document.getElementById('st-op2').value=op2.price
     const op3=ops.find(o=>o.name==='衣装チェンジ②');if(op3) document.getElementById('st-op3').value=op3.price
   }
+  // 指名料（store_settingsから読み込み、なければデフォルト）
+  const{data:ss}=await sb.from('store_settings').select('*').single()
+  if(ss){
+    const sfEl=document.getElementById('st-shimei-free');if(sfEl) sfEl.value=ss.shimei_free||0
+    const snEl=document.getElementById('st-shimei-net');if(snEl) snEl.value=ss.shimei_net||1000
+    const shEl=document.getElementById('st-shimei-hon');if(shEl) shEl.value=ss.shimei_hon||2000
+  }
   document.getElementById('store-overlay').classList.add('on')
 }
 
@@ -1584,9 +1622,16 @@ async function saveStoreSettings(){
     if(op2) await sb.from('options').update({price:g('st-op2')}).eq('id',op2.id)
     if(op3) await sb.from('options').update({price:g('st-op3')}).eq('id',op3.id)
   }
-  // coursesをリロード
+  // 指名料をstore_settingsに保存
+  const shimeiData={shimei_free:g('st-shimei-free'),shimei_net:g('st-shimei-net'),shimei_hon:g('st-shimei-hon')}
+  const{data:existing}=await sb.from('store_settings').select('id').single()
+  if(existing) await sb.from('store_settings').update(shimeiData).eq('id',existing.id)
+  else await sb.from('store_settings').insert(shimeiData)
+  // coursesをリロード＋store_settingsをキャッシュ
   const{data:newCs}=await sb.from('courses').select('*').order('price')
   courses=newCs||[]
+  const{data:newSs}=await sb.from('store_settings').select('*').single()
+  storeSettings=newSs||{}
   btn.disabled=false;btn.textContent='保存する'
   toast('料金を保存しました！');closeSheet('store')
 }
