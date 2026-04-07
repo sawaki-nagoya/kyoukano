@@ -1116,7 +1116,10 @@ async function deleteShift(){
 async function loadToday(){
   const td=today();const[y,m,d]=td.split('-')
   document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'
-  const{data:shifts}=await sb.from('shifts').select('*, casts(name)').eq('date',td).eq('status','approved').order('start_time')
+  const{data:shiftsRaw}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
+  const{data:castList2}=await sb.from('casts').select('id,name')
+  const getName2=id=>{const c=(castList2||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
+  const shifts=(shiftsRaw||[]).map(s=>({...s,casts:{name:getName2(s.cast_id)}}))
   // ルームに複数人を対応
   const rm={}
   ;(shifts||[]).forEach(s=>{
@@ -1614,7 +1617,10 @@ async function loadOwnerSalary(){
   document.getElementById('owner-sal-title').textContent=y+'年'+m+'月'
   const area=document.getElementById('owner-sal-area')
   area.innerHTML='<div class="spin">読み込み中...</div>'
-  const{data:works}=await sb.from('works').select('*,casts(name)').gte('date',ownerSalMonth+'-01').lt('date',nextYM(ownerSalMonth)+'-01').order('date')
+  const{data:worksRaw}=await sb.from('works').select('*').gte('date',ownerSalMonth+'-01').lt('date',nextYM(ownerSalMonth)+'-01').order('date')
+  const{data:castList3}=await sb.from('casts').select('id,name')
+  const getName3=id=>{const c=(castList3||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
+  const works=(worksRaw||[]).map(w=>({...w,casts:{name:getName3(w.cast_id)}}))
   if(!works||!works.length){
     document.getElementById('o-sales').textContent='¥0'
     document.getElementById('o-back').textContent='¥0'
