@@ -485,8 +485,15 @@ tr:last-child td{border-bottom:none}
             <div><div class="fi-lbl">入室時間</div><input class="fi" id="rv-checkin" type="time" oninput="autoCalcCheckout()"></div>
             <div><div class="fi-lbl">退室時間</div><input class="fi" id="rv-checkout" type="time"></div>
           </div>
-          <div><div class="fi-lbl">オプション</div><input class="fi" id="rv-options" placeholder="極液、衣装②など"></div>
-          <div><div class="fi-lbl">割引</div><input class="fi" id="rv-discount" placeholder="割引内容など"></div>
+          <div><div class="fi-lbl">オプション（複数選択可）</div>
+            <select class="fi" id="rv-options-list" multiple style="height:auto;min-height:44px;padding:.4rem .9rem"></select>
+            <div style="font-size:.7rem;color:var(--text3);margin-top:.25rem">複数選択：長押しまたはCtrl+クリック</div>
+          </div>
+          <div><div class="fi-lbl">割引</div>
+            <select class="fi" id="rv-discount">
+              <option value="">なし</option>
+            </select>
+          </div>
           <div><div class="fi-lbl">支払い方法</div>
             <select class="fi" id="rv-payment"><option value="cash">現金</option><option value="card">カード</option><option value="mix">現金+カード</option></select>
           </div>
@@ -1274,6 +1281,29 @@ async function openReservation(shiftId,castName,date){
   if(courses&&courses.length){
     sel.innerHTML=courses.map(c=>`<option value="${c.name}">${c.name}（¥${c.price?.toLocaleString()||''}）</option>`).join('')
   }
+  // オプション一覧をロード
+  const{data:opts}=await sb.from('options').select('*').order('name')
+  const optsList=document.getElementById('rv-options-list')
+  if(opts&&opts.length){
+    optsList.innerHTML='<option value="">なし</option>'+opts.map(o=>`<option value="${o.name}">${o.name}（¥${(o.price||0).toLocaleString()}）</option>`).join('')
+  } else {
+    optsList.innerHTML='<option value="">オプションなし</option>'
+  }
+  // 割引一覧をロード（キャストのcast_discountsから）
+  const discSel=document.getElementById('rv-discount')
+  discSel.innerHTML='<option value="">なし</option>'
+  const{data:castData}=await sb.from('casts').select('id').eq('name',castName).single()
+  if(castData){
+    const{data:discs}=await sb.from('cast_discounts').select('*').eq('cast_id',castData.id)
+    if(discs&&discs.length){
+      discs.forEach(d=>{
+        const opt=document.createElement('option')
+        opt.value=d.name
+        opt.textContent=`${d.name}（-¥${(d.amount||0).toLocaleString()}）`
+        discSel.appendChild(opt)
+      })
+    }
+  }
   document.getElementById('reservation-overlay').classList.add('on')
 }
 
@@ -1292,12 +1322,25 @@ function autoCalcCheckout(){
   document.getElementById('rv-checkout').value=`${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
 }
 
+function autoFillCustomer(){
+  const no=parseInt(document.getElementById('rv-cust-id').value)
+  if(!no){document.getElementById('rv-cust-name').textContent='';return}
+  const c=allCustomers.find(x=>x.customer_no===no)
+  if(c){
+    document.getElementById('rv-name').value=c.name.endsWith('様')?c.name:c.name+'様'
+    document.getElementById('rv-cust-name').textContent='✓ '+c.name
+    document.getElementById('rv-cust-name').style.color='var(--green)'
+  } else {
+    document.getElementById('rv-cust-name').textContent='未登録'
+    document.getElementById('rv-cust-name').style.color='var(--rtx)'
+  }
+}
 async function lookupCustomer(){
   const no=parseInt(document.getElementById('rv-cust-id').value)
   if(!no){return}
   const c=allCustomers.find(x=>x.customer_no===no)
   if(c){
-    document.getElementById('rv-name').value=c.name
+    document.getElementById('rv-name').value=c.name.endsWith('様')?c.name:c.name+'様'
     document.getElementById('rv-cust-name').textContent=`✓ ${c.name}`
     document.getElementById('rv-cust-name').style.color='var(--green)'
   } else {
@@ -1316,23 +1359,25 @@ async function saveReservation(){
   const course=document.getElementById('rv-course').value
   const checkin=document.getElementById('rv-checkin').value
   const checkout=document.getElementById('rv-checkout').value
-  const opts=[...document.querySelectorAll('#reservation-overlay input[type=checkbox]:checked')].map(cb=>cb.value)
-  const discount=document.getElementById('rv-discount').value.trim()
+  const optsSel=document.getElementById('rv-options-list')
+  const opts=[...optsSel.selectedOptions].map(o=>o.value).filter(v=>v)
+  const discount=document.getElementById('rv-discount').value
   const payment=document.getElementById('rv-payment').value
   const memo=document.getElementById('rv-note').value.trim()
+  // 名前に「様」を自動付与
+  const finalName=custName.endsWith('様')?custName:custName+'様'
   const{error}=await sb.from('reservations').insert({
-    shift_id:shiftId,customer_no:custNo?parseInt(custNo):null,
-    customer_name:custName,is_new:isNew,shimei_type:shimei,
-    course,options:opts.join(','),discounts:discount,payment,memo,
-    checkin_time:checkin||null,checkout_time:checkout||null
+    shift_id:shiftId,
+    customer_name:finalName,is_new:isNew,shimei_type:shimei,
+    course,options:opts.join(','),discount,payment,note:memo
   })
   if(error){toast('エラー: '+error.message);return}
   // 顧客の来店記録にも追加
   if(custNo){
-    const c=allCustomers.find(x=>x.customer_no===parseInt(custNo))
+    const c=allCustomers.find(x=>x.customer_no===parseInt(custNo)||x.id===parseInt(custNo))
     if(c){
       await sb.from('customer_visits').insert({
-        customer_id:c.id,cast_name:'',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
+        customer_id:c.id,cast_name:'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
       })
     }
   }
