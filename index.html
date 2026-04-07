@@ -629,7 +629,7 @@ function fmt(n){return '¥'+Math.round(n||0).toLocaleString()}
 function addMonth(y,d){const[yr,m]=y.split('-').map(Number);const nd=new Date(yr,m-1+d,1);return nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')}
 function nextYM(y){return addMonth(y,1)}
 function jpDate(s){const[y,m,d]=s.split('-');return parseInt(m)+'月'+parseInt(d)+'日'}
-function today(){const d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10)}
+function today(){return new Date().toLocaleDateString('ja-JP',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'-')}
 function toast(msg,dur=1800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),dur)}
 function closeSheet(id){document.getElementById(id+'-overlay').classList.remove('on')}
 
@@ -1116,7 +1116,8 @@ async function deleteShift(){
 async function loadToday(){
   const td=today();const[y,m,d]=td.split('-')
   document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'
-  const{data:shiftsRaw}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
+  const{data:shiftsRaw,error:shiftErr}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
+  if(shiftErr||!shiftsRaw||!shiftsRaw.length){alert('today='+td+' shifts='+(shiftsRaw?shiftsRaw.length:'null')+' err='+(shiftErr?shiftErr.message:'none'))}
   const{data:castList2}=await sb.from('casts').select('id,name')
   const getName2=id=>{const c=(castList2||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
   const shifts=(shiftsRaw||[]).map(s=>({...s,casts:{name:getName2(s.cast_id)}}))
