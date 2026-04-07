@@ -1010,7 +1010,7 @@ async function loadOwnerCal(){
     ss.forEach(s=>{
       html+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
         <div style="margin-bottom:.3rem">
-          <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
+          <span style="font-size:.88rem;font-weight:600">${s._castName||'?'}</span>
           <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
           ${s.note?`<div style="font-size:.7rem;color:var(--text3)">${s.note}</div>`:''}
         </div>
@@ -1040,7 +1040,7 @@ function ownerSelectDay(ds){
     html+='<div class="sec" style="margin-top:0">承認待ち（'+pending.length+'件）</div>'
     pending.forEach(function(s){
       const sid=s.id
-      const sname=(s.casts&&s.casts.name)||'?'
+      const sname=s._castName||(s.casts&&s.casts.name)||'?'
       const sstart=(s.start_time||'').slice(0,5)||'13:00'
       const send=(s.end_time||'').slice(0,5)||'22:00'
       const snote=s.note||''
@@ -1067,7 +1067,7 @@ function ownerSelectDay(ds){
       html+='<div class="card" style="margin-bottom:.5rem"><div style="margin-bottom:.4rem">'+roomLabel+'</div>'
       ss.forEach(function(s){
         const sid=s.id
-        const sname=(s.casts&&s.casts.name)||'?'
+        const sname=s._castName||(s.casts&&s.casts.name)||'?'
         const sstart=(s.start_time||'').slice(0,5)||'13:00'
         const send=(s.end_time||'').slice(0,5)||'22:00'
         const sroom=s.room||''
