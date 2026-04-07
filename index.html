@@ -949,8 +949,8 @@ let ownerShiftData={pending:[],approved:[]}
 async function loadOwnerCal(){
   const[y,m]=ownerCalMonth.split('-').map(Number)
   document.getElementById('owner-cal-title').textContent=y+'年'+m+'月'
-  const{data:pending}=await sb.from('shifts').select('*').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date')
-  const{data:approved}=await sb.from('shifts').select('*').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date')
+  const{data:pending}=await sb.from('shifts').select('*,casts:cast_id(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','requested').order('date')
+  const{data:approved}=await sb.from('shifts').select('*,casts:cast_id(name)').gte('date',ownerCalMonth+'-01').lt('date',nextYM(ownerCalMonth)+'-01').eq('status','approved').order('date')
   ownerShiftData={pending:pending||[],approved:approved||[]}
 
   // カレンダー描画
