@@ -629,7 +629,7 @@ function fmt(n){return '¥'+Math.round(n||0).toLocaleString()}
 function addMonth(y,d){const[yr,m]=y.split('-').map(Number);const nd=new Date(yr,m-1+d,1);return nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')}
 function nextYM(y){return addMonth(y,1)}
 function jpDate(s){const[y,m,d]=s.split('-');return parseInt(m)+'月'+parseInt(d)+'日'}
-function today(){return new Date().toISOString().slice(0,10)}
+function today(){const d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10)}
 function toast(msg,dur=1800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),dur)}
 function closeSheet(id){document.getElementById(id+'-overlay').classList.remove('on')}
 
