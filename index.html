@@ -1337,6 +1337,11 @@ async function openReservation(shiftId,castName,date){
   document.getElementById('rv-cust-name').textContent=''
   document.getElementById('rv-is-new').value=''
   document.getElementById('rv-shimei').value=''
+  // allCustomersが空ならDBから読み込む（顧客番号自動入力のため）
+  if(!allCustomers||!allCustomers.length){
+    const{data:custs}=await sb.from('customers').select('*').order('customer_no')
+    allCustomers=custs||[]
+  }
   document.getElementById('rv-payment').value='cash'
   document.getElementById('rv-note').value=''
   document.getElementById('rv-checkin').value=''
@@ -1546,10 +1551,17 @@ async function loadOwnerCal(){
   area.innerHTML=html
 }
 
-function ownerSelectDay(ds){
+async function ownerSelectDay(ds){
   const pending=ownerShiftData.pending.filter(s=>s.date===ds)
   const approved=ownerShiftData.approved.filter(s=>s.date===ds)
   if(!pending.length&&!approved.length) return
+  // 承認済みシフトの予約件数を取得
+  let shiftRvCount={}
+  if(approved.length){
+    const sids=approved.map(s=>s.id)
+    const{data:rvs}=await sb.from('reservations').select('shift_id').in('shift_id',sids)
+    if(rvs) rvs.forEach(r=>{ shiftRvCount[r.shift_id]=(shiftRvCount[r.shift_id]||0)+1 })
+  }
   const[y,m,d]=ds.split('-')
   const dn=['日','月','火','水','木','金','土'][new Date(ds).getDay()]
   document.getElementById('owner-shift-detail-title').textContent=parseInt(m)+'月'+parseInt(d)+'日（'+dn+'）'
@@ -1593,7 +1605,9 @@ function ownerSelectDay(ds){
         const sroom=s.room||''
         const stimestr=sstart+'〜'+send
         html+='<div style="padding:.35rem 0;border-bottom:1px solid var(--border)">'
-        html+='<div style="font-size:.88rem;font-weight:600;margin-bottom:.25rem">'+sname+' <span style="font-size:.72rem;color:var(--text3)">'+stimestr+'</span></div>'
+        const rvCnt=shiftRvCount[sid]||0
+        const rvBadgeS=rvCnt>0?'<span style="font-size:.6rem;padding:1px 7px;border-radius:99px;font-weight:600;background:rgba(255,149,0,.15);color:var(--accent);border:1px solid var(--accent);margin-left:.35rem">予約'+rvCnt+'件</span>':''
+        html+='<div style="font-size:.88rem;font-weight:600;margin-bottom:.25rem">'+sname+'<span style="font-size:.72rem;color:var(--text3);margin-left:.3rem">'+stimestr+'</span>'+rvBadgeS+'</div>'
         html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.25rem">'
         html+='<button class="btn btn-purple btn-xs" onclick="closeSheet(\'owner-shift-detail\');setTimeout(()=>openRoom('+sid+',\''+sname+'\',\''+stimestr+'\',\''+sroom+'\'),100)">ルーム変更</button>'
         html+='<button class="btn btn-blue btn-xs" onclick="closeSheet(\'owner-shift-detail\');setTimeout(()=>openReservation('+sid+',\''+sname+'\',\''+ds+'\'),100)">予約登録</button>'
@@ -2578,7 +2592,7 @@ function showReservationDetail(idx,cacheKey){
   window._currentRvCacheKey=cacheKey
   const detail=`
     <div style="font-size:1rem;font-weight:700;margin-bottom:.75rem">📋 予約詳細</div>
-    <div style="display:flex;flex-direction:column;gap:.5rem">
+    ${me?.is_owner?`<div style="display:flex;flex-direction:column;gap:.5rem">
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div>
         <input id="edit-rv-name" class="fi2" value="${r.customer_name||''}" style="margin-top:.3rem">
       </div>
@@ -2614,11 +2628,21 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div>
         <input id="edit-rv-note" class="fi2" value="${r.note||''}" placeholder="任意" style="margin-top:.3rem">
       </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem">
+    </div>`:`<div style="display:flex;flex-direction:column;gap:.5rem">
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div><div style="font-size:.95rem;font-weight:700">${r.customer_name||'-'}</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <div class="card"><div style="font-size:.75rem;color:var(--text3)">入室</div><div style="font-size:.9rem;font-weight:600">${r.checkin_time?.slice(0,5)||'-'}</div></div>
+        <div class="card"><div style="font-size:.75rem;color:var(--text3)">退室</div><div style="font-size:.9rem;font-weight:600">${r.checkout_time?.slice(0,5)||'-'}</div></div>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div><div>${r.is_new?'新規':'再来'}</div></div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">指名区分</div><div>${r.shimei_type||'フリー'}</div></div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div><div>${r.course||'-'}</div></div>
+      ${r.note?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div><div>${r.note}</div></div>`:''}
+    </div>`}
+    ${me?.is_owner?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem">
       <button class="btn btn-gold" onclick="saveReservationEdit(${r.id},'${cacheKey}')">訂正を保存</button>
       <button class="btn btn-red" onclick="deleteReservation(${r.id},'${cacheKey}')">この予約を削除</button>
-    </div>
+    </div>`:''}
     <button class="btn btn-gray btn-full" style="margin-top:.5rem" onclick="backToRvList()">← 一覧に戻る</button>
   `
   document.getElementById('rv-detail-body').innerHTML=detail
@@ -2675,8 +2699,14 @@ async function deleteReservation(rvId,cacheKey){
   if(window._rvDetailCache?.[cacheKey]){
     window._rvDetailCache[cacheKey]=window._rvDetailCache[cacheKey].filter(r=>r.id!==rvId)
   }
-  backToRvList()
+  // 件数が0になったらシートを閉じる
+  if(window._rvDetailCache?.[cacheKey]?.length===0){
+    closeSheet('rv-detail')
+  } else {
+    backToRvList()
+  }
   if(document.getElementById('p-today')?.classList.contains('on'))loadToday()
+  loadOwnerCal()
 }
 
 // ── 予約確認シート（キャストID指定） ──
