@@ -1702,17 +1702,42 @@ async function loadToday(){
       shiftRvs.forEach(r=>{
         const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
         const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
+        const checkin=r.checkin_time?.slice(0,5)||''
+        const checkout=r.checkout_time?.slice(0,5)||''
+        const timeStr=checkin?(checkout?checkin+'〜'+checkout:checkin+'〜'):''
         rvListHtml+=`<div style="font-size:.78rem;padding:.2rem 0;border-bottom:1px dashed var(--border)">
-          <span style="font-weight:600">${r.checkin_time||''}〜${r.checkout_time||''}</span>
-          <span style="margin-left:.4rem">${r.customer_name||''}</span>
+          <span style="font-weight:600;color:var(--accent)">${timeStr}</span>
+          <span style="margin-left:.4rem;font-weight:600">${r.customer_name||''}</span>
           <span style="font-size:.7rem;color:var(--text3);margin-left:.4rem">${r.course||''}${opts?' / '+opts:''}${discs?' / 割引:'+discs:''}</span>
         </div>`
       })
       rvListHtml+=`</div>`
     }
+    // インターバル計算：checkout_timeがあればそれを使い、なければcheckin+コース時間で推定
+    const COURSE_MINS2={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
+    let intervalDisplay=''
+    if(intervalMin>0&&shiftRvs.length>0){
+      // 最後の予約を特定
+      const sortedRvs=[...shiftRvs].sort((a,b)=>(a.checkin_time||'').localeCompare(b.checkin_time||''))
+      const lastRv=sortedRvs[sortedRvs.length-1]
+      let endMin=null
+      if(lastRv?.checkout_time){
+        const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
+        endMin=hh*60+mm
+      } else if(lastRv?.checkin_time){
+        const[hh,mm]=lastRv.checkin_time.split(':').map(Number)
+        const courseMin=COURSE_MINS2[lastRv.course]||80
+        endMin=hh*60+mm+courseMin
+      }
+      if(endMin!==null){
+        const nmin=endMin+intervalMin
+        const nt=String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')
+        intervalDisplay=`<span style="font-size:.65rem;font-weight:400;color:var(--accent);margin-left:.35rem">⏱${nt}〜</span>`
+      }
+    }
     html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.55rem">
       <div class="ib">
-        <div class="it">${s.casts?.name||'?'} ${intervalMin>0&&shiftRvs.length>0?`<span style="font-size:.65rem;font-weight:400;color:var(--accent);margin-left:.35rem">${(()=>{const lr=shiftRvs.filter(r=>r.checkout_time).sort((a,b)=>b.checkout_time.localeCompare(a.checkout_time))[0];if(lr?.checkout_time){const[hh,mm]=lr.checkout_time.split(':').map(Number);const nmin=(hh*60+mm)+intervalMin;return '⏱'+String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')+'〜'}return ''})()}</span>`:''}</div>
+        <div class="it">${s.casts?.name||'?'}${intervalDisplay}</div>
         <div class="is">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}${s.note?' ／ '+s.note:''}</div>
         <div class="tags">${rt}${rvBadge}</div>
         ${rvListHtml}
