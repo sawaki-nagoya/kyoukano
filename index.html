@@ -1428,7 +1428,8 @@ async function saveReservation(){
   const{error}=await sb.from('reservations').insert({
     shift_id:shiftId,
     customer_name:finalName,is_new:isNew,shimei_type:shimei,
-    course,options:opts.join(','),discount,payment,note:memo
+    course,options:opts.join(','),discount,payment,note:memo,
+    checkin_time:checkin||null,checkout_time:checkout||null
   })
   if(error){toast('エラー: '+error.message);return}
   // 顧客の来店記録にも追加
@@ -1983,7 +1984,6 @@ async function loadCastMgmt(){
       <div class="cast-nm">${c.name}</div>
       <div class="cast-btns">
         <button class="btn btn-blue btn-xs" onclick="openFeeSheet(${c.id},'${c.name}')">委託金設定</button>
-        <button class="btn btn-purple btn-xs" onclick="openCastDiscTypeSheet(${c.id},'${c.name}')">割引種別</button>
         <button class="btn btn-gray btn-xs" onclick="changePIN(${c.id},'${c.name}')">PIN変更</button>
         <button class="btn btn-red btn-xs" onclick="toggleActive(${c.id},true)">退店</button>
       </div>
@@ -2573,26 +2573,110 @@ function showReservationDetail(idx,cacheKey){
   const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
   const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
   const payMap={cash:'現金',card:'カード',mix:'現金+カード'}
+  window._rvDetailBodyCache=document.getElementById('rv-detail-body').innerHTML
+  window._currentRvId=r.id
+  window._currentRvCacheKey=cacheKey
   const detail=`
     <div style="font-size:1rem;font-weight:700;margin-bottom:.75rem">📋 予約詳細</div>
     <div style="display:flex;flex-direction:column;gap:.5rem">
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div><div style="font-size:.95rem;font-weight:700">${r.customer_name||'-'}</div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
-        <div class="card"><div style="font-size:.75rem;color:var(--text3)">入室</div><div style="font-size:.9rem;font-weight:600">${r.checkin_time?.slice(0,5)||'-'}</div></div>
-        <div class="card"><div style="font-size:.75rem;color:var(--text3)">退室</div><div style="font-size:.9rem;font-weight:600">${r.checkout_time?.slice(0,5)||'-'}</div></div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div>
+        <input id="edit-rv-name" class="fi2" value="${r.customer_name||''}" style="margin-top:.3rem">
       </div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div><div>${r.is_new?'新規':'再来'}</div></div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">指名区分</div><div>${r.shimei_type||'フリー'}</div></div>
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div><div>${r.course||'-'}</div></div>
-      ${opts?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション</div><div>${opts}</div></div>`:''}
-      ${discs?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">割引</div><div style="color:var(--rtx)">${discs}</div></div>`:''}
-      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div><div>${payMap[r.payment]||r.payment||'-'}</div></div>
-      ${r.note?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div><div>${r.note}</div></div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
+        <div class="card"><div style="font-size:.75rem;color:var(--text3)">入室</div>
+          <input id="edit-rv-checkin" type="time" class="fi2" value="${r.checkin_time?.slice(0,5)||''}" style="margin-top:.3rem">
+        </div>
+        <div class="card"><div style="font-size:.75rem;color:var(--text3)">退室</div>
+          <input id="edit-rv-checkout" type="time" class="fi2" value="${r.checkout_time?.slice(0,5)||''}" style="margin-top:.3rem">
+        </div>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div>
+        <select id="edit-rv-isnew" class="fi2" style="margin-top:.3rem">
+          <option value="">-- 選択 --</option>
+          <option value="false" ${!r.is_new?'selected':''}>再来</option>
+          <option value="true" ${r.is_new?'selected':''}>新規</option>
+        </select>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">指名区分</div>
+        <select id="edit-rv-shimei" class="fi2" style="margin-top:.3rem">
+          <option value="">-- 選択 --</option>
+          <option value="フリー" ${(r.shimei_type||'')==='フリー'?'selected':''}>フリー</option>
+          <option value="ネット指名" ${r.shimei_type==='ネット指名'?'selected':''}>ネット指名</option>
+          <option value="本指名" ${r.shimei_type==='本指名'?'selected':''}>本指名</option>
+        </select>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div>
+        <select id="edit-rv-course" class="fi2" style="margin-top:.3rem">
+          <option value="">-- 選択 --</option>
+          ${(window._courses||courses||[]).map(c=>`<option value="${c.name}" ${r.course===c.name?'selected':''}>${c.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div>
+        <input id="edit-rv-note" class="fi2" value="${r.note||''}" placeholder="任意" style="margin-top:.3rem">
+      </div>
     </div>
-    <button class="btn btn-gray btn-full" style="margin-top:.75rem" onclick="document.getElementById('rv-detail-body').innerHTML=window._rvDetailBodyCache||''; window._rvDetailBodyCache=null">← 一覧に戻る</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem">
+      <button class="btn btn-gold" onclick="saveReservationEdit(${r.id},'${cacheKey}')">訂正を保存</button>
+      <button class="btn btn-red" onclick="deleteReservation(${r.id},'${cacheKey}')">この予約を削除</button>
+    </div>
+    <button class="btn btn-gray btn-full" style="margin-top:.5rem" onclick="backToRvList()">← 一覧に戻る</button>
   `
-  window._rvDetailBodyCache=document.getElementById('rv-detail-body').innerHTML
   document.getElementById('rv-detail-body').innerHTML=detail
+}
+
+function backToRvList(){
+  if(window._rvDetailBodyCache){
+    document.getElementById('rv-detail-body').innerHTML=window._rvDetailBodyCache
+    window._rvDetailBodyCache=null
+  }
+}
+
+async function saveReservationEdit(rvId,cacheKey){
+  const name=document.getElementById('edit-rv-name')?.value.trim()
+  const checkin=document.getElementById('edit-rv-checkin')?.value
+  const checkout=document.getElementById('edit-rv-checkout')?.value
+  const isNew=document.getElementById('edit-rv-isnew')?.value
+  const shimei=document.getElementById('edit-rv-shimei')?.value
+  const course=document.getElementById('edit-rv-course')?.value
+  const note=document.getElementById('edit-rv-note')?.value.trim()
+  if(!name){toast('お客様名を入力してください');return}
+  const finalName=name.endsWith('様')?name:name+'様'
+  const{error}=await sb.from('reservations').update({
+    customer_name:finalName,
+    checkin_time:checkin||null,
+    checkout_time:checkout||null,
+    is_new:isNew==='true',
+    shimei_type:shimei||null,
+    course:course||null,
+    note:note||null
+  }).eq('id',rvId)
+  if(error){toast('エラー: '+error.message);return}
+  toast('訂正しました')
+  // キャッシュ更新
+  if(window._rvDetailCache?.[cacheKey]){
+    const idx=window._rvDetailCache[cacheKey].findIndex(r=>r.id===rvId)
+    if(idx>=0){
+      const updated=window._rvDetailCache[cacheKey][idx]
+      window._rvDetailCache[cacheKey][idx]={...updated,customer_name:finalName,checkin_time:checkin||null,checkout_time:checkout||null,is_new:isNew==='true',shimei_type:shimei,course,note}
+    }
+  }
+  // 一覧に戻って再表示
+  backToRvList()
+  // 本日ページも再読み込み
+  if(document.getElementById('p-today')?.classList.contains('on'))loadToday()
+}
+
+async function deleteReservation(rvId,cacheKey){
+  if(!confirm('この予約を削除しますか？'))return
+  const{error}=await sb.from('reservations').delete().eq('id',rvId)
+  if(error){toast('エラー: '+error.message);return}
+  toast('削除しました')
+  // キャッシュから削除
+  if(window._rvDetailCache?.[cacheKey]){
+    window._rvDetailCache[cacheKey]=window._rvDetailCache[cacheKey].filter(r=>r.id!==rvId)
+  }
+  backToRvList()
+  if(document.getElementById('p-today')?.classList.contains('on'))loadToday()
 }
 
 // ── 予約確認シート（キャストID指定） ──
