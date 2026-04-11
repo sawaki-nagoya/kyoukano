@@ -522,7 +522,7 @@ tr:last-child td{border-bottom:none}
 
 
 <!-- ===== ガントチャートモーダル ===== -->
-<div id="gantt-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:var(--bg);display:none;flex-direction:column">
+<div id="gantt-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:var(--bg);flex-direction:column">
   <!-- ヘッダー -->
   <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem .75rem;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)">
     <div style="display:flex;align-items:center;gap:.4rem">
@@ -533,7 +533,7 @@ tr:last-child td{border-bottom:none}
     <span style="font-size:.82rem;font-weight:700" id="gantt-modal-title">ガントチャート</span>
     <button style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--text2);padding:.1rem .5rem;line-height:1" onclick="closeGanttModal()">✕</button>
   </div>
-  <!-- ガントエリア：縦スクロールOK、横スクロールOK -->
+  <!-- ガントエリア -->
   <div id="gantt-modal-body" style="flex:1;overflow:auto;padding:.5rem .4rem"><div class="spin">読み込み中...</div></div>
 </div>
 
@@ -834,7 +834,7 @@ function fmt(n){return '¥'+Math.round(n||0).toLocaleString()}
 function addMonth(y,d){const[yr,m]=y.split('-').map(Number);const nd=new Date(yr,m-1+d,1);return nd.getFullYear()+'-'+String(nd.getMonth()+1).padStart(2,'0')}
 function nextYM(y){return addMonth(y,1)}
 function jpDate(s){const[y,m,d]=s.split('-');return parseInt(m)+'月'+parseInt(d)+'日'}
-function today(){const d=new Date();d.setHours(d.getHours()+9);return d.toISOString().slice(0,10)}
+function today(){const d=new Date();return new Date(d.getTime()+9*60*60*1000).toISOString().slice(0,10)}
 function toast(msg,dur=1800){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),dur)}
 function closeSheet(id){
   const el=document.getElementById(id+'-overlay')
@@ -2061,9 +2061,11 @@ async function loadToday(){
         const checkin=r.checkin_time?.slice(0,5)||''
         const checkout=r.checkout_time?.slice(0,5)||''
         const timeStr=checkin?(checkout?checkin+'〜'+checkout:checkin+'〜'):''
+        const noCustNo=!r.customer_no
+        const noCustBadge=noCustNo?`<span style="font-size:.6rem;color:var(--rtx);background:var(--rbg);border:1px solid var(--rbd);border-radius:4px;padding:1px 5px;margin-left:.3rem">番号未登録</span>`:''
         rvListHtml+=`<div style="font-size:.78rem;padding:.2rem 0;border-bottom:1px dashed var(--border)">
           <span style="font-weight:600;color:var(--accent)">${timeStr}</span>
-          <span style="margin-left:.4rem;font-weight:600">${r.customer_name||''}</span>
+          <span style="margin-left:.4rem;font-weight:600">${r.customer_name||''}${noCustBadge}</span>
           <span style="font-size:.7rem;color:var(--text3);margin-left:.4rem">${r.course||''}${opts?' / '+opts:''}${discs?' / 割引:'+discs:''}</span>
         </div>`
       })
@@ -2138,6 +2140,10 @@ function openGanttModal(room){
   document.getElementById('gantt-modal-title').textContent=room+' のガントチャート'
   const ov=document.getElementById('gantt-modal-overlay')
   ov.style.display='flex'
+  // 横画面誘導メッセージ（縦画面の場合）
+  if(window.innerWidth<window.innerHeight){
+    ov.style.flexDirection='column'
+  }
   loadGanttModal()
 }
 
@@ -2156,6 +2162,7 @@ async function loadGanttModal(){
   const area=document.getElementById('gantt-modal-body')
   const lbl=document.getElementById('gantt-modal-date-lbl')
   if(!area) return
+  console.log('ガントチャート日付:', ganttModalDate)
   const[y,m,d]=ganttModalDate.split('-')
   if(lbl) lbl.textContent=parseInt(m)+'月'+parseInt(d)+'日'
   area.innerHTML='<div class="spin">読み込み中...</div>'
@@ -2164,8 +2171,12 @@ async function loadGanttModal(){
   const norm=s=>(s||'').trim().replace(/\u3000/g,' ')
   const targetRoom=norm(ganttModalRoom)
 
-  const{data:allShifts}=await sb.from('shifts').select('*,casts(name)').eq('date',ganttModalDate).eq('status','approved').order('start_time')
+  // shiftsを取得（エラーも捕捉してデバッグ）
+  const{data:allShifts,error:shiftErr}=await sb.from('shifts').select('*,casts(name)').eq('date',ganttModalDate).eq('status','approved').order('start_time')
+  if(shiftErr) console.error('ガントシフト取得エラー:',shiftErr)
+  console.log('ガント取得結果:', {date:ganttModalDate, room:ganttModalRoom, allCount:(allShifts||[]).length, allShifts:allShifts})
   const targetShifts=(allShifts||[]).filter(s=>norm(s.room)===targetRoom)
+  console.log('ルームフィルタ後:', targetShifts.length, '件')
 
   // 予約取得
   const{data:allRvs}=targetShifts.length
@@ -2230,10 +2241,16 @@ async function loadGanttModal(){
 
   let rows=''
   if(!targetShifts.length){
-    const dbgInfo=(allShifts||[]).map(s=>`${s.casts?.name||'?'}:「${s.room||'(未設定)'}」`).join(', ')
-    rows=`<div class="empty" style="padding:1.5rem 0;font-size:.82rem">
-      この日このルームに出勤なし<br>
-      <span style="font-size:.62rem;color:var(--text3)">検索：「${ganttModalRoom}」／登録：${dbgInfo||'なし'}</span>
+    // 各文字のUnicodeコードポイントも表示してルーム名不一致の原因を特定
+    const toHex=str=>[...str].map(c=>c+'('+c.charCodeAt(0).toString(16).toUpperCase()+')').join('')
+    const dbgRooms=(allShifts||[]).map(s=>`${s.casts?.name||'?'}:「${s.room||'(未設定)'}」[${toHex(s.room||'')}]`).join('<br>')
+    rows=`<div style="padding:.75rem;font-size:.7rem;text-align:left;color:var(--text2)">
+      <b style="color:var(--rtx)">⚠️ この日このルームに出勤なし</b><br>
+      日付：${ganttModalDate}<br>
+      検索ルーム：「${ganttModalRoom}」[${toHex(ganttModalRoom)}]<br>
+      全シフト取得数：${(allShifts||[]).length}件<br>
+      ${dbgRooms||'シフトデータなし（RLS/DB問題の可能性）'}
+      ${shiftErr?'<br><b>DBエラー：</b>'+shiftErr.message:''}
     </div>`
   } else {
     targetShifts.forEach((s,si)=>{
