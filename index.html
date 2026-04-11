@@ -342,18 +342,7 @@ tr:last-child td{border-bottom:none}
       <div id="owner-cal-grid"></div>
       <div style="font-size:.72rem;color:var(--text3);margin:.4rem 0 .25rem">📋 日付をタップして詳細確認・承認できます</div>
       <div id="owner-shift-area" style="margin-top:.25rem"><div class="spin">読み込み中...</div></div>
-      <!-- ガントチャート -->
-      <div style="margin-top:1rem">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-          <div style="font-size:.88rem;font-weight:700">📊 ガントチャート（承認済みシフト）</div>
-          <div style="display:flex;gap:.4rem;align-items:center">
-            <button class="cal-nav-btn" onclick="ganttMove(-1)">‹</button>
-            <div style="font-size:.8rem;font-weight:600" id="gantt-date-lbl">-</div>
-            <button class="cal-nav-btn" onclick="ganttMove(1)">›</button>
-          </div>
-        </div>
-        <div id="gantt-area"><div class="spin">読み込み中...</div></div>
-      </div>
+
     </div>
 
     <!-- 店舗：本日状況 -->
@@ -509,7 +498,7 @@ tr:last-child td{border-bottom:none}
             <div id="rv-discount-list" style="display:flex;flex-direction:column;gap:.35rem;padding:.5rem .9rem;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);min-height:44px"></div>
           </div>
           <div><div class="fi-lbl">支払い方法</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
               <div>
                 <div style="font-size:.7rem;color:var(--text3);margin-bottom:.25rem;font-weight:600">コース</div>
                 <select class="fi" id="rv-pay-course" style="padding:.4rem .5rem;font-size:.82rem"><option value="現金">現金</option><option value="カード">カード</option></select>
@@ -517,10 +506,6 @@ tr:last-child td{border-bottom:none}
               <div>
                 <div style="font-size:.7rem;color:var(--text3);margin-bottom:.25rem;font-weight:600">指名料</div>
                 <select class="fi" id="rv-pay-shimei" style="padding:.4rem .5rem;font-size:.82rem"><option value="現金">現金</option><option value="カード">カード</option></select>
-              </div>
-              <div>
-                <div style="font-size:.7rem;color:var(--text3);margin-bottom:.25rem;font-weight:600">オプション</div>
-                <select class="fi" id="rv-pay-option" style="padding:.4rem .5rem;font-size:.82rem"><option value="現金">現金</option><option value="カード">カード</option></select>
               </div>
             </div>
           </div>
@@ -534,21 +519,22 @@ tr:last-child td{border-bottom:none}
 
 
 
-<!-- ===== ガントチャートモーダル ===== -->
-<div class="sheet-overlay" id="gantt-modal-overlay">
-  <div class="sheet">
-    <div class="sheet-hdr">
-      <span id="gantt-modal-title">ガントチャート</span>
-      <button class="sheet-close" onclick="closeSheet('gantt-modal')">✕</button>
-    </div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
-      <div style="font-size:.75rem;color:var(--text3)" id="gantt-modal-date-lbl"></div>
-      <div style="display:flex;gap:.35rem">
+<!-- ===== ガントチャートモーダル（横画面フルスクリーン） ===== -->
+<div id="gantt-modal-overlay" style="display:none;position:fixed;inset:0;z-index:9000;background:var(--bg)">
+  <!-- 横画面強制ラッパー -->
+  <div id="gantt-landscape-wrap" style="position:absolute;background:var(--bg);overflow:hidden">
+    <!-- ヘッダー -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:.4rem .7rem;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:.5rem">
         <button class="cal-nav-btn" onclick="ganttModalMove(-1)">‹</button>
+        <div style="font-size:.78rem;font-weight:700" id="gantt-modal-date-lbl"></div>
         <button class="cal-nav-btn" onclick="ganttModalMove(1)">›</button>
       </div>
+      <span style="font-size:.85rem;font-weight:700" id="gantt-modal-title">ガントチャート</span>
+      <button style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text2);padding:.2rem .5rem" onclick="closeGanttModal()">✕</button>
     </div>
-    <div id="gantt-modal-body"><div class="spin">読み込み中...</div></div>
+    <!-- ガントエリア（横スクロール可） -->
+    <div id="gantt-modal-body" style="flex:1;overflow:auto;padding:.4rem .5rem"><div class="spin">読み込み中...</div></div>
   </div>
 </div>
 
@@ -976,7 +962,7 @@ function tab(name){
   if(name==='shift')        loadCal()
   if(name==='shift-list')   loadShiftList()
   if(name==='salary')       loadMySalary()
-  if(name==='owner-shift')  {loadOwnerCal();ganttDate=today();loadGantt()}
+  if(name==='owner-shift')  {loadOwnerCal()}
   if(name==='today')        loadToday()
   if(name==='cast-memo')      loadCastMemoPage()
   if(name==='cast-memo')     loadCastMemoList()
@@ -1423,7 +1409,6 @@ async function openReservation(shiftId,castName,date){
   }
   if(document.getElementById('rv-pay-course')) document.getElementById('rv-pay-course').value='現金'
   if(document.getElementById('rv-pay-shimei')) document.getElementById('rv-pay-shimei').value='現金'
-  if(document.getElementById('rv-pay-option')) document.getElementById('rv-pay-option').value='現金'
   document.getElementById('rv-note').value=''
   document.getElementById('rv-checkin').value=''
   document.getElementById('rv-checkout').value=''
@@ -1437,7 +1422,15 @@ async function openReservation(shiftId,castName,date){
   const{data:opts}=await sb.from('options').select('*').order('name')
   const optsList=document.getElementById('rv-options-list')
   if(opts&&opts.length){
-    optsList.innerHTML=opts.map(o=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem"><input type="checkbox" class="rv-opt-chk" value="${o.name}" style="width:18px;height:18px;accent-color:var(--accent)"><span>${o.name}（¥${(o.price||0).toLocaleString()}）</span></label>`).join('')
+    optsList.innerHTML=opts.map(o=>`<div style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0">
+      <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer;flex:1;font-size:.88rem">
+        <input type="checkbox" class="rv-opt-chk" value="${o.name}" style="width:18px;height:18px;accent-color:var(--accent)" onchange="updateOptPay(this)">
+        <span>${o.name}（¥${(o.price||0).toLocaleString()}）</span>
+      </label>
+      <select class="rv-opt-pay fi" data-opt="${o.name}" style="padding:.3rem .4rem;font-size:.75rem;width:72px;opacity:.4;pointer-events:none" disabled>
+        <option value="現金">現金</option><option value="カード">カード</option>
+      </select>
+    </div>`).join('')
   } else {
     optsList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">オプションなし</div>'
   }
@@ -1450,6 +1443,24 @@ async function openReservation(shiftId,castName,date){
     discList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">店舗料金設定で割引を登録してください</div>'
   }
   document.getElementById('reservation-overlay').classList.add('on')
+}
+
+// オプションチェック時に支払い方法セレクトを有効化/無効化
+function updateOptPay(chk){
+  const row=chk.closest('div')
+  if(!row) return
+  const sel=row.querySelector('.rv-opt-pay')
+  if(!sel) return
+  if(chk.checked){
+    sel.disabled=false
+    sel.style.opacity='1'
+    sel.style.pointerEvents='auto'
+  } else {
+    sel.disabled=true
+    sel.style.opacity='.4'
+    sel.style.pointerEvents='none'
+    sel.value='現金'
+  }
 }
 
 // コース時間から退室時間を自動計算
@@ -1509,9 +1520,16 @@ async function saveReservation(){
   const discount=discounts.join(',')
   const payCourse=document.getElementById('rv-pay-course')?.value||'現金'
   const payShimei=document.getElementById('rv-pay-shimei')?.value||'現金'
-  const payOption=document.getElementById('rv-pay-option')?.value||'現金'
-  // 支払い方法をJSON文字列で保存
-  const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOption})
+  // オプションごとの支払い方法を収集
+  const optPayMap={}
+  document.querySelectorAll('#rv-options-list .rv-opt-pay').forEach(sel=>{
+    const optName=sel.dataset.opt
+    const chk=sel.closest('div').querySelector('.rv-opt-chk')
+    if(chk&&chk.checked) optPayMap[optName]=sel.value||'現金'
+  })
+  const payOption=Object.values(optPayMap).includes('カード')?'カード':'現金'
+  // 支払い方法をJSON文字列で保存（オプション個別payも含む）
+  const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOption,optPay:optPayMap})
   const memo=document.getElementById('rv-note').value.trim()
   // 名前に「様」を自動付与
   const finalName=custName.endsWith('様')?custName:custName+'様'
@@ -1904,8 +1922,8 @@ async function ownerSelectDay(ds){
   document.getElementById('owner-shift-detail-overlay').classList.add('on')
 }
 
-async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal();loadGantt()}
-async function rejectShift(id){if(!confirm('却下しますか？'))return;await sb.from('shifts').update({status:'rejected'}).eq('id',id);toast('却下しました');loadOwnerCal();loadGantt()}
+async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
+async function rejectShift(id){if(!confirm('却下しますか？'))return;await sb.from('shifts').update({status:'rejected'}).eq('id',id);toast('却下しました');loadOwnerCal()}
 
 function openShiftEdit(id,name,date,start,end,note){
   editShiftId=id
@@ -1921,13 +1939,13 @@ async function saveShiftEdit(){
   const note=document.getElementById('se-note').value
   const{error}=await sb.from('shifts').update({start_time:start,end_time:end,note}).eq('id',editShiftId)
   if(error){toast('エラー: '+error.message);console.error('saveShiftEdit error:',error);return}
-  toast('シフトを訂正しました');closeSheet('shift-edit');loadOwnerCal();loadGantt()
+  toast('シフトを訂正しました');closeSheet('shift-edit');loadOwnerCal()
 }
 async function deleteShift(){
   if(!confirm('このシフトを削除しますか？'))return
   const{error}=await sb.from('shifts').delete().eq('id',editShiftId)
   if(error){toast('エラー: '+error.message);console.error('deleteShift error:',error);return}
-  toast('削除しました');closeSheet('shift-edit');loadOwnerCal();loadGantt()
+  toast('削除しました');closeSheet('shift-edit');loadOwnerCal()
 }
 
 // ── 店舗：本日状況 ──
@@ -2072,9 +2090,47 @@ function openGanttModal(room){
   ganttModalRoom=room
   ganttModalDate=today()
   document.getElementById('gantt-modal-title').textContent=room+' のガントチャート'
-  document.getElementById('gantt-modal-overlay').classList.add('on')
+  const overlay=document.getElementById('gantt-modal-overlay')
+  overlay.style.display='block'
+  applyGanttLandscape()
   loadGanttModal()
 }
+
+function closeGanttModal(){
+  const overlay=document.getElementById('gantt-modal-overlay')
+  overlay.style.display='none'
+  // 横画面強制を解除
+  if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock()
+  document.getElementById('gantt-landscape-wrap').style.transform=''
+  document.getElementById('gantt-landscape-wrap').style.width=''
+  document.getElementById('gantt-landscape-wrap').style.height=''
+}
+
+// 横画面強制 or CSS回転で横表示
+function applyGanttLandscape(){
+  const wrap=document.getElementById('gantt-landscape-wrap')
+  const overlay=document.getElementById('gantt-modal-overlay')
+  const isLandscape=window.innerWidth>window.innerHeight
+  if(isLandscape){
+    // すでに横画面
+    wrap.style.cssText='position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;transform:none;width:100%;height:100%;top:0;left:0'
+  } else {
+    // 縦画面 → CSS回転で横表示
+    const vw=window.innerWidth
+    const vh=window.innerHeight
+    wrap.style.cssText=`position:absolute;display:flex;flex-direction:column;background:var(--bg);overflow:hidden;
+      width:${vh}px;height:${vw}px;
+      top:${(vh-vw)/2}px;left:${(vw-vh)/2}px;
+      transform:rotate(90deg);transform-origin:center center`
+  }
+  // gantt-modal-bodyにもflexを
+  const body=document.getElementById('gantt-modal-body')
+  if(body) body.style.cssText='flex:1;overflow:auto;padding:.4rem .5rem'
+}
+
+window.addEventListener('resize',()=>{
+  if(document.getElementById('gantt-modal-overlay').style.display==='block') applyGanttLandscape()
+})
 
 function ganttModalMove(d){
   const dt=new Date(ganttModalDate)
@@ -2091,7 +2147,6 @@ async function loadGanttModal(){
   if(lbl) lbl.textContent=parseInt(m)+'月'+parseInt(d)+'日（'+ganttModalRoom+'）'
   area.innerHTML='<div class="spin">読み込み中...</div>'
 
-  // このルームのシフトを取得（全キャスト）
   const{data:allShifts}=await sb.from('shifts').select('*,casts(name)').eq('date',ganttModalDate).eq('status','approved').order('start_time')
   const roomShifts=(allShifts||[]).filter(s=>s.room===ganttModalRoom)
   const{data:allRvs}=allShifts&&allShifts.length
@@ -2107,91 +2162,112 @@ async function loadGanttModal(){
     if(h<START_H) h+=24
     return Math.max(0,Math.min(100,((h-START_H)*60+m)/TOTAL_MIN*100))
   }
-  // 時間軸ラベル・グリッドライン
-  const hourLabels=[]
-  const hourLines=[]
-  for(let h=START_H;h<=END_H;h++){
-    const pos=(h-START_H)/(END_H-START_H)*100
-    if(h%2===0) hourLabels.push(`<div style="position:absolute;left:${pos}%;transform:translateX(-50%);font-size:.58rem;color:var(--text3);white-space:nowrap">${h>=24?h-24+'時':h+'時'}</div>`)
-    hourLines.push(`<div style="position:absolute;left:${pos}%;top:0;bottom:0;width:1px;background:${h%2===0?'rgba(0,0,0,.12)':'rgba(0,0,0,.05)'}"></div>`)
+  const timeToPx=t=>{
+    const pos=timeToPos(t)
+    return pos===null?null:pos/100*TOTAL_MIN*4 // 4px per minute
   }
+  const TOTAL_W=TOTAL_MIN*4 // px総幅
+  const NAME_W=64 // キャスト名列幅px
+
+  // 時間軸ラベル（1時間ごと）
+  const hourLabels=[]
+  for(let h=START_H;h<=END_H;h++){
+    const px=(h-START_H)*60*4
+    const label=h>=24?(h-24)+'時':h+'時'
+    hourLabels.push(`<div style="position:absolute;left:${px}px;transform:translateX(-50%);font-size:.62rem;color:var(--text3);white-space:nowrap;font-weight:600">${label}</div>`)
+  }
+
+  // グリッドライン（10分ごと）
+  const gridLines=[]
+  for(let min=0;min<=TOTAL_MIN;min+=10){
+    const px=min*4
+    const isHour=min%60===0
+    const isHalf=min%30===0&&!isHour
+    gridLines.push(`<div style="position:absolute;left:${px}px;top:0;bottom:0;width:${isHour?1.5:isHalf?1:0.5}px;background:${isHour?'rgba(0,0,0,.18)':isHalf?'rgba(0,0,0,.1)':'rgba(0,0,0,.04)'}"></div>`)
+  }
+
   // 現在時刻ライン
   const now=new Date()
   const nowH=now.getHours()+(now.getHours()<START_H?24:0)
-  const nowPos=((nowH-START_H)*60+now.getMinutes())/TOTAL_MIN*100
+  const nowPx=((nowH-START_H)*60+now.getMinutes())*4
   const todayStr=today()
-  const nowLine=ganttModalDate===todayStr&&nowPos>=0&&nowPos<=100
-    ? `<div style="position:absolute;left:${nowPos}%;top:0;bottom:0;width:2px;background:rgba(255,59,48,.7);z-index:10"></div>`
+  const nowLine=ganttModalDate===todayStr&&nowPx>=0&&nowPx<=TOTAL_W
+    ? `<div style="position:absolute;left:${nowPx}px;top:0;bottom:0;width:2px;background:rgba(255,59,48,.8);z-index:10"></div>
+       <div style="position:absolute;left:${nowPx}px;top:-16px;transform:translateX(-50%);font-size:.55rem;color:var(--rtx);font-weight:700;white-space:nowrap;background:var(--bg);padding:0 2px">${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</div>`
     : ''
 
   const CAST_COLORS=['#FF6B9D','#9B72CF','#4ECDC4','#FF9A56','#45B7D1','#96CEB4']
 
-  // ルーム内のシフト行
   let rows=''
   if(!roomShifts.length){
-    rows='<div class="empty" style="padding:1.5rem 0">この日このルームに出勤なし</div>'
+    rows='<div class="empty" style="padding:2rem 0">この日このルームに出勤なし</div>'
   } else {
     roomShifts.forEach((s,si)=>{
-      const startPos=timeToPos(s.start_time?.slice(0,5))
-      const endPos=timeToPos(s.end_time?.slice(0,5))
-      if(startPos===null||endPos===null) return
+      const startPx=timeToPx(s.start_time?.slice(0,5))
+      const endPx=timeToPx(s.end_time?.slice(0,5))
+      if(startPx===null||endPx===null) return
       const color=CAST_COLORS[si%CAST_COLORS.length]
-      const shiftW=endPos-startPos
+      const shiftW=endPx-startPx
       const shiftRvs=rvByShift[s.id]||[]
+
       // 予約バー
       let rvBars=''
       shiftRvs.forEach(r=>{
-        const rStart=timeToPos(r.checkin_time?.slice(0,5))
-        const rEnd=timeToPos(r.checkout_time?.slice(0,5))
-        if(rStart===null||rEnd===null||rEnd-rStart<=0) return
-        rvBars+=`<div title="${r.customer_name||''}　${r.checkin_time?.slice(0,5)||''}-${r.checkout_time?.slice(0,5)||''}　${r.course||''}" style="position:absolute;left:${rStart}%;width:${rEnd-rStart}%;top:2px;bottom:2px;background:rgba(255,149,0,.9);border-radius:3px;z-index:5;display:flex;align-items:center;overflow:hidden;padding:0 2px">
-          <span style="font-size:.5rem;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.customer_name?.replace('様','')||''}</span>
+        const rS=timeToPx(r.checkin_time?.slice(0,5))
+        const rE=timeToPx(r.checkout_time?.slice(0,5))
+        if(rS===null||rE===null||rE-rS<=0) return
+        rvBars+=`<div title="${r.customer_name||''}　${r.checkin_time?.slice(0,5)||''}-${r.checkout_time?.slice(0,5)||''}　${r.course||''}" style="position:absolute;left:${rS}px;width:${rE-rS}px;top:2px;bottom:2px;background:rgba(255,149,0,.9);border-radius:3px;z-index:5;display:flex;align-items:center;overflow:hidden;padding:0 3px">
+          <span style="font-size:.58rem;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.customer_name?.replace('様','')||''}<span style="font-weight:400;opacity:.85"> ${r.course||''}</span></span>
         </div>`
       })
+
       // 空き時間バー
       let freeBars=''
       const sorted=[...shiftRvs].filter(r=>r.checkin_time&&r.checkout_time).sort((a,b)=>a.checkin_time.localeCompare(b.checkin_time))
       let prevEnd=s.start_time?.slice(0,5)||''
       ;[...sorted,{checkin_time:s.end_time?.slice(0,5),checkout_time:s.end_time?.slice(0,5)}].forEach(r=>{
-        const fStart=timeToPos(prevEnd)
-        const fEnd=timeToPos(r.checkin_time?.slice(0,5))
-        if(fStart!==null&&fEnd!==null&&fEnd-fStart>0.5)
-          freeBars+=`<div style="position:absolute;left:${fStart}%;width:${fEnd-fStart}%;top:4px;bottom:4px;background:rgba(52,199,89,.25);border:1px dashed rgba(52,199,89,.5);border-radius:2px;z-index:3"></div>`
+        const fS=timeToPx(prevEnd),fE=timeToPx(r.checkin_time?.slice(0,5))
+        if(fS!==null&&fE!==null&&fE-fS>2)
+          freeBars+=`<div style="position:absolute;left:${fS}px;width:${fE-fS}px;top:4px;bottom:4px;background:rgba(52,199,89,.22);border-radius:2px;border:1px dashed rgba(52,199,89,.6);z-index:3"></div>`
         prevEnd=r.checkout_time?.slice(0,5)||prevEnd
       })
-      // 予約ラベル
+
       const rvLabel=shiftRvs.length>0
-        ? `<span style="font-size:.65rem;color:var(--accent);margin-left:.3rem">予約${shiftRvs.length}件</span>`
-        : `<span style="font-size:.65rem;color:var(--green);margin-left:.3rem">空き</span>`
-      rows+=`<div style="margin-bottom:.6rem">
-        <div style="font-size:.75rem;font-weight:700;color:${color};margin-bottom:.2rem">${s.casts?.name||'?'}${rvLabel}</div>
-        <div style="position:relative;height:30px;background:var(--surface2);border-radius:4px;overflow:visible">
-          ${hourLines.join('')}
-          <div style="position:absolute;left:${startPos}%;width:${shiftW}%;top:0;bottom:0;background:${color}22;border:1.5px solid ${color}66;border-radius:3px;z-index:2"></div>
+        ?`<span style="font-size:.6rem;color:var(--accent);margin-left:.3rem">予約${shiftRvs.length}件</span>`
+        :`<span style="font-size:.6rem;color:var(--green);margin-left:.3rem">空き</span>`
+
+      rows+=`<div style="display:flex;align-items:center;margin-bottom:.55rem;gap:0">
+        <div style="width:${NAME_W}px;min-width:${NAME_W}px;font-size:.72rem;font-weight:700;color:${color};overflow:hidden;line-height:1.25;padding-right:.3rem">
+          ${s.casts?.name||'?'}${rvLabel}<br>
+          <span style="font-size:.55rem;font-weight:400;color:var(--text3)">${s.start_time?.slice(0,5)||''}-${s.end_time?.slice(0,5)||''}</span>
+        </div>
+        <div style="position:relative;height:34px;width:${TOTAL_W}px;background:var(--surface2);border-radius:4px;flex-shrink:0;overflow:visible">
+          ${gridLines.join('')}
+          <div style="position:absolute;left:${startPx}px;width:${shiftW}px;top:0;bottom:0;background:${color}22;border:1.5px solid ${color}66;border-radius:3px;z-index:2"></div>
           ${freeBars}${rvBars}${nowLine}
         </div>
       </div>`
     })
   }
 
-  // ルーム全体の空き状況サマリ
-  const hasAnyone=roomShifts.length>0
-  const summaryColor=hasAnyone?'var(--accent)':'var(--green)'
-  const summaryText=hasAnyone?`${roomShifts.length}名出勤中`:'本日は終日空き'
+  const legend=`<div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;font-size:.62rem;padding-left:${NAME_W}px">
+    <div style="display:flex;align-items:center;gap:.2rem"><div style="width:10px;height:7px;background:rgba(255,149,0,.9);border-radius:2px"></div>予約済み</div>
+    <div style="display:flex;align-items:center;gap:.2rem"><div style="width:10px;height:7px;background:rgba(52,199,89,.22);border:1px dashed rgba(52,199,89,.6);border-radius:2px"></div>空き</div>
+    <div style="display:flex;align-items:center;gap:.2rem"><div style="width:14px;height:1px;background:rgba(0,0,0,.18)"></div>1時間</div>
+    <div style="display:flex;align-items:center;gap:.2rem"><div style="width:14px;height:1px;background:rgba(0,0,0,.1)"></div>30分</div>
+    <div style="display:flex;align-items:center;gap:.2rem"><div style="width:14px;height:0.5px;background:rgba(0,0,0,.06)"></div>10分</div>
+    ${ganttModalDate===todayStr?'<div style="display:flex;align-items:center;gap:.2rem"><div style="width:2px;height:8px;background:rgba(255,59,48,.8)"></div>現在</div>':''}
+  </div>`
 
-  area.innerHTML=`
-    <div style="background:var(--surface2);border-radius:8px;padding:.4rem .6rem;margin-bottom:.75rem;font-size:.78rem;font-weight:600;color:${summaryColor}">${summaryText}</div>
-    <div style="position:relative;padding-top:18px">
-      <div style="position:relative;height:18px;margin-bottom:4px">${hourLabels.join('')}</div>
-      ${rows}
-    </div>
-    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem;font-size:.65rem">
-      <div style="display:flex;align-items:center;gap:.25rem"><div style="width:12px;height:8px;background:rgba(255,149,0,.9);border-radius:2px"></div>予約済み</div>
-      <div style="display:flex;align-items:center;gap:.25rem"><div style="width:12px;height:8px;background:rgba(52,199,89,.25);border:1px dashed rgba(52,199,89,.5);border-radius:2px"></div>空き時間</div>
-      ${ganttModalDate===todayStr?'<div style="display:flex;align-items:center;gap:.25rem"><div style="width:2px;height:10px;background:rgba(255,59,48,.7)"></div>現在時刻</div>':''}
-    </div>`
+  // ヘッダー時間軸
+  const headerHtml=`<div style="position:relative;height:20px;margin-left:${NAME_W}px;margin-bottom:2px;width:${TOTAL_W}px">${hourLabels.join('')}</div>`
+
+  area.innerHTML=`<div style="min-width:${TOTAL_W+NAME_W+20}px">
+    ${headerHtml}
+    ${rows}
+    ${legend}
+  </div>`
 }
-
 // ── 委託金入力（セット方式） ──
 async function openWorkSheet(shiftId,castName,date,castId){
   sheetCastId=castId;sheetCastName=castName;sheetDate=date
