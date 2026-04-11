@@ -89,7 +89,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .fi2:focus{border-color:var(--accent);background:var(--surface)}
 .fi2 option{background:var(--surface)}
 /* シートフォーム用 */
-.fi{width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:var(--rs);padding:.72rem .9rem;font-size:.95rem;font-family:inherit;outline:none;-webkit-appearance:none;transition:all .2s;display:block}
+.fi{width:100%;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:var(--rs);padding:.72rem .9rem;font-size:.95rem;font-family:inherit;outline:none;-webkit-appearance:none;appearance:none;transition:all .2s;display:block}
+.pay-sel{-webkit-appearance:none;appearance:none;background-image:none !important;background:var(--surface2);border:1.5px solid var(--border);color:var(--text);border-radius:var(--rs);font-family:inherit;outline:none;cursor:pointer;text-align:center;font-weight:600}
 .fi:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 3px rgba(184,137,58,.12)}
 .fi option{background:var(--surface)}
 .fi-lbl{font-size:.75rem;font-weight:700;color:var(--text3);letter-spacing:.04em;margin-bottom:.3rem;display:block}
@@ -481,7 +482,7 @@ tr:last-child td{border-bottom:none}
             </div>
             <div id="rv-cust-warn" style="display:none;font-size:.75rem;color:var(--rtx);margin-top:.3rem;padding:.3rem .5rem;background:var(--rbg);border-radius:6px;border:1px solid var(--rbd)">⚠️ 顧客番号が未登録です。予約後に顧客管理から登録してください。</div>
           </div>
-          <div><div class="fi-lbl">お客様名</div><input class="fi" id="rv-name" placeholder="○○様" oninput="autoKatakana(this)"></div>
+          <div><div class="fi-lbl">お客様名</div><input class="fi" id="rv-name" placeholder="○○様" oninput="autoKatakana(this)" onblur="autoKatakanaBlur(this)"></div>
           <div><div class="fi-lbl">来店区分</div>
             <select class="fi" id="rv-is-new"><option value="">-- 選択 --</option><option value="false">再来</option><option value="true">新規</option></select>
           </div>
@@ -489,14 +490,14 @@ tr:last-child td{border-bottom:none}
             <div class="fi-lbl">指名区分</div>
             <div style="display:flex;gap:.4rem;align-items:center">
               <select class="fi" id="rv-shimei" style="flex:1"><option value="">-- 選択 --</option><option value="フリー">フリー</option><option value="ネット指名">ネット指名</option><option value="本指名">本指名</option></select>
-              <select class="fi" id="rv-pay-shimei" style="width:72px;padding:.4rem .35rem;font-size:.78rem;flex-shrink:0"><option value="現金">💴現金</option><option value="カード">💳カード</option></select>
+              <select class="pay-sel" id="rv-pay-shimei" style="width:64px;padding:.35rem .3rem;font-size:.78rem;flex-shrink:0"><option value="現金">💴現金</option><option value="カード">💳カード</option></select>
             </div>
           </div>
           <div>
             <div class="fi-lbl">コース</div>
             <div style="display:flex;gap:.4rem;align-items:center">
               <select class="fi" id="rv-course" onchange="autoCalcCheckout()" style="flex:1"></select>
-              <select class="fi" id="rv-pay-course" style="width:72px;padding:.4rem .35rem;font-size:.78rem;flex-shrink:0"><option value="現金">💴現金</option><option value="カード">💳カード</option></select>
+              <select class="pay-sel" id="rv-pay-course" style="width:64px;padding:.35rem .3rem;font-size:.78rem;flex-shrink:0"><option value="現金">💴現金</option><option value="カード">💳カード</option></select>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
@@ -1411,6 +1412,9 @@ async function openReservation(shiftId,castName,date){
   if(document.getElementById('rv-pay-course')) document.getElementById('rv-pay-course').value='現金'
   if(document.getElementById('rv-pay-shimei')) document.getElementById('rv-pay-shimei').value='現金'
   document.getElementById('rv-note').value=''
+  // 顧客番号警告リセット
+  const custWarnEl=document.getElementById('rv-cust-warn')
+  if(custWarnEl) custWarnEl.style.display='none'
   document.getElementById('rv-checkin').value=''
   document.getElementById('rv-checkout').value=''
   // コース一覧をロード
@@ -1428,7 +1432,7 @@ async function openReservation(shiftId,castName,date){
         <input type="checkbox" class="rv-opt-chk" value="${o.name}" style="width:18px;height:18px;accent-color:var(--accent)" onchange="updateOptPay(this)">
         <span>${o.name}（¥${(o.price||0).toLocaleString()}）</span>
       </label>
-      <select class="rv-opt-pay fi" data-opt="${o.name}" style="padding:.3rem .4rem;font-size:.75rem;width:72px;opacity:.4;pointer-events:none" disabled>
+      <select class="rv-opt-pay pay-sel" data-opt="${o.name}" style="font-size:.75rem;width:64px;padding:.3rem .3rem;opacity:.4;pointer-events:none" disabled>
         <option value="現金">現金</option><option value="カード">カード</option>
       </select>
     </div>`).join('')
@@ -1443,16 +1447,24 @@ async function openReservation(shiftId,castName,date){
   } else {
     discList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">店舗料金設定で割引を登録してください</div>'
   }
+  // フォームを開いた時点で顧客番号未入力警告を表示
+  autoFillCustomer()
   document.getElementById('reservation-overlay').classList.add('on')
 }
 
-// ひらがな・漢字入力をカタカナに自動変換
+// ひらがなをカタカナに変換 + 「様」自動付与
 function autoKatakana(input){
-  // compositionend後に変換（IME確定後）
   if(input._composing) return
-  const v=input.value
-  const kata=v.replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60))
-  if(kata!==v) input.value=kata
+  let v=input.value
+  v=v.replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60))
+  input.value=v
+}
+function autoKatakanaBlur(input){
+  let v=input.value.trim()
+  if(!v) return
+  v=v.replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+0x60))
+  if(!v.endsWith('様')) v=v+'様'
+  input.value=v
 }
 // IME入力中はスキップ
 document.addEventListener('DOMContentLoaded',()=>{
@@ -1501,9 +1513,11 @@ function autoCalcCheckout(){
 function autoFillCustomer(){
   const no=parseInt(document.getElementById('rv-cust-id').value)
   const warn=document.getElementById('rv-cust-warn')
-  if(!no){
+  const custIdVal=document.getElementById('rv-cust-id').value.trim()
+  if(!custIdVal||!no){
     document.getElementById('rv-cust-name').textContent=''
-    if(warn) warn.style.display='none'
+    // 空欄の場合も「未入力」として警告表示
+    if(warn){warn.style.display='block';warn.textContent='⚠️ 顧客番号が未入力です。予約後に顧客管理から登録してください。'}
     return
   }
   const c=allCustomers.find(x=>x.customer_no===no)
@@ -1515,7 +1529,7 @@ function autoFillCustomer(){
   } else {
     document.getElementById('rv-cust-name').textContent='未登録'
     document.getElementById('rv-cust-name').style.color='var(--rtx)'
-    if(warn) warn.style.display='block'
+    if(warn){warn.style.display='block';warn.textContent='⚠️ 顧客番号が未登録です。予約後に顧客管理から登録してください。'}
   }
 }
 async function lookupCustomer(){
@@ -2174,13 +2188,13 @@ async function loadGanttModal(){
 
   // このルームのシフトのみ取得
   const{data:allShifts}=await sb.from('shifts').select('*,casts(name)').eq('date',ganttModalDate).eq('status','approved').order('start_time')
-  const roomShifts=(allShifts||[]).filter(s=>s.room===ganttModalRoom)
+  // roomの値を正規化して比較（全角スペース・半角スペースなどのトリム）
+  const normalizeRoom=s=>(s||'').trim().replace(/　/g,' ')
+  const targetRoom=normalizeRoom(ganttModalRoom)
+  const roomShifts=(allShifts||[]).filter(s=>normalizeRoom(s.room)===targetRoom)
 
-  // デバッグ：ルームが一致しない場合も全シフトを表示（ルーム未割当対応）
-  const useShifts=roomShifts.length>0?roomShifts:(allShifts||[]).filter(s=>!s.room)
-
-  // 予約はroomShiftsのIDのみで取得
-  const targetShifts=roomShifts.length>0?roomShifts:useShifts
+  // ルーム一致なしの場合：全シフトとルーム値をデバッグ表示
+  const targetShifts=roomShifts
   const{data:allRvs}=targetShifts.length
     ? await sb.from('reservations').select('*').in('shift_id',targetShifts.map(s=>s.id)).order('checkin_time')
     : {data:[]}
@@ -2245,7 +2259,10 @@ async function loadGanttModal(){
 
   let rows=''
   if(!targetShifts.length){
-    rows=`<div class="empty" style="padding:1.5rem 0;font-size:.85rem">この日このルームに出勤なし<br><span style="font-size:.7rem;color:var(--text3)">（ルーム：${ganttModalRoom}）</span></div>`
+    const debugInfo=(allShifts||[]).map(s=>`${s.casts?.name||'?'}:「${s.room||'(未設定)'}」`).join(', ')
+    rows=`<div class="empty" style="padding:1.5rem 0;font-size:.85rem">この日このルームに出勤なし<br>
+      <span style="font-size:.65rem;color:var(--text3)">検索ルーム：「${ganttModalRoom}」<br>
+      本日シフト：${debugInfo||'なし'}</span></div>`
   } else {
     targetShifts.forEach((s,si)=>{
       const startPx=timeToPos(s.start_time?.slice(0,5))
@@ -3255,7 +3272,7 @@ function showReservationDetail(idx,cacheKey){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <div class="card"><div style="font-size:.75rem;color:var(--text3)">入室</div>
-          <input id="edit-rv-checkin" type="time" class="fi2" value="${r.checkin_time?.slice(0,5)||''}" style="margin-top:.3rem">
+          <input id="edit-rv-checkin" type="time" class="fi2" value="${r.checkin_time?.slice(0,5)||''}" style="margin-top:.3rem" oninput="autoCalcEditCheckout()">
         </div>
         <div class="card"><div style="font-size:.75rem;color:var(--text3)">退室</div>
           <input id="edit-rv-checkout" type="time" class="fi2" value="${r.checkout_time?.slice(0,5)||''}" style="margin-top:.3rem">
@@ -3277,7 +3294,7 @@ function showReservationDetail(idx,cacheKey){
         </select>
       </div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div>
-        <select id="edit-rv-course" class="fi2" style="margin-top:.3rem">
+        <select id="edit-rv-course" class="fi2" style="margin-top:.3rem" onchange="autoCalcEditCheckout()">
           <option value="">-- 選択 --</option>
           ${(window._courses||courses||[]).map(c=>`<option value="${c.name}" ${r.course===c.name?'selected':''}>${c.name}</option>`).join('')}
         </select>
@@ -3317,6 +3334,22 @@ function showReservationDetail(idx,cacheKey){
     <button class="btn btn-gray btn-full" style="margin-top:.5rem" onclick="backToRvList()">← 一覧に戻る</button>
   `
   document.getElementById('rv-detail-body').innerHTML=detail
+}
+
+// 予約詳細編集画面での退室時間自動計算
+function autoCalcEditCheckout(){
+  const checkin=document.getElementById('edit-rv-checkin')?.value
+  const courseEl=document.getElementById('edit-rv-course')
+  const course=courseEl?.value||''
+  if(!checkin||!course) return
+  const mins=COURSE_MINUTES[course]||parseInt(course)||0
+  if(!mins) return
+  const[h,m]=checkin.split(':').map(Number)
+  const total=h*60+m+mins
+  const nh=Math.floor(total/60)%24
+  const nm=total%60
+  const checkoutEl=document.getElementById('edit-rv-checkout')
+  if(checkoutEl) checkoutEl.value=String(nh).padStart(2,'0')+':'+String(nm).padStart(2,'0')
 }
 
 function backToRvList(){
