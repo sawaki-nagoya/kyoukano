@@ -831,6 +831,22 @@ async function init(){
   const{data:op}=await sb.from('options').select('*').order('id')
   const{data:ss}=await sb.from('store_settings').select('*').single()
   courses=cs||[]; opts=op||[]; storeSettings=ss||{}
+  // リロード時：sessionStorageにログイン情報があれば自動復元
+  const savedMe=sessionStorage.getItem('kyoukano_me')
+  if(savedMe){
+    try{
+      const parsed=JSON.parse(savedMe)
+      if(parsed&&parsed.name){
+        if(!parsed.is_owner&&parsed.id){
+          const{data:c}=await sb.from('casts').select('*').eq('id',parsed.id).eq('active',true).single()
+          if(c){me={...c,is_owner:false};startApp();return}
+          else{sessionStorage.removeItem('kyoukano_me')}
+        } else if(parsed.is_owner){
+          me=parsed;startApp();return
+        }
+      }
+    }catch(e){sessionStorage.removeItem('kyoukano_me')}
+  }
 }
 
 async function doOwnerLogin(){
@@ -842,7 +858,9 @@ async function doOwnerLogin(){
   const btn=document.getElementById('btn-owner')
   btn.disabled=true; btn.textContent='確認中...'
   btn.disabled=false; btn.textContent='ログイン'
-  me={id:0,name:'店舗',is_owner:true}; startApp()
+  me={id:0,name:'店舗',is_owner:true}
+  sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
+  startApp()
 }
 
 async function doCastLogin(){
@@ -857,7 +875,9 @@ async function doCastLogin(){
   const{data:c,error}=await sb.from('casts').select('*').eq('id',cid).eq('pin',pin).single()
   btn.disabled=false; btn.textContent='ログイン'
   if(error||!c){err.textContent='PINが正しくありません';return}
-  me={...c,is_owner:false}; startApp()
+  me={...c,is_owner:false}
+  sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
+  startApp()
 }
 
 function startApp(){
@@ -883,6 +903,8 @@ function startApp(){
 
 function doLogout(){
   me=null; myShifts=[]
+  sessionStorage.removeItem('kyoukano_me')
+  sessionStorage.removeItem('kyoukano_tab')
   document.getElementById('owner-pin').value=''
   document.getElementById('cast-pin').value=''
   document.getElementById('owner-err').textContent=''
@@ -1430,11 +1452,13 @@ async function saveReservation(){
   const memo=document.getElementById('rv-note').value.trim()
   // 名前に「様」を自動付与
   const finalName=custName.endsWith('様')?custName:custName+'様'
+  const custNoInt=custNo?parseInt(custNo)||null:null
   const{error}=await sb.from('reservations').insert({
     shift_id:shiftId,
     customer_name:finalName,is_new:isNew,shimei_type:shimei,
     course,options:opts.join(','),discount,payment,note:memo,
-    checkin_time:checkin||null,checkout_time:checkout||null
+    checkin_time:checkin||null,checkout_time:checkout||null,
+    customer_no:custNoInt
   })
   if(error){toast('エラー: '+error.message);return}
   // 顧客の来店記録にも追加
@@ -1696,20 +1720,9 @@ async function loadToday(){
     const rt=s.room?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;border:1.5px solid;background:${rc2.bg};color:${rc2.tx};border-color:${rc2.bd}">${s.room}</span>`:`<span class="tag tr2">ルーム未指定</span>`
     const shiftRvs=rvByShift2[s.id]||[]
     const rvBadge=shiftRvs.length>0?`<span style="font-size:.62rem;padding:2px 8px;border-radius:99px;font-weight:600;background:rgba(255,149,0,.15);color:var(--accent);border:1.5px solid var(--accent)">事前予約${shiftRvs.length}件</span>`:''
-    // インターバル計算
+    // インターバル計算（intervalHtmlは後段のintervalDisplayに統合）
     let intervalHtml=''
     const intervalMin=intervalBycast[s.cast_id]||0
-    if(intervalMin>0&&shiftRvs.length>0){
-      const lastRv=shiftRvs.filter(r=>r.checkout_time).sort((a,b)=>b.checkout_time.localeCompare(a.checkout_time))[0]
-      if(lastRv&&lastRv.checkout_time){
-        const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
-        const nextMin=(hh*60+mm)+intervalMin
-        const nh=Math.floor(nextMin/60)%24
-        const nm=nextMin%60
-        const nextTime=`${String(nh).padStart(2,'0')}:${String(nm).padStart(2,'0')}`
-        intervalHtml=`<div style="font-size:.72rem;color:var(--accent);margin-top:.2rem">⏱ 最短次予約可能：${nextTime}〜（インターバル${intervalMin}分）</div>`
-      }
-    }
     // 予約一覧
     let rvListHtml=''
     if(shiftRvs.length>0){
@@ -1731,23 +1744,26 @@ async function loadToday(){
     // インターバル計算：checkout_timeがあればそれを使い、なければcheckin+コース時間で推定
     const COURSE_MINS2={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
     let intervalDisplay=''
-    if(intervalMin>0&&shiftRvs.length>0){
-      // 最後の予約を特定
-      const sortedRvs=[...shiftRvs].sort((a,b)=>(a.checkin_time||'').localeCompare(b.checkin_time||''))
-      const lastRv=sortedRvs[sortedRvs.length-1]
-      let endMin=null
-      if(lastRv?.checkout_time){
-        const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
-        endMin=hh*60+mm
-      } else if(lastRv?.checkin_time){
-        const[hh,mm]=lastRv.checkin_time.split(':').map(Number)
-        const courseMin=COURSE_MINS2[lastRv.course]||80
-        endMin=hh*60+mm+courseMin
-      }
-      if(endMin!==null){
-        const nmin=endMin+intervalMin
-        const nt=String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')
-        intervalDisplay=`<span style="font-size:.65rem;font-weight:400;color:var(--accent);margin-left:.35rem">⏱${nt}〜</span>`
+    if(intervalMin>0){
+      // checkin_timeがある予約の中で最後のものを特定（checkout優先、なければcheckin+コース推定）
+      const rvsWithTime=shiftRvs.filter(r=>r.checkin_time||r.checkout_time)
+      if(rvsWithTime.length>0){
+        const sortedRvs=[...rvsWithTime].sort((a,b)=>(a.checkin_time||'').localeCompare(b.checkin_time||''))
+        const lastRv=sortedRvs[sortedRvs.length-1]
+        let endMin=null
+        if(lastRv?.checkout_time){
+          const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
+          endMin=hh*60+mm
+        } else if(lastRv?.checkin_time){
+          const[hh,mm]=lastRv.checkin_time.split(':').map(Number)
+          const courseMin=COURSE_MINS2[lastRv.course]||80
+          endMin=hh*60+mm+courseMin
+        }
+        if(endMin!==null){
+          const nmin=endMin+intervalMin
+          const nt=String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')
+          intervalDisplay=`<span style="font-size:.65rem;font-weight:400;color:var(--accent);margin-left:.35rem">⏱${nt}〜</span>`
+        }
       }
     }
     html+=`<div class="item" style="flex-direction:column;align-items:stretch;gap:.55rem">
@@ -2175,9 +2191,18 @@ async function saveFee(){
     misc_enabled:miscEnabled,misc_0:g('f-misc-0'),misc_1:g('f-misc-1'),misc_3:g('f-misc-3'),
     interval_min:g('f-interval')
   }
-  const{data:ex}=await sb.from('cast_fees').select('id').eq('cast_id',feeCastId2).single()
-  if(ex)await sb.from('cast_fees').update(payload).eq('cast_id',feeCastId2)
-  else await sb.from('cast_fees').insert(payload)
+  const{error:feeErr}=await sb.from('cast_fees').upsert(payload,{onConflict:'cast_id'})
+  if(feeErr){
+    // upsertが失敗した場合はupdate/insertを試みる
+    const{data:ex}=await sb.from('cast_fees').select('id').eq('cast_id',feeCastId2).single()
+    if(ex){
+      const{error:upErr}=await sb.from('cast_fees').update(payload).eq('cast_id',feeCastId2)
+      if(upErr){btn.disabled=false;btn.textContent='保存する';toast('保存エラー: '+upErr.message);return}
+    } else {
+      const{error:inErr}=await sb.from('cast_fees').insert(payload)
+      if(inErr){btn.disabled=false;btn.textContent='保存する';toast('保存エラー: '+inErr.message);return}
+    }
+  }
   btn.disabled=false;btn.textContent='保存する'
   toast('保存しました！');closeSheet('fee')
 }
@@ -2367,19 +2392,28 @@ async function saveStoreSettings(){
     }
   }
   const{data:ops}=await sb.from('options').select('*').order('id')
+  const opDefs=[
+    {id:'st-op1',names:['極液']},
+    {id:'st-op2',names:['衣装チェンジ①','衣装チェンジ']},
+    {id:'st-op3',names:['衣装チェンジ②']}
+  ]
   if(ops){
-    const op1=ops.find(o=>o.name==='極液')
-    const op2=ops.find(o=>o.name==='衣装チェンジ①'||o.name==='衣装チェンジ')
-    const op3=ops.find(o=>o.name==='衣装チェンジ②')
-    if(op1) await sb.from('options').update({price:g('st-op1')}).eq('id',op1.id)
-    if(op2) await sb.from('options').update({price:g('st-op2')}).eq('id',op2.id)
-    if(op3) await sb.from('options').update({price:g('st-op3')}).eq('id',op3.id)
+    for(const def of opDefs){
+      const op=ops.find(o=>def.names.includes(o.name))
+      if(op) await sb.from('options').update({price:g(def.id)}).eq('id',op.id)
+      else await sb.from('options').insert({name:def.names[0],price:g(def.id)})
+    }
   }
   // 指名料をstore_settingsに保存
   const shimeiData={shimei_free:g('st-shimei-free'),shimei_net:g('st-shimei-net'),shimei_hon:g('st-shimei-hon')}
   const{data:existing}=await sb.from('store_settings').select('id').single()
-  if(existing) await sb.from('store_settings').update(shimeiData).eq('id',existing.id)
-  else await sb.from('store_settings').insert(shimeiData)
+  if(existing){
+    const{error:ssErr}=await sb.from('store_settings').update(shimeiData).eq('id',existing.id)
+    if(ssErr) toast('指名料保存エラー: '+ssErr.message)
+  } else {
+    const{error:ssErr}=await sb.from('store_settings').insert(shimeiData)
+    if(ssErr) toast('指名料保存エラー: '+ssErr.message)
+  }
   // coursesをリロード＋store_settingsをキャッシュ
   const{data:newCs}=await sb.from('courses').select('*').order('price')
   courses=newCs||[]
@@ -2515,12 +2549,24 @@ async function loadCastMemoPage(){
       html+=`</div>`
     })
     if(intervalMin>0){
-      const lastRv=rvs.filter(r=>r.checkout_time).sort((a,b)=>b.checkout_time.localeCompare(a.checkout_time))[0]
-      if(lastRv?.checkout_time){
-        const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
-        const nmin=(hh*60+mm)+intervalMin
-        const nt=String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')
-        html+=`<div style="font-size:.75rem;color:var(--accent);margin-top:.4rem">⏱ 次予約最短: ${nt}〜（インターバル${intervalMin}分）</div>`
+      const COURSE_MINS_CAST={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
+      const rvsWithTime2=rvs.filter(r=>r.checkin_time||r.checkout_time)
+      if(rvsWithTime2.length>0){
+        const sortedRvs2=[...rvsWithTime2].sort((a,b)=>(a.checkin_time||'').localeCompare(b.checkin_time||''))
+        const lastRv2=sortedRvs2[sortedRvs2.length-1]
+        let endMin2=null
+        if(lastRv2?.checkout_time){
+          const[hh,mm]=lastRv2.checkout_time.split(':').map(Number)
+          endMin2=hh*60+mm
+        } else if(lastRv2?.checkin_time){
+          const[hh,mm]=lastRv2.checkin_time.split(':').map(Number)
+          endMin2=hh*60+mm+(COURSE_MINS_CAST[lastRv2.course]||80)
+        }
+        if(endMin2!==null){
+          const nmin2=endMin2+intervalMin
+          const nt2=String(Math.floor(nmin2/60)%24).padStart(2,'0')+':'+String(nmin2%60).padStart(2,'0')
+          html+=`<div style="font-size:.75rem;color:var(--accent);margin-top:.4rem">⏱ 次予約最短: ${nt2}〜（インターバル${intervalMin}分）</div>`
+        }
       }
     }
     const{data:submittedMemos}=await sb.from('customer_visits').select('cast_name,visit_date').eq('cast_name',me.name).eq('visit_date',td).neq('cast_memo','')
@@ -2566,12 +2612,24 @@ async function openShiftReservations(shiftId,castName){
     </div>`
   })
   if(intervalMin>0){
-    const lastRv=rvs.filter(r=>r.checkout_time).sort((a,b)=>b.checkout_time.localeCompare(a.checkout_time))[0]
-    if(lastRv?.checkout_time){
-      const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
-      const nmin=(hh*60+mm)+intervalMin
-      const nt=String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')
-      html+=`<div style="font-size:.78rem;color:var(--accent);padding:.4rem;background:rgba(255,149,0,.1);border-radius:8px;margin-top:.5rem">⏱ 次予約最短: ${nt}〜（インターバル${intervalMin}分）</div>`
+    const COURSE_MINS_RV={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
+    const rvsWithTime=rvs.filter(r=>r.checkin_time||r.checkout_time)
+    if(rvsWithTime.length>0){
+      const sortedRvs=[...rvsWithTime].sort((a,b)=>(a.checkin_time||'').localeCompare(b.checkin_time||''))
+      const lastRv=sortedRvs[sortedRvs.length-1]
+      let endMin=null
+      if(lastRv?.checkout_time){
+        const[hh,mm]=lastRv.checkout_time.split(':').map(Number)
+        endMin=hh*60+mm
+      } else if(lastRv?.checkin_time){
+        const[hh,mm]=lastRv.checkin_time.split(':').map(Number)
+        endMin=hh*60+mm+(COURSE_MINS_RV[lastRv.course]||80)
+      }
+      if(endMin!==null){
+        const nmin=endMin+intervalMin
+        const nt=String(Math.floor(nmin/60)%24).padStart(2,'0')+':'+String(nmin%60).padStart(2,'0')
+        html+=`<div style="font-size:.78rem;color:var(--accent);padding:.4rem;background:rgba(255,149,0,.1);border-radius:8px;margin-top:.5rem">⏱ 次予約最短: ${nt}〜（インターバル${intervalMin}分）</div>`
+      }
     }
   }
   // reservationキャッシュ保存
@@ -2593,6 +2651,7 @@ function showReservationDetail(idx,cacheKey){
   const detail=`
     <div style="font-size:1rem;font-weight:700;margin-bottom:.75rem">📋 予約詳細</div>
     ${me?.is_owner?`<div style="display:flex;flex-direction:column;gap:.5rem">
+      ${r.customer_no?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">顧客番号</div><div>No.${r.customer_no}</div></div>`:''}
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div>
         <input id="edit-rv-name" class="fi2" value="${r.customer_name||''}" style="margin-top:.3rem">
       </div>
@@ -2628,8 +2687,22 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div>
         <input id="edit-rv-note" class="fi2" value="${r.note||''}" placeholder="任意" style="margin-top:.3rem">
       </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション（登録済）</div>
+        <div style="font-size:.85rem;margin-top:.3rem;color:var(--text3)">${opts||'なし'}</div>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">割引（登録済）</div>
+        <div style="font-size:.85rem;margin-top:.3rem;color:var(--rtx)">${discs||'なし'}</div>
+      </div>
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div>
+        <select id="edit-rv-payment" class="fi2" style="margin-top:.3rem">
+          <option value="cash" ${(r.payment||'cash')==='cash'?'selected':''}>現金</option>
+          <option value="card" ${r.payment==='card'?'selected':''}>カード</option>
+          <option value="mix" ${r.payment==='mix'?'selected':''}>現金+カード</option>
+        </select>
+      </div>
     </div>`:`<div style="display:flex;flex-direction:column;gap:.5rem">
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">お客様名</div><div style="font-size:.95rem;font-weight:700">${r.customer_name||'-'}</div></div>
+      ${r.customer_no?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">顧客番号</div><div>No.${r.customer_no}</div></div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <div class="card"><div style="font-size:.75rem;color:var(--text3)">入室</div><div style="font-size:.9rem;font-weight:600">${r.checkin_time?.slice(0,5)||'-'}</div></div>
         <div class="card"><div style="font-size:.75rem;color:var(--text3)">退室</div><div style="font-size:.9rem;font-weight:600">${r.checkout_time?.slice(0,5)||'-'}</div></div>
@@ -2637,6 +2710,9 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div><div>${r.is_new?'新規':'再来'}</div></div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">指名区分</div><div>${r.shimei_type||'フリー'}</div></div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div><div>${r.course||'-'}</div></div>
+      ${opts?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション</div><div>${opts}</div></div>`:''}
+      ${discs?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">割引</div><div style="color:var(--rtx)">${discs}</div></div>`:''}
+      <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div><div>${{cash:'現金',card:'カード',mix:'現金+カード'}[r.payment]||r.payment||'-'}</div></div>
       ${r.note?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div><div>${r.note}</div></div>`:''}
     </div>`}
     ${me?.is_owner?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.75rem">
@@ -2663,6 +2739,7 @@ async function saveReservationEdit(rvId,cacheKey){
   const shimei=document.getElementById('edit-rv-shimei')?.value
   const course=document.getElementById('edit-rv-course')?.value
   const note=document.getElementById('edit-rv-note')?.value.trim()
+  const payment=document.getElementById('edit-rv-payment')?.value||null
   if(!name){toast('お客様名を入力してください');return}
   const finalName=name.endsWith('様')?name:name+'様'
   const{error}=await sb.from('reservations').update({
@@ -2672,7 +2749,8 @@ async function saveReservationEdit(rvId,cacheKey){
     is_new:isNew==='true',
     shimei_type:shimei||null,
     course:course||null,
-    note:note||null
+    note:note||null,
+    payment:payment||null
   }).eq('id',rvId)
   if(error){toast('エラー: '+error.message);return}
   toast('訂正しました')
@@ -2681,7 +2759,7 @@ async function saveReservationEdit(rvId,cacheKey){
     const idx=window._rvDetailCache[cacheKey].findIndex(r=>r.id===rvId)
     if(idx>=0){
       const updated=window._rvDetailCache[cacheKey][idx]
-      window._rvDetailCache[cacheKey][idx]={...updated,customer_name:finalName,checkin_time:checkin||null,checkout_time:checkout||null,is_new:isNew==='true',shimei_type:shimei,course,note}
+      window._rvDetailCache[cacheKey][idx]={...updated,customer_name:finalName,checkin_time:checkin||null,checkout_time:checkout||null,is_new:isNew==='true',shimei_type:shimei,course,note,payment}
     }
   }
   // 一覧に戻って再表示
