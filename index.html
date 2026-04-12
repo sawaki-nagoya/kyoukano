@@ -3203,7 +3203,7 @@ async function openShiftReservations(shiftId,castName){
   if(!rvs||!rvs.length){document.getElementById('rv-detail-body').innerHTML='<div class="empty">予約はありません</div>';return}
   let html=`<div style="font-size:.82rem;color:var(--text3);margin-bottom:.6rem">${shift?.date||''} 計${rvs.length}件</div>`
   rvs.forEach((r,idx)=>{
-    const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
+    const rvOptStr=r.options?r.options.split(',').filter(Boolean).join('・'):''
     const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
     html+=`<div class="item" style="flex-direction:column;align-items:stretch;cursor:pointer" onclick="showReservationDetail(${idx},'shift_${shiftId}')">
       <div style="display:flex;align-items:center;justify-content:space-between">
@@ -3247,7 +3247,7 @@ function showReservationDetail(idx,cacheKey){
   const rvs=window._rvDetailCache?.[cacheKey]
   if(!rvs||!rvs[idx])return
   const r=rvs[idx]
-  const opts=r.options?r.options.split(',').filter(Boolean).join('・'):''
+  const rvDisplayOpts=r.options?r.options.split(',').filter(Boolean).join('・'):''
   const discs=r.discount?r.discount.split(',').filter(Boolean).join('・'):''
   const payMap={cash:'現金',card:'カード',mix:'現金+カード'}
   // payment がJSON形式かどうか判定
@@ -3349,7 +3349,7 @@ function showReservationDetail(idx,cacheKey){
         <input id="edit-rv-note" class="fi2" value="${r.note||''}" placeholder="任意" style="margin-top:.3rem">
       </div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション（登録済）</div>
-        <div style="font-size:.85rem;margin-top:.3rem;color:var(--text3)">${opts||'なし'}</div>
+        <div style="font-size:.85rem;margin-top:.3rem;color:var(--text3)">${rvDisplayOpts||'なし'}</div>
       </div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">割引（登録済）</div>
         <div style="font-size:.85rem;margin-top:.3rem;color:var(--rtx)">${discs||'なし'}</div>
@@ -3367,7 +3367,7 @@ function showReservationDetail(idx,cacheKey){
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">来店区分</div><div>${r.is_new?'新規':'再来'}</div></div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">指名区分</div><div>${r.shimei_type||'フリー'}</div></div>
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">コース</div><div>${r.course||'-'}</div></div>
-      ${opts?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション</div><div>${opts}</div></div>`:''}
+      ${rvDisplayOpts?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">オプション</div><div>${rvDisplayOpts}</div></div>`:''}
       ${discs?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">割引</div><div style="color:var(--rtx)">${discs}</div></div>`:''}
       <div class="card"><div style="font-size:.75rem;color:var(--text3)">支払い方法</div><div style="font-size:.83rem">${payDisplay}</div></div>
       ${r.note?`<div class="card"><div style="font-size:.75rem;color:var(--text3)">備考</div><div>${r.note}</div></div>`:''}
