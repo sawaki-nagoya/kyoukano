@@ -1621,7 +1621,11 @@ async function loadGantt(){
   const[y,m,d]=ganttDate.split('-')
   if(lbl) lbl.textContent=parseInt(m)+'月'+parseInt(d)+'日'
   area.innerHTML='<div class="spin">読み込み中...</div>'
-  const{data:shifts}=await sb.from('shifts').select('*,casts(name)').eq('date',ganttDate).eq('status','approved').order('start_time')
+  const{data:rawShiftsG}=await sb.from('shifts').select('*').eq('date',ganttDate).eq('status','approved').order('start_time')
+  const castIdsG=[...new Set((rawShiftsG||[]).map(s=>s.cast_id).filter(Boolean))]
+  let castMapG={}
+  if(castIdsG.length){const{data:cr}=await sb.from('casts').select('id,name').in('id',castIdsG);if(cr)cr.forEach(c=>{castMapG[c.id]=c.name})}
+  const shifts=(rawShiftsG||[]).map(s=>({...s,casts:{name:castMapG[s.cast_id]||'?'}}))
   const{data:rvs}=shifts&&shifts.length
     ? await sb.from('reservations').select('*').in('shift_id',shifts.map(s=>s.id)).order('checkin_time')
     : {data:[]}
@@ -1729,8 +1733,11 @@ async function renderGanttInto(area, date, filterShifts=null){
   if(filterShifts){
     shifts=filterShifts
   } else {
-    const{data}=await sb.from('shifts').select('*,casts(name)').eq('date',date).eq('status','approved').order('start_time')
-    shifts=data||[]
+    const{data:rawRGI}=await sb.from('shifts').select('*').eq('date',date).eq('status','approved').order('start_time')
+    const cidsRGI=[...new Set((rawRGI||[]).map(s=>s.cast_id).filter(Boolean))]
+    let cmapRGI={}
+    if(cidsRGI.length){const{data:crRGI}=await sb.from('casts').select('id,name').in('id',cidsRGI);if(crRGI)crRGI.forEach(c=>{cmapRGI[c.id]=c.name})}
+    shifts=(rawRGI||[]).map(s=>({...s,casts:{name:cmapRGI[s.cast_id]||'?'}}))
   }
   if(!shifts.length){area.innerHTML='<div class="empty">この日の承認済みシフトはありません</div>';return}
   const{data:rvs}=await sb.from('reservations').select('*').in('shift_id',shifts.map(s=>s.id)).order('checkin_time')
@@ -2171,12 +2178,18 @@ async function loadGanttModal(){
   const norm=s=>(s||'').trim().replace(/\u3000/g,' ')
   const targetRoom=norm(ganttModalRoom)
 
-  // shiftsを取得（エラーも捕捉してデバッグ）
-  const{data:allShifts,error:shiftErr}=await sb.from('shifts').select('*,casts(name)').eq('date',ganttModalDate).eq('status','approved').order('start_time')
-  if(shiftErr) console.error('ガントシフト取得エラー:',shiftErr)
-  console.log('ガント取得結果:', {date:ganttModalDate, room:ganttModalRoom, allCount:(allShifts||[]).length, allShifts:allShifts})
-  const targetShifts=(allShifts||[]).filter(s=>norm(s.room)===targetRoom)
-  console.log('ルームフィルタ後:', targetShifts.length, '件')
+  // shiftsを取得（casts JOINなし・別途キャスト名取得）
+  const{data:rawShifts,error:shiftErr}=await sb.from('shifts').select('*').eq('date',ganttModalDate).eq('status','approved').order('start_time')
+  // キャスト名を別途取得
+  const castIds=[...new Set((rawShifts||[]).map(s=>s.cast_id).filter(Boolean))]
+  let castNameMap={}
+  if(castIds.length){
+    const{data:castRows}=await sb.from('casts').select('id,name').in('id',castIds)
+    if(castRows) castRows.forEach(c=>{castNameMap[c.id]=c.name})
+  }
+  // casts.nameを付与
+  const allShifts=(rawShifts||[]).map(s=>({...s,casts:{name:castNameMap[s.cast_id]||'?'}}))
+  const targetShifts=allShifts.filter(s=>norm(s.room)===targetRoom)
 
   // 予約取得
   const{data:allRvs}=targetShifts.length
