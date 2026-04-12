@@ -2318,19 +2318,19 @@ async function loadGanttModal(){
         const minStr=minNum?minNum+'分':''
         const ci=r.checkin_time?.slice(0,5)||''
         const co=r.checkout_time?.slice(0,5)||''
-        // ROW_H=70px想定：5行 × line-height≈14px = 70px
-        // 各行高さ = ROW_H / 5 - 1px gap
-        const lineH=Math.max(Math.floor(ROW_H/5)-1, 11)
-        const fsMain=(lineH/16).toFixed(2)  // px→rem換算
-        const fsSub=((lineH*0.88)/16).toFixed(2)
+        // 5行：名前(1)+分数(1)+入室(1)+〜(0.6)+退室(1) = 4.6行分
+        // ROW_H / 4.6行 = 1行あたりのpx
+        const lineH=Math.max(Math.floor(ROW_H/4.8), 11)
+        const fsMain=Math.min(lineH, 13)/16  // 名前：最大13px
+        const fsSub=Math.min(lineH*0.9, 11)/16  // サブ：最大11px
         rvBars+=`<div style="position:absolute;left:${rS}px;width:${bW}px;top:1px;bottom:1px;
           background:linear-gradient(160deg,#FF9A2E,#FF6400);border-radius:5px;z-index:5;
           overflow:hidden;cursor:pointer;box-shadow:0 2px 5px rgba(255,140,0,.35)"
           onclick="closeGanttModal();setTimeout(()=>openReservation(${s.id},'${(s.casts?.name||'').replace(/'/g,"\\\\'")}','${ganttModalDate}'),150)">
-          <div style="padding:2px 4px;height:100%;display:flex;flex-direction:column;justify-content:center;gap:1px">
-            <div style="font-size:${fsMain}rem;color:#fff;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25">${name}</div>
+          <div style="padding:2px 4px;height:100%;display:flex;flex-direction:column;justify-content:center;gap:0">
+            <div style="font-size:${fsMain}rem;color:#fff;font-weight:800;white-space:nowrap;overflow:visible;line-height:1.2">${name}</div>
             ${minStr?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.92);line-height:1.2;white-space:nowrap">${minStr}</div>`:''}
-            ${ci?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.15;white-space:nowrap">${ci}</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.65);line-height:.9;white-space:nowrap">〜</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.15;white-space:nowrap">${co}</div>`:''}
+            ${ci?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.2;white-space:nowrap">${ci}</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.65);line-height:.85;white-space:nowrap">〜</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.2;white-space:nowrap">${co}</div>`:''}
           </div>
         </div>`
       })
