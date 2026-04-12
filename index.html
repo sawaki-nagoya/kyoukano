@@ -534,7 +534,7 @@ tr:last-child td{border-bottom:none}
       <span style="font-size:.82rem;font-weight:800;color:#fff" id="gantt-modal-title">ガントチャート</span>
       <button onclick="closeGanttModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:28px;height:28px;border-radius:50%;font-size:.9rem;cursor:pointer">✕</button>
     </div>
-    <div id="gantt-modal-body" style="flex:1;overflow:auto;padding:.5rem .4rem"><div class="spin">読み込み中...</div></div>
+    <div id="gantt-modal-body" style="flex:1;overflow:auto;padding:0"><div class="spin">読み込み中...</div></div>
   </div>
 </div>
 
@@ -2158,25 +2158,28 @@ function _ganttLock(){
     const inner=document.getElementById('gantt-modal-inner')
     const vw=window.innerWidth, vh=window.innerHeight
     if(vw>=vh){
-      // すでに横画面
-      ov.style.cssText='display:block;position:fixed;inset:0;z-index:9999;background:transparent'
-      inner.style.cssText='position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;transform:none;width:100%;height:100%'
+      // 横画面：そのままフルスクリーン
+      ov.style.cssText='display:flex;flex-direction:column;position:fixed;top:0;left:0;width:'+vw+'px;height:'+vh+'px;z-index:9999;background:var(--bg);overflow:hidden;transform:none'
+      inner.style.cssText='display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden'
     } else {
-      // 縦画面 → inner要素を絶対座標＋回転で横表示
-      ov.style.cssText='display:block;position:fixed;inset:0;z-index:9999;background:transparent'
-      inner.style.cssText=`position:absolute;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;
-        width:${vh}px;height:${vw}px;
-        top:${(vh-vw)/2}px;left:${(vw-vh)/2}px;
-        transform:rotate(90deg);transform-origin:center center`
+      // 縦画面 → ov自体をvh幅・vw高さで配置してrotate
+      // rotate後：見た目の幅=vh、見た目の高さ=vw
+      const W=vh, H=vw
+      const t=(vh-H)/2, l=(vw-W)/2
+      ov.style.cssText='display:flex;flex-direction:column;position:fixed;'
+        +'top:'+t+'px;left:'+l+'px;'
+        +'width:'+W+'px;height:'+H+'px;'
+        +'z-index:9999;background:var(--bg);overflow:hidden;'
+        +'transform:rotate(90deg);transform-origin:center center'
+      inner.style.cssText='display:flex;flex-direction:column;width:100%;height:100%;overflow:hidden'
     }
+    document.body.style.overflow='hidden'
   }
-  // Screen Orientation API（Android Chrome等）
   if(screen.orientation&&screen.orientation.lock){
     screen.orientation.lock('landscape').then(go).catch(go)
   } else {
     go()
   }
-  document.body.style.overflow='hidden'
 }
 
 function closeGanttModal(){
@@ -2226,13 +2229,12 @@ async function loadGanttModal(){
 
   const START_H=11,END_H=26,TOTAL_MIN=(END_H-START_H)*60
 
-  // inner要素の実際の描画サイズを取得（回転後の表示サイズ）
-  const inner=document.getElementById('gantt-modal-inner')
-  const rect=inner.getBoundingClientRect()
-  // getBoundingClientRectは画面上の実際のpxを返す
-  // 回転後：幅方向＝横（時間軸）、高さ方向＝縦（バー）
-  const EW=Math.round(rect.width)
-  const EH=Math.round(rect.height)
+  // 回転後の実効サイズ
+  // ov自体をrotateしているのでovのwidth/heightが実効サイズそのもの
+  const vw=window.innerWidth, vh=window.innerHeight
+  const isPort=vw<vh
+  const EW=isPort?vh:vw   // 実効横幅（時間軸方向）
+  const EH=isPort?vw:vh   // 実効縦幅（バー方向）
 
   const PAD=8
   const HDR_H=44
@@ -2324,7 +2326,7 @@ async function loadGanttModal(){
           <div style="padding:1px 3px;height:100%;display:flex;flex-direction:column;justify-content:center;gap:0">
             <div style="font-size:${fsMain}rem;color:#fff;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25">${name}</div>
             ${minStr?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.92);line-height:1.2;white-space:nowrap">${minStr}</div>`:''}
-            ${ci?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.2;white-space:nowrap">${ci}〜${co}</div>`:''}
+            ${ci?`<div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.15;white-space:nowrap">${ci}</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.65);line-height:.9;white-space:nowrap">〜</div><div style="font-size:${fsSub}rem;color:rgba(255,255,255,.88);line-height:1.15;white-space:nowrap">${co}</div>`:''}
           </div>
         </div>`
       })
