@@ -3252,10 +3252,18 @@ function showReservationDetail(idx,cacheKey){
   const payMap={cash:'現金',card:'カード',mix:'現金+カード'}
   // payment がJSON形式かどうか判定
   let payDisplay='-'
+  const optNamesForPay=(r.options||'').split(',').filter(Boolean)
   try{
     const pj=JSON.parse(r.payment||'{}')
     if(pj.course||pj.shimei||pj.option){
-      payDisplay=`コース:${pj.course||'現金'} / 指名:${pj.shimei||'現金'} / OP:${pj.option||'現金'}`
+      // オプション個別の支払い方法を表示（pj["op_極液"] 等があれば個別表示、なければ pj.option で一括）
+      const opPayParts=optNamesForPay.map(opName=>{
+        const opKey='op_'+opName
+        const opPay=pj[opKey]||pj.option||'現金'
+        return `${opName}:${opPay}`
+      })
+      const opPayDisplay=opPayParts.length?opPayParts.join(' / '):(pj.option||'現金')
+      payDisplay=`コース:${pj.course||'現金'} / 指名:${pj.shimei||'現金'} / ${opPayDisplay}`
     } else {
       payDisplay=payMap[r.payment]||r.payment||'-'
     }
@@ -3276,13 +3284,15 @@ function showReservationDetail(idx,cacheKey){
     if(pj.shimei==='カード'){cardAmount+=shimeiPrice;cardDetail.push(`指名料 ¥${shimeiPrice.toLocaleString()}(カード)`)}
     else{cashAmount+=shimeiPrice;cashDetail.push(`指名料 ¥${shimeiPrice.toLocaleString()}(現金)`)}
   }
-  // オプション料（グローバルopts配列から金額取得）
-  const _optsArr=window._opts||window.opts||(typeof opts!=='string'?opts:[])||[]
+  // オプション料（グローバルopts配列から金額取得・オプション個別に集計）
   optNames.forEach(opName=>{
-    const opItem=_optsArr.find(o=>o.name===opName)
+    const opItem=opts.find(o=>o.name===opName)
     const opPrice=opItem?.price||0
     if(opPrice>0){
-      if(pj.option==='カード'){cardAmount+=opPrice;cardDetail.push(`${opName} ¥${opPrice.toLocaleString()}(カード)`)}
+      // オプション個別の支払い方法: pj["op_極液"] のようなキー、なければ pj.option にフォールバック
+      const opKey='op_'+opName
+      const opPayMethod=pj[opKey]||pj.option||'現金'
+      if(opPayMethod==='カード'){cardAmount+=opPrice;cardDetail.push(`${opName} ¥${opPrice.toLocaleString()}(カード)`)}
       else{cashAmount+=opPrice;cashDetail.push(`${opName} ¥${opPrice.toLocaleString()}(現金)`)}
     }
   })
