@@ -317,14 +317,13 @@ tr:last-child td{border-bottom:none}
       <div style="font-size:1rem;font-weight:700;margin-bottom:.75rem">接客メモ</div>
       <!-- 当日予約一覧（常時表示） -->
       <div id="cast-memo-today-area" style="margin-bottom:1rem"></div>
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.5rem">
-        <div style="font-size:.88rem;font-weight:600;color:var(--text3)">過去のメモ</div>
-        <button class="btn btn-gold btn-sm2" onclick="openMemoCustomerSearch()">＋ 顧客を選んでメモ</button>
+      <!-- 検索バー + 顧客を選んでメモ ボタン（横並び） -->
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+        <input id="memo-search" type="text" placeholder="顧客番号・名前で検索" style="width:fit-content;max-width:200px;padding:.5rem .75rem;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);font-size:.85rem;color:var(--text)" oninput="filterMemos()">
+        <button class="btn btn-gold btn-sm2" onclick="openMemoCustomerSearch()" style="white-space:nowrap;flex-shrink:0">＋ 顧客を選んでメモ</button>
       </div>
-      <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
-        <input id="memo-search" type="text" placeholder="顧客番号・名前で検索" style="flex:1;padding:.5rem .75rem;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);font-size:.85rem;color:var(--text)" oninput="filterMemos()">
-      </div>
-      <div id="cast-memo-area"><div class="spin">読み込み中...</div></div>
+      <!-- 検索中のみ表示 -->
+      <div id="cast-memo-area" style="display:none"></div>
     </div>
 
     <!-- メモ用顧客検索シート -->
@@ -3139,15 +3138,23 @@ function renderMemoCustomerList(){
 // ── 接客メモ一覧（キャスト側） ──
 let allMemos=[]
 async function loadCastMemoList(){
-  const area=document.getElementById('cast-memo-area')
-  area.innerHTML='<div class="spin">読み込み中...</div>'
   const{data:visits}=await sb.from('customer_visits').select('*').order('created_at',{ascending:false})
   allMemos=visits||[]
-  renderMemos(allMemos)
+  // 検索バーが空なら非表示のまま
+  const q=document.getElementById('memo-search')?.value.trim().toLowerCase()||''
+  if(!q){
+    const area=document.getElementById('cast-memo-area')
+    area.style.display='none'
+    area.innerHTML=''
+  } else {
+    filterMemos()
+  }
 }
 function filterMemos(){
   const q=document.getElementById('memo-search').value.trim().toLowerCase()
-  if(!q){renderMemos(allMemos);return}
+  const area=document.getElementById('cast-memo-area')
+  if(!q){area.style.display='none';area.innerHTML='';return}
+  area.style.display='block'
   renderMemos(allMemos.filter(m=>
     String(m.customer_id).includes(q)||(m.cast_name||'').toLowerCase().includes(q)||(m.cast_memo||'').toLowerCase().includes(q)
   ))
