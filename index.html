@@ -1270,14 +1270,24 @@ async function openCustomerDetail(id){
   
   // 来店記録取得
   const{data:visits}=await sb.from('customer_visits').select('*').eq('customer_id',id).order('visit_date',{ascending:false})
-  // キャストメモ取得
-  const{data:memos}=await sb.from('customer_visits').select('cast_memo,cast_name,created_at').eq('customer_id',id).neq('cast_memo','').order('created_at',{ascending:false})
+  // キャストメモ取得（cast_memoがnullでないもの）
+  const{data:memos}=await sb.from('customer_visits').select('id,cast_memo,cast_name,created_at').eq('customer_id',id).not('cast_memo','is',null).neq('cast_memo','').order('created_at',{ascending:false})
+  // キャスト一覧取得（NGプルダウン用）
+  const{data:allCastsData}=await sb.from('casts').select('id,name').eq('active',true).order('sort_order')
+  const ngSelected=(c.ng_casts||'').split(/[,、]/).map(x=>x.trim()).filter(Boolean)
+  const ngOptions=(allCastsData||[]).map(cast=>`<option value="${cast.name}" ${ngSelected.includes(cast.name)?'selected':''}>${cast.name}</option>`).join('')
   
   let html=`
     <div style="display:flex;flex-direction:column;gap:.75rem;margin-bottom:1rem">
       <div><div class="fi-lbl">名前</div><input class="fi" id="edit-cust-name" value="${c.name}"></div>
       <div><div class="fi-lbl">電話番号</div><input class="fi" id="edit-cust-phone" type="tel" value="${c.phone||''}" placeholder="090-0000-0000"></div>
-      <div><div class="fi-lbl">NGキャスト</div><input class="fi" id="edit-cust-ng" value="${c.ng_casts||''}" placeholder="例：はな、るあ"></div>
+      <div>
+        <div class="fi-lbl">NGキャスト（複数選択可）</div>
+        <select class="fi" id="edit-cust-ng" multiple size="4" style="height:auto;min-height:80px">
+          ${ngOptions}
+        </select>
+        <div style="font-size:.65rem;color:var(--text3);margin-top:.2rem">※ 複数選択はCtrl/Cmd押しながらタップ</div>
+      </div>
       <div><div class="fi-lbl">出禁</div>
         <select class="fi" id="edit-cust-banned">
           <option value="false" ${!c.is_banned?'selected':''}>通常</option>
@@ -1294,9 +1304,11 @@ async function openCustomerDetail(id){
   } else {
     visits.forEach(v=>{
       html+=`<div class="item" style="flex-direction:column;align-items:stretch">
-        <div style="font-size:.83rem;font-weight:600">${v.visit_date||''}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="font-size:.83rem;font-weight:600">${v.visit_date||''}</div>
+          <button class="btn btn-red btn-xs" onclick="deleteVisit(${v.id},${id})" style="font-size:.6rem;padding:2px 6px">削除</button>
+        </div>
         <div style="font-size:.78rem;color:var(--text3)">${v.cast_name||''} / ${v.shimei_type||'フリー'} / ${v.course||''} ${v.options?'/ '+v.options:''}</div>
-        ${v.cast_memo?`<div style="font-size:.75rem;color:var(--accent);margin-top:.2rem">📝 ${v.cast_memo}</div>`:''}
       </div>`
     })
   }
@@ -1308,7 +1320,10 @@ async function openCustomerDetail(id){
     memos.forEach(m=>{
       if(!m.cast_memo)return
       html+=`<div class="card" style="margin-bottom:.4rem">
-        <div style="font-size:.75rem;color:var(--text3);margin-bottom:.2rem">${m.cast_name||''}　${m.created_at?.slice(0,10)||''}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
+          <div style="font-size:.75rem;color:var(--text3)">${m.created_at?.slice(0,10)||''}</div>
+          <button class="btn btn-red btn-xs" onclick="deleteMemo(${m.id},${id})" style="font-size:.6rem;padding:2px 6px">削除</button>
+        </div>
         <div style="font-size:.83rem">${m.cast_memo}</div>
       </div>`
     })
@@ -1322,7 +1337,9 @@ async function openCustomerDetail(id){
 async function saveCustomerEdit(id){
   const name=document.getElementById('edit-cust-name').value.trim()
   const phone=document.getElementById('edit-cust-phone').value.trim()
-  const ng=document.getElementById('edit-cust-ng').value.trim()
+  // マルチセレクトからNG取得
+  const ngEl=document.getElementById('edit-cust-ng')
+  const ng=ngEl?Array.from(ngEl.selectedOptions).map(o=>o.value).join(','):''
   const memo=document.getElementById('edit-cust-memo').value.trim()
   const bannedEl=document.getElementById('edit-cust-banned')
   const ban=bannedEl?bannedEl.value==='true':false
@@ -1332,6 +1349,22 @@ async function saveCustomerEdit(id){
   await loadCustomers()
   const updated=allCustomers.find(x=>x.id===id)
   if(updated)openCustomerDetail(id)
+}
+
+async function deleteVisit(visitId,custId){
+  if(!confirm('この来店記録を削除しますか？'))return
+  const{error}=await sb.from('customer_visits').delete().eq('id',visitId)
+  if(error){toast('エラー: '+error.message);return}
+  toast('削除しました')
+  openCustomerDetail(custId)
+}
+
+async function deleteMemo(visitId,custId){
+  if(!confirm('このメモを削除しますか？'))return
+  const{error}=await sb.from('customer_visits').update({cast_memo:null}).eq('id',visitId)
+  if(error){toast('エラー: '+error.message);return}
+  toast('削除しました')
+  openCustomerDetail(custId)
 }
 
 async function toggleBan(id,ban){
@@ -3140,7 +3173,7 @@ function renderMemos(list){
       <div style="font-size:.88rem;font-weight:700;margin-bottom:.4rem">${custLabel}</div>`
     memos.forEach(m=>{
       html+=`<div style="padding:.35rem 0;border-bottom:1px solid var(--border)">
-        <div style="font-size:.75rem;color:var(--text3)">${m.cast_name||''}　${m.visit_date||m.created_at?.slice(0,10)||''}</div>
+        <div style="font-size:.75rem;color:var(--text3)">${m.visit_date||m.created_at?.slice(0,10)||''}</div>
         <div style="font-size:.83rem;margin-top:.15rem">${m.cast_memo||''}</div>
       </div>`
     })
