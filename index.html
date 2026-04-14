@@ -1282,7 +1282,7 @@ async function openCustomerDetail(id){
       <div><div class="fi-lbl">電話番号</div><input class="fi" id="edit-cust-phone" type="tel" value="${c.phone||''}" placeholder="090-0000-0000"></div>
       <div>
         <div class="fi-lbl">NGキャスト（複数選択可）</div>
-        <select class="fi" id="edit-cust-ng" multiple size="4" style="height:auto;min-height:80px">
+        <select class="fi" id="edit-cust-ng" multiple style="height:120px;padding:.3rem">
           ${ngOptions}
         </select>
 
@@ -3475,6 +3475,12 @@ function showReservationDetail(idx,cacheKey){
         <div style="font-size:.75rem;color:var(--text3)">支払い方法（登録済）</div>
         <div style="font-size:.83rem;margin-top:.3rem;color:var(--text3)">${payDisplay||'未設定'}</div>
       </div>
+      <div class="card" style="background:linear-gradient(135deg,rgba(255,149,0,.1),rgba(255,149,0,.05));border-color:rgba(255,149,0,.3)">
+        <div style="font-size:.72rem;color:var(--text3);font-weight:600;margin-bottom:.35rem">💴 受取金額（現金）</div>
+        <div style="font-size:1.1rem;font-weight:800;color:var(--accent)">¥${cashAmount.toLocaleString()}</div>
+        ${cashDetail.length?`<div style="font-size:.68rem;color:var(--text3);margin-top:.25rem">${cashDetail.join('、')}</div>`:''}
+        ${cardAmount>0?`<div style="margin-top:.35rem;padding-top:.35rem;border-top:1px solid var(--border)"><div style="font-size:.72rem;color:var(--text3);font-weight:600">💳 カード決済済み</div><div style="font-size:.95rem;font-weight:700;color:var(--text2)">¥${cardAmount.toLocaleString()}</div>${cardDetail.length?`<div style="font-size:.68rem;color:var(--text3)">${cardDetail.join('、')}</div>`:''}</div>`:''}
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">
         <button class="btn btn-gold" onclick="saveReservationEdit(${r.id},'${cacheKey}')">訂正を保存</button>
         <button class="btn btn-blue" onclick="extendReservation(${r.id},'${cacheKey}')">延長+30分</button>
@@ -3564,28 +3570,51 @@ async function saveReservationEdit(rvId,cacheKey){
   if(document.getElementById('p-today')?.classList.contains('on'))loadToday()
 }
 
-async function openAddOptionToRv(rvId, cacheKey){
+function openAddOptionToRv(rvId, cacheKey){
   const rvs=window._rvDetailCache?.[cacheKey]
   const r=rvs?.find(x=>x.id===rvId)
   if(!r){toast('予約が見つかりません');return}
   const availOpts=(opts||[]).filter(o=>o.name&&o.price>0)
   if(!availOpts.length){toast('オプションが設定されていません');return}
   const currentOpts=(r.options||'').split(',').filter(Boolean)
-  const lines=availOpts.map(function(o,i){return (i+1)+':'+o.name+'(¥'+o.price.toLocaleString()+')'})
-  const msg='追加するオプション番号をカンマ区切りで入力\n現在: '+(currentOpts.join(',')||'なし')+'\n\n'+lines.join('\n')
-  const input=prompt(msg)
-  if(input===null)return
-  const idxList=input.split(',').map(function(x){return parseInt(x.trim())-1}).filter(function(i){return i>=0&&i<availOpts.length})
-  const newOpts=currentOpts.slice()
-  idxList.forEach(function(i){if(!newOpts.includes(availOpts[i].name))newOpts.push(availOpts[i].name)})
-  const err=(await sb.from('reservations').update({options:newOpts.join(',')}).eq('id',rvId)).error
-  if(err){toast('エラー: '+err.message);return}
-  toast('オプションを追加しました')
+  // プルダウンシートを動的に生成
+  const existingSheet=document.getElementById('add-opt-sheet')
+  if(existingSheet) existingSheet.remove()
+  const optSelOpts=availOpts.map(o=>'<option value="'+o.name+'">'+o.name+' (¥'+o.price.toLocaleString()+')</option>').join('')
+  const sheet=document.createElement('div')
+  sheet.id='add-opt-sheet'
+  sheet.style.cssText='position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-radius:16px 16px 0 0;padding:1.2rem;z-index:9999;box-shadow:0 -4px 20px rgba(0,0,0,.15)'
+  sheet.innerHTML='<div style="font-size:.9rem;font-weight:700;margin-bottom:.75rem">オプションを追加</div>'
+    +'<div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">現在: '+(currentOpts.join('・')||'なし')+'</div>'
+    +'<select id="add-opt-sel" class="fi" style="margin-bottom:.75rem"><option value="">-- 選択してください --</option>'+optSelOpts+'</select>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem">'
+    +'<button class="btn btn-gray" onclick="closeAddOptSheet()">キャンセル</button>'
+    +'<button class="btn btn-gold" onclick="confirmAddOpt('+rvId+',\''+cacheKey+'\')">追加する</button>'
+    +'</div>'
+  document.body.appendChild(sheet)
+}
+
+function closeAddOptSheet(){const s=document.getElementById('add-opt-sheet');if(s)s.remove()}
+
+async function confirmAddOpt(rvId, cacheKey){
+  const sel=document.getElementById('add-opt-sel')
+  const optName=sel?.value
+  if(!optName){toast('オプションを選択してください');return}
+  document.getElementById('add-opt-sheet')?.remove()
+  const rvs=window._rvDetailCache?.[cacheKey]
+  const r=rvs?.find(x=>x.id===rvId)
+  if(!r)return
+  const currentOpts=(r.options||'').split(',').filter(Boolean)
+  if(currentOpts.includes(optName)){toast('すでに追加されています');return}
+  const newOpts=[...currentOpts,optName]
+  const{error}=await sb.from('reservations').update({options:newOpts.join(',')}).eq('id',rvId)
+  if(error){toast('エラー: '+error.message);return}
+  toast(optName+'を追加しました')
   if(window._rvDetailCache?.[cacheKey]){
-    const idx=window._rvDetailCache[cacheKey].findIndex(function(x){return x.id===rvId})
-    if(idx>=0) window._rvDetailCache[cacheKey][idx]=Object.assign({},window._rvDetailCache[cacheKey][idx],{options:newOpts.join(',')})
+    const idx=window._rvDetailCache[cacheKey].findIndex(x=>x.id===rvId)
+    if(idx>=0) window._rvDetailCache[cacheKey][idx]={...window._rvDetailCache[cacheKey][idx],options:newOpts.join(',')}
   }
-  showReservationDetail(rvs.findIndex(function(x){return x.id===rvId}),cacheKey)
+  showReservationDetail(rvs.findIndex(x=>x.id===rvId),cacheKey)
 }
 
 async function extendReservation(rvId, cacheKey){
