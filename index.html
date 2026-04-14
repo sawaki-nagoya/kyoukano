@@ -1342,10 +1342,13 @@ async function openCustomerDetail(id){
       <div><div class="fi-lbl">電話番号</div><input class="fi" id="edit-cust-phone" type="tel" value="${c.phone||''}" placeholder="090-0000-0000"></div>
       <div>
         <div class="fi-lbl">NGキャスト（複数選択可）</div>
-        <div id="edit-cust-ng-wrap" style="background:var(--surface2);border:1.5px solid var(--border);border-radius:var(--rs);padding:.4rem .6rem;max-height:130px;overflow-y:auto">
+        <div id="edit-cust-ng-wrap" style="display:flex;flex-wrap:wrap;gap:.4rem;padding:.4rem 0">
           ${(allCastsData||[]).map(cast=>{
             const chk=ngSelected.includes(cast.name)
-            return '<label style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0;cursor:pointer"><input type="checkbox" class="ng-cast-chk" value="'+cast.name+'" '+(chk?'checked':'')+' style="width:16px;height:16px;accent-color:var(--accent)"><span style="font-size:.85rem">'+cast.name+'</span></label>'
+            const bg=chk?'var(--rtx)':'var(--surface2)'
+            const col=chk?'#fff':'var(--text)'
+            const bd=chk?'var(--rtx)':'var(--border)'
+            return '<button type="button" class="ng-chip" data-name="'+cast.name+'" onclick="toggleNgChip(this)" style="padding:.3rem .8rem;border-radius:99px;border:1.5px solid '+bd+';background:'+bg+';color:'+col+';font-size:.82rem;cursor:pointer;font-family:inherit;transition:all .15s">'+cast.name+'</button>'
           }).join('')}
         </div>
       </div>
@@ -1393,14 +1396,41 @@ async function openCustomerDetail(id){
   }
   
   document.getElementById('customer-detail-body').innerHTML=html
+  initNgChips(ngSelected)
+}
+
+function toggleNgChip(el){
+  const selected=el.dataset.selected==='true'
+  if(selected){
+    el.dataset.selected='false'
+    el.style.background='var(--surface2)'
+    el.style.color='var(--text)'
+    el.style.borderColor='var(--border)'
+  } else {
+    el.dataset.selected='true'
+    el.style.background='var(--rtx)'
+    el.style.color='#fff'
+    el.style.borderColor='var(--rtx)'
+  }
+}
+
+// チップの初期選択状態をセット（openCustomerDetailで生成後に呼ぶ）
+function initNgChips(ngSelected){
+  document.querySelectorAll('.ng-chip').forEach(el=>{
+    const sel=ngSelected.includes(el.dataset.name)
+    el.dataset.selected=sel?'true':'false'
+    el.style.background=sel?'var(--rtx)':'var(--surface2)'
+    el.style.color=sel?'#fff':'var(--text)'
+    el.style.borderColor=sel?'var(--rtx)':'var(--border)'
+  })
 }
 
 async function saveCustomerEdit(id){
   const name=document.getElementById('edit-cust-name').value.trim()
   const phone=document.getElementById('edit-cust-phone').value.trim()
-  // チェックボックスからNG取得
-  const ngChecks=document.querySelectorAll('.ng-cast-chk:checked')
-  const ng=Array.from(ngChecks).map(x=>x.value).join(',')
+  // チップからNG取得（選択済みのみ）
+  const ngChips=document.querySelectorAll('.ng-chip[data-selected="true"]')
+  const ng=Array.from(ngChips).map(x=>x.dataset.name).join(',')
   const memo=document.getElementById('edit-cust-memo').value.trim()
   const bannedEl=document.getElementById('edit-cust-banned')
   const ban=bannedEl?bannedEl.value==='true':false
@@ -3757,23 +3787,18 @@ async function confirmExtend(rvId, cacheKey, newCheckout, extCount, extPrice){
   pj['ext_count']=extCount
   const newPayment=JSON.stringify(pj)
   const newCheckoutFull=newCheckout+':00'
+  // extension_countカラムなしでも動くようpaymentのみで管理
   const{error}=await sb.from('reservations').update({
     checkout_time:newCheckoutFull,
-    extension_count:extCount,
     payment:newPayment
   }).eq('id',rvId)
-  if(error){
-    // extension_countカラムがない場合はそれ以外を更新
-    const{error:e2}=await sb.from('reservations').update({checkout_time:newCheckoutFull,payment:newPayment}).eq('id',rvId)
-    if(e2){toast('エラー: '+e2.message);return}
-  }
+  if(error){toast('エラー: '+error.message);return}
   toast('退室時間を'+newCheckout+'に延長しました（'+extCount+'回目）')
   if(window._rvDetailCache?.[cacheKey]){
     const idx=window._rvDetailCache[cacheKey].findIndex(x=>x.id===rvId)
     if(idx>=0) window._rvDetailCache[cacheKey][idx]={
       ...window._rvDetailCache[cacheKey][idx],
       checkout_time:newCheckoutFull,
-      extension_count:extCount,
       payment:newPayment
     }
   }
