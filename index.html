@@ -3099,8 +3099,7 @@ async function saveFee(){
   if(!feeCastId2){toast('エラー: キャストIDが不明です');btn.disabled=false;btn.textContent='保存する';return}
   const g=id=>parseInt(document.getElementById(id)?.value)||0
   const miscEnabled=document.getElementById('f-misc-enabled')?.value!=='0'
-  // update用payload（cast_idなし）
-  const payloadUpdate={
+  const payload={
     back_50:g('f-b50'),back_80:g('f-b80'),back_100:g('f-b100'),back_130:g('f-b130'),back_ext30:g('f-bext'),
     shimei_free:g('f-shimei-free'),shimei_net:g('f-shimei-net'),shimei_hon:g('f-shimei-hon'),
     op_gokueki:g('f-op1'),op_isho:g('f-op2'),op_isho2:g('f-op3'),
@@ -3109,33 +3108,18 @@ async function saveFee(){
     joined_at:document.getElementById('f-joined-at')?.value||null
   }
   const castIdNum=Number(feeCastId2)
-  // 保存前の値を確認用toastで表示
-  toast('保存中... castId='+castIdNum+' op_isho='+payloadUpdate.op_isho)
-  await new Promise(r=>setTimeout(r,1500))
-  // update を実行して影響行数を確認
-  const{data:upData,error:upErr}=await sb.from('cast_fees').update(payloadUpdate).eq('cast_id',castIdNum).select()
-  if(upErr){
-    btn.disabled=false;btn.textContent='保存する'
-    toast('UPDATEエラー: '+upErr.message)
-    return
-  }
-  if(!upData||upData.length===0){
-    // updateで0行 → insertを試みる
-    toast('UPDATE 0行→INSERT試みます castId='+castIdNum)
-    await new Promise(r=>setTimeout(r,1500))
-    const{data:inData,error:inErr}=await sb.from('cast_fees').insert({cast_id:castIdNum,...payloadUpdate}).select()
-    if(inErr){
-      btn.disabled=false;btn.textContent='保存する'
-      toast('INSERTエラー: '+inErr.message)
-      return
-    }
-    toast('INSERT成功 op_isho='+(inData?.[0]?.op_isho??'?'))
+  const{data:existing}=await sb.from('cast_fees').select('id').eq('cast_id',castIdNum).maybeSingle()
+  let saveError
+  if(existing){
+    const r=await sb.from('cast_fees').update(payload).eq('cast_id',castIdNum)
+    saveError=r.error
   } else {
-    toast('UPDATE成功 行数='+upData.length+' op_isho='+(upData[0]?.op_isho??'?'))
+    const r=await sb.from('cast_fees').insert({cast_id:castIdNum,...payload})
+    saveError=r.error
   }
-  await new Promise(r=>setTimeout(r,2000))
   btn.disabled=false;btn.textContent='保存する'
-  sheetFee={...sheetFee,...payloadUpdate}
+  if(saveError){toast('保存エラー: '+saveError.message);console.error('saveFee error:',saveError);return}
+  sheetFee={...sheetFee,...payload}
   toast('保存しました！');closeSheet('fee')
 }
 
@@ -3338,13 +3322,11 @@ async function saveStoreSettings(){
   }
   // 指名料をstore_settingsに保存
   const shimeiData={shimei_free:g('st-shimei-free'),shimei_net:g('st-shimei-net'),shimei_hon:g('st-shimei-hon')}
-  const{data:existing}=await sb.from('store_settings').select('id').single()
-  if(existing){
-    const{error:ssErr}=await sb.from('store_settings').update(shimeiData).eq('id',existing.id)
-    if(ssErr) toast('指名料保存エラー: '+ssErr.message)
-  } else {
-    const{error:ssErr}=await sb.from('store_settings').insert(shimeiData)
-    if(ssErr) toast('指名料保存エラー: '+ssErr.message)
+  const{error:ssErr}=await sb.from('store_settings').upsert({id:1,...shimeiData},{onConflict:'id'})
+  if(ssErr){
+    const{data:ssx}=await sb.from('store_settings').select('id').maybeSingle()
+    if(ssx){await sb.from('store_settings').update(shimeiData).eq('id',ssx.id)}
+    else{await sb.from('store_settings').insert(shimeiData)}
   }
   // coursesをリロード＋store_settingsをキャッシュ
   const{data:newCs}=await sb.from('courses').select('*').order('price')
