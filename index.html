@@ -3313,11 +3313,13 @@ async function saveStoreSettings(){
     {id:'st-op2',names:['衣装チェンジ①','衣装チェンジ']},
     {id:'st-op3',names:['衣装チェンジ②']}
   ]
-  if(ops){
-    for(const def of opDefs){
-      const op=ops.find(o=>def.names.includes(o.name))
-      if(op) await sb.from('options').update({price:g(def.id)}).eq('id',op.id)
-      else await sb.from('options').insert({name:def.names[0],price:g(def.id)})
+  for(const def of opDefs){
+    const price=g(def.id)
+    const op=(ops||[]).find(o=>def.names.includes(o.name))
+    if(op){
+      await sb.from('options').update({price,name:def.names[0]}).eq('id',op.id)
+    } else {
+      await sb.from('options').insert({name:def.names[0],price})
     }
   }
   // 指名料をstore_settingsに保存
@@ -3331,6 +3333,8 @@ async function saveStoreSettings(){
   // coursesをリロード＋store_settingsをキャッシュ
   const{data:newCs}=await sb.from('courses').select('*').order('price')
   courses=newCs||[]
+  const{data:newOps}=await sb.from('options').select('*').order('id')
+  opts=newOps||[]
   const{data:newSs}=await sb.from('store_settings').select('*').single()
   storeSettings=newSs||{}
   btn.disabled=false;btn.textContent='保存する'
