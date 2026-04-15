@@ -2628,20 +2628,18 @@ function addSession(data=null){
 
   const extCount=data?.ext_count||0
   const extPays=data?.ext_pays||[]
-  // 延長チェックボックス（オプション〜割引の間に表示）
+  // 延長チェックボックス・支払い列：延長がある場合のみ表示
   let extItems=''
-  for(let ei=1;ei<=3;ei++){
-    const checked=(extCount>=ei)?'checked':''
-    extItems+=`<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0">
-      <input type="checkbox" class="ext-check" data-ext-no="${ei}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--blue)">
-      延長${ei}回目（30分）
-    </label>`
-  }
-  // 延長支払い方法（最大3回）
   let extPayCols=''
-  for(let ei=1;ei<=3;ei++){
-    const ep=extPays[ei-1]||'現金'
-    extPayCols+=`<div><div style="font-size:.62rem;color:var(--blue);margin-bottom:.2rem">延長${ei}回目</div><select class="fi2 s-pay-ext-${ei}" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${ep==='現金'?'selected':''}>現金</option><option value="カード" ${ep==='カード'?'selected':''}>カード</option></select></div>`
+  if(extCount>0){
+    for(let ei=1;ei<=extCount;ei++){
+      extItems+=`<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0">
+        <input type="checkbox" class="ext-check" data-ext-no="${ei}" checked onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--blue)">
+        延長${ei}回目（30分）
+      </label>`
+      const ep=extPays[ei-1]||'現金'
+      extPayCols+=`<div><div style="font-size:.62rem;color:var(--blue);margin-bottom:.2rem">延長${ei}回目</div><select class="fi2 s-pay-ext-${ei}" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${ep==='現金'?'selected':''}>現金</option><option value="カード" ${ep==='カード'?'selected':''}>カード</option></select></div>`
+    }
   }
   div.innerHTML=`
     <div class="session-hdr">
@@ -2653,8 +2651,8 @@ function addSession(data=null){
       <div><div class="session-label">指名</div><select class="fi2 s-shimei" onchange="calcTotal2()">${shimeiOpts}</select></div>
     </div>
     <div style="margin-bottom:.4rem">
-      <div class="session-label">支払い方法（コース / 指名 / オプション / 延長）</div>
-      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:.3rem;align-items:end">
+      <div class="session-label">支払い方法（コース / 指名 / オプション${extCount>0?' / 延長':''}）</div>
+      <div style="display:grid;grid-template-columns:repeat(${3+extCount},1fr);gap:.3rem;align-items:end">
         <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">コース</div><select class="fi2 s-pay-course" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_course||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_course==='カード'?'selected':''}>カード</option></select></div>
         <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">指名</div><select class="fi2 s-pay-shimei" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_shimei||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_shimei==='カード'?'selected':''}>カード</option></select></div>
         <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">オプション</div><select class="fi2 s-pay-option" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_option||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_option==='カード'?'selected':''}>カード</option></select></div>
@@ -2662,7 +2660,7 @@ function addSession(data=null){
       </div>
     </div>
     <div style="margin-bottom:.4rem"><div class="session-label">オプション</div>${opItems}</div>
-    <div style="margin-bottom:.4rem"><div class="session-label">延長</div>${extItems}</div>
+    ${extCount>0?`<div style="margin-bottom:.4rem"><div class="session-label" style="color:var(--blue)">延長</div>${extItems}</div>`:''}
     <div><div class="session-label">割引</div>${discItems}</div>`
   document.getElementById('session-list').appendChild(div)
   calcTotal2()
