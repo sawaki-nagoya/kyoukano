@@ -2579,34 +2579,23 @@ async function openWorkSheet(shiftId,castName,date,castId){
         // 支払い方法を解析
         let payCourse='現金',payShimei='現金',payOption='現金'
         try{const pj=JSON.parse(rv.payment||'{}');payCourse=pj.course||'現金';payShimei=pj.shimei||'現金';payOption=pj.option||'現金'}catch(e){}
+        // 延長情報を取得してセッションに渡す
+        let rvPj={}
+        try{rvPj=JSON.parse(rv.payment||'{}')}catch(e){}
+        const rvExtCount=rvPj.ext_count||0
+        // 延長ごとの支払い方法
+        const extPays=[]
+        for(let ei=1;ei<=rvExtCount;ei++) extPays.push(rvPj['ext_'+ei]||'現金')
         addSession({
           course_id:matchedCourse?.id||null,
           shimei_type:shimeiType,
           options:opData,
           pay_course:payCourse,
           pay_shimei:payShimei,
-          pay_option:payOption
+          pay_option:payOption,
+          ext_count:rvExtCount,
+          ext_pays:extPays
         })
-        // 延長がある場合は延長セッションを追加
-        let rvPj={}
-        try{rvPj=JSON.parse(rv.payment||'{}')}catch(e){}
-        const rvExtCount=rvPj.ext_count||0
-        const extCourseForWork=courses.find(c=>c.name&&c.name.includes('延長'))
-        if(rvExtCount>0 && extCourseForWork){
-          for(let ei=1;ei<=rvExtCount;ei++){
-            const extPay=rvPj['ext_'+ei]||'現金'
-            addSession({
-              course_id:extCourseForWork.id,
-              shimei_type:'フリー',
-              options:[],
-              pay_course:extPay,
-              pay_shimei:'現金',
-              pay_option:'現金',
-              is_extension:true,
-              ext_no:ei
-            })
-          }
-        }
       })
     } else {
       addSession()
@@ -2637,12 +2626,26 @@ function addSession(data=null){
     return `<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0"><input type="checkbox" class="disc-check" data-id="${d.id}" data-name="${d.name}" data-amount="${d.amount}" data-dtype="${d.disc_type||'back'}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--red)"> ${d.name}（-${fmt(d.amount)}）<span style="font-size:.65rem;color:${typeColor}">${typeLabel}</span></label>`
   }).join(''):'<div style="font-size:.76rem;color:var(--text3)">割引設定なし</div>'
 
-  const paymentOpts=['現金','カード'].map(p=>`<option value="${p}" ${data?.payment===p?'selected':''}>${p}</option>`).join('')
-  const isExt=data?.is_extension||false
-  const sessionLabel=isExt?`<span class="session-no" style="color:var(--blue)">延長${data.ext_no||''}回目</span>`:`<span class="session-no">${currentNo}本目</span>`
+  const extCount=data?.ext_count||0
+  const extPays=data?.ext_pays||[]
+  // 延長チェックボックス（オプション〜割引の間に表示）
+  let extItems=''
+  for(let ei=1;ei<=3;ei++){
+    const checked=(extCount>=ei)?'checked':''
+    extItems+=`<label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;padding:.2rem 0">
+      <input type="checkbox" class="ext-check" data-ext-no="${ei}" ${checked} onchange="calcTotal2()" style="width:18px;height:18px;accent-color:var(--blue)">
+      延長${ei}回目（30分）
+    </label>`
+  }
+  // 延長支払い方法（最大3回）
+  let extPayCols=''
+  for(let ei=1;ei<=3;ei++){
+    const ep=extPays[ei-1]||'現金'
+    extPayCols+=`<div><div style="font-size:.62rem;color:var(--blue);margin-bottom:.2rem">延長${ei}回目</div><select class="fi2 s-pay-ext-${ei}" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${ep==='現金'?'selected':''}>現金</option><option value="カード" ${ep==='カード'?'selected':''}>カード</option></select></div>`
+  }
   div.innerHTML=`
-    <div class="session-hdr" ${isExt?'data-is-ext="true"':''}>
-      ${sessionLabel}
+    <div class="session-hdr">
+      <span class="session-no">${currentNo}本目</span>
       <button class="session-del" onclick="removeSession(this)">削除</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-bottom:.5rem">
@@ -2650,26 +2653,24 @@ function addSession(data=null){
       <div><div class="session-label">指名</div><select class="fi2 s-shimei" onchange="calcTotal2()">${shimeiOpts}</select></div>
     </div>
     <div style="margin-bottom:.4rem">
-      <div class="session-label">支払い方法（コース / 指名 / オプション）</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem">
+      <div class="session-label">支払い方法（コース / 指名 / オプション / 延長）</div>
+      <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:.3rem;align-items:end">
         <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">コース</div><select class="fi2 s-pay-course" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_course||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_course==='カード'?'selected':''}>カード</option></select></div>
         <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">指名</div><select class="fi2 s-pay-shimei" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_shimei||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_shimei==='カード'?'selected':''}>カード</option></select></div>
         <div><div style="font-size:.62rem;color:var(--text3);margin-bottom:.2rem">オプション</div><select class="fi2 s-pay-option" style="padding:.35rem .4rem;font-size:.8rem"><option value="現金" ${(data?.pay_option||'現金')==='現金'?'selected':''}>現金</option><option value="カード" ${data?.pay_option==='カード'?'selected':''}>カード</option></select></div>
+        ${extPayCols}
       </div>
     </div>
     <div style="margin-bottom:.4rem"><div class="session-label">オプション</div>${opItems}</div>
+    <div style="margin-bottom:.4rem"><div class="session-label">延長</div>${extItems}</div>
     <div><div class="session-label">割引</div>${discItems}</div>`
   document.getElementById('session-list').appendChild(div)
   calcTotal2()
 }
 function removeSession(btn){
   btn.closest('.session-block').remove()
-  let normalIdx=0
-  document.querySelectorAll('.session-block').forEach((b)=>{
-    const hdr=b.querySelector('.session-hdr')
-    if(hdr&&hdr.dataset.isExt) return // 延長セッションはスキップ
-    normalIdx++
-    const no=b.querySelector('.session-no');if(no) no.textContent=normalIdx+'本目'
+  document.querySelectorAll('.session-block').forEach((b,i)=>{
+    const no=b.querySelector('.session-no');if(no) no.textContent=(i+1)+'本目'
   })
   calcTotal2()
 }
@@ -2732,10 +2733,18 @@ function calcTotal2(){
       else discFromBack+=amt
     })
     const c=courses.find(x=>x.id===cid)
-    // 総売上 = コース料金 + 指名料（店舗側） + オプション料（店舗側）
+    // 総売上 = コース料金 + 指名料（店舗側） + オプション料（店舗側） + 延長料金
     if(c) totalSales+=c.price||0
     totalSales+=getShimeiPrice(stype)
     block.querySelectorAll('.op-check:checked').forEach(cb=>totalSales+=getOptPrice(cb.dataset.name))
+    // 延長チェックボックス集計
+    const extCourseCalc=courses.find(c=>c.name&&c.name.includes('延長'))
+    const extBackUnit=sheetFee.back_ext30||DEFAULT_FEE.back_ext30
+    const extPriceUnit=extCourseCalc?.price||0
+    block.querySelectorAll('.ext-check:checked').forEach(()=>{
+      totalBack+=extBackUnit
+      totalSales+=extPriceUnit
+    })
   })
   const misc=parseInt(document.getElementById('w-misc').value)||0
   const net=totalBack-discFromBack-misc
@@ -2784,9 +2793,24 @@ async function saveWork(){
     const shimeiPrice=getShimeiPrice(stype)
     let optSaleTotal=0
     options.forEach(o=>{ optSaleTotal+=getOptPrice(o.name) })
-    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal
-    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,sales:sessionSales,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
-    totalSales+=sessionSales;totalBack+=cback+sback+optBack;totalCount++
+    // 延長集計
+    const extCourseW=courses.find(c=>c.name&&c.name.includes('延長'))
+    const extBackUnitW=sheetFee.back_ext30||DEFAULT_FEE.back_ext30
+    const extPriceUnitW=extCourseW?.price||0
+    const extensions=[]
+    block.querySelectorAll('.ext-check').forEach(cb=>{
+      const ei=parseInt(cb.dataset.extNo)
+      const paySel=block.querySelector(`.s-pay-ext-${ei}`)
+      const payExt=paySel?.value||'現金'
+      if(cb.checked){
+        extensions.push({no:ei,pay:payExt,back:extBackUnitW,price:extPriceUnitW})
+      }
+    })
+    const extSaleTotal=extensions.reduce((s,e)=>s+e.price,0)
+    const extBackTotal=extensions.reduce((s,e)=>s+e.back,0)
+    const sessionSales=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal
+    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
+    totalSales+=sessionSales;totalBack+=cback+sback+optBack+extBackTotal;totalCount++
   })
   const net=totalBack-discFromBack-misc
   const shopDrop=totalSales-net-discFromShop
