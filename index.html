@@ -3336,12 +3336,14 @@ async function saveStoreSettings(){
   const opIsho1=ops?ops.find(o=>o.name.includes('衣装')&&!o.name.includes('②')&&!o.name.includes('2')):null
   const opIsho2=ops?ops.find(o=>o.name.includes('衣装')&&(o.name.includes('②')||o.name.includes('2'))):null
   const p1=gv('st-op1'),p2=gv('st-op2'),p3=gv('st-op3')
-  if(opGokueki) await sb.from('options').update({price:p1}).eq('id',opGokueki.id)
-  else await sb.from('options').insert({name:'極液',price:p1})
-  if(opIsho1) await sb.from('options').update({price:p2}).eq('id',opIsho1.id)
-  else await sb.from('options').insert({name:'衣装チェンジ①',price:p2})
-  if(opIsho2) await sb.from('options').update({price:p3}).eq('id',opIsho2.id)
-  else await sb.from('options').insert({name:'衣装チェンジ②',price:p3})
+  let errMsg=''
+  if(opGokueki){const r=await sb.from('options').update({price:p1}).eq('id',opGokueki.id);if(r.error)errMsg+='極液:'+r.error.message+' '}
+  else{const r=await sb.from('options').insert({name:'極液',price:p1});if(r.error)errMsg+='極液insert:'+r.error.message+' '}
+  if(opIsho1){const r=await sb.from('options').update({price:p2}).eq('id',opIsho1.id);if(r.error)errMsg+='衣装①:'+r.error.message+' '}
+  else{const r=await sb.from('options').insert({name:'衣装チェンジ①',price:p2});if(r.error)errMsg+='衣装①insert:'+r.error.message+' '}
+  if(opIsho2){const r=await sb.from('options').update({price:p3}).eq('id',opIsho2.id);if(r.error)errMsg+='衣装②:'+r.error.message+' '}
+  else{const r=await sb.from('options').insert({name:'衣装チェンジ②',price:p3});if(r.error)errMsg+='衣装②insert:'+r.error.message+' '}
+  if(errMsg){btn.disabled=false;btn.textContent='保存する';toast('保存エラー: '+errMsg);return}
   // 指名料をstore_settingsに保存
   const shimeiData={shimei_free:gv('st-shimei-free'),shimei_net:gv('st-shimei-net'),shimei_hon:gv('st-shimei-hon')}
   const{error:ssErr}=await sb.from('store_settings').upsert({id:1,...shimeiData},{onConflict:'id'})
