@@ -3025,7 +3025,8 @@ let feeCastId2=null
 async function openFeeSheet(castId,name){
   feeCastId2=Number(castId)  // 型を数値に統一（文字列だとDBマッチしない）
   document.getElementById('fee-title').textContent=name+' の委託金設定'
-  const{data:fee}=await sb.from('cast_fees').select('*').eq('cast_id',castId).single()
+  const castIdNum2=Number(castId)
+  const{data:fee}=await sb.from('cast_fees').select('*').eq('cast_id',castIdNum2).single()
   const f=fee||{}
   document.getElementById('f-b50').value=f.back_50??5850
   document.getElementById('f-b80').value=f.back_80??7200
@@ -3097,29 +3098,51 @@ async function saveFee(){
   const btn=document.getElementById('btn-save-fee')
   btn.disabled=true;btn.textContent='保存中...'
   if(!feeCastId2){toast('エラー: キャストIDが不明です');btn.disabled=false;btn.textContent='保存する';return}
-  const g=id=>parseInt(document.getElementById(id)?.value)||0
+  const g=id=>{const el=document.getElementById(id);return el?(parseInt(el.value,10)||0):0}
   const miscEnabled=document.getElementById('f-misc-enabled')?.value!=='0'
+  const joinedVal=document.getElementById('f-joined-at')?.value||null
+  const castIdNum=Number(feeCastId2)
   const payload={
+    cast_id:castIdNum,
     back_50:g('f-b50'),back_80:g('f-b80'),back_100:g('f-b100'),back_130:g('f-b130'),back_ext30:g('f-bext'),
     shimei_free:g('f-shimei-free'),shimei_net:g('f-shimei-net'),shimei_hon:g('f-shimei-hon'),
     op_gokueki:g('f-op1'),op_isho:g('f-op2'),op_isho2:g('f-op3'),
     misc_enabled:miscEnabled,misc_0:g('f-misc-0'),misc_1:g('f-misc-1'),misc_3:g('f-misc-3'),
     interval_min:g('f-interval'),
-    joined_at:document.getElementById('f-joined-at')?.value||null
+    joined_at:joinedVal
   }
-  const castIdNum=Number(feeCastId2)
-  const{data:existing}=await sb.from('cast_fees').select('id').eq('cast_id',castIdNum).maybeSingle()
-  let saveError
-  if(existing){
-    const r=await sb.from('cast_fees').update(payload).eq('cast_id',castIdNum)
-    saveError=r.error
-  } else {
-    const r=await sb.from('cast_fees').insert({cast_id:castIdNum,...payload})
-    saveError=r.error
+  // upsertで確実に保存（cast_idが重複した場合は更新）
+  const{error:upsertErr}=await sb.from('cast_fees').upsert(payload,{onConflict:'cast_id'})
+  if(upsertErr){
+    console.warn('upsert失敗、update/insertにフォールバック:',upsertErr)
+    const{data:existing}=await sb.from('cast_fees').select('id').eq('cast_id',castIdNum).maybeSingle()
+    let saveError
+    if(existing){
+      const r=await sb.from('cast_fees').update(payload).eq('cast_id',castIdNum)
+      saveError=r.error
+    } else {
+      const r=await sb.from('cast_fees').insert(payload)
+      saveError=r.error
+    }
+    if(saveError){btn.disabled=false;btn.textContent='保存する';toast('保存エラー: '+saveError.message);console.error('saveFee error:',saveError);return}
+  }
+  // 保存後DBから再読み込みして画面を正確に更新
+  const{data:saved}=await sb.from('cast_fees').select('*').eq('cast_id',castIdNum).single()
+  if(saved){
+    sheetFee={...DEFAULT_FEE,...saved}
+    document.getElementById('f-b50').value=saved.back_50??''
+    document.getElementById('f-b80').value=saved.back_80??''
+    document.getElementById('f-b100').value=saved.back_100??''
+    document.getElementById('f-b130').value=saved.back_130??''
+    document.getElementById('f-bext').value=saved.back_ext30??''
+    const fsfEl=document.getElementById('f-shimei-free');if(fsfEl)fsfEl.value=saved.shimei_free??''
+    const fsnEl=document.getElementById('f-shimei-net');if(fsnEl)fsnEl.value=saved.shimei_net??''
+    const fshEl=document.getElementById('f-shimei-hon');if(fshEl)fshEl.value=saved.shimei_hon??''
+    document.getElementById('f-op1').value=saved.op_gokueki??''
+    document.getElementById('f-op2').value=saved.op_isho??''
+    const op3El=document.getElementById('f-op3');if(op3El)op3El.value=saved.op_isho2??''
   }
   btn.disabled=false;btn.textContent='保存する'
-  if(saveError){toast('保存エラー: '+saveError.message);console.error('saveFee error:',saveError);return}
-  sheetFee={...sheetFee,...payload}
   toast('保存しました！');closeSheet('fee')
 }
 
