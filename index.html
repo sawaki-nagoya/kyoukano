@@ -412,7 +412,7 @@ tr:last-child td{border-bottom:none}
         <div style="font-size:1rem;font-weight:700">キャスト管理</div>
         <div style="display:flex;gap:.35rem">
           <button class="btn btn-red btn-sm2" onclick="openInactiveSheet()">退店済み</button>
-          <button class="btn btn-blue btn-sm2" onclick="alert('OK');openStoreSettings()">⚙️ 料金設定</button>
+          <button class="btn btn-blue btn-sm2" onclick="openStoreSettings()">⚙️ 料金設定</button>
           <button class="btn btn-gold btn-sm2" onclick="openAddCast()">＋ 追加</button>
         </div>
       </div>
@@ -3361,6 +3361,32 @@ async function saveStoreSettings(){
   }
   btn.disabled=false;btn.textContent='保存する'
   toast('料金を保存しました！');closeSheet('store')
+}
+async function loadStoreDiscList(){
+  const area=document.getElementById('store-disc-list')
+  if(!area)return
+  const{data:discs}=await sb.from('cast_discounts').select('*').eq('cast_id',0).order('id')
+  if(!discs||!discs.length){area.innerHTML='<div style="font-size:.78rem;color:var(--text3);margin-bottom:.4rem">割引なし</div>';return}
+  area.innerHTML=discs.map(d=>`
+    <div style="display:flex;align-items:center;gap:.4rem;margin-bottom:.4rem;padding:.35rem;background:var(--surface2);border-radius:8px">
+      <span style="flex:1;font-size:.83rem">${d.name}</span>
+      <span style="font-size:.75rem;color:var(--rtx)">-${fmt(d.amount||0)}円</span>
+      <button class="btn btn-red btn-xs" onclick="deleteStoreDisc(${d.id})">削除</button>
+    </div>`).join('')
+}
+async function addStoreDisc(){
+  const name=document.getElementById('st-disc-name')?.value.trim()
+  const amount=parseInt(document.getElementById('st-disc-amount')?.value)||0
+  if(!name){toast('割引名を入力してください');return}
+  const{error}=await sb.from('cast_discounts').insert({cast_id:0,name,amount,disc_type:'back',sort_order:99})
+  if(error){toast('エラー: '+error.message);return}
+  document.getElementById('st-disc-name').value=''
+  document.getElementById('st-disc-amount').value=''
+  await loadStoreDiscList();toast('割引を追加しました')
+}
+async function deleteStoreDisc(id){
+  await sb.from('cast_discounts').delete().eq('id',id)
+  await loadStoreDiscList();toast('削除しました')
 }
 init()
 </script>
