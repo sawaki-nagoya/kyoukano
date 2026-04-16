@@ -3300,6 +3300,7 @@ async function openStoreSettings(){
     const opG=ops.find(o=>o.name==='極液')
     const opI1=ops.find(o=>o.name==='衣装チェンジ①')
     const opI2=ops.find(o=>o.name==='衣装チェンジ②')
+    toast('DB読込: 衣装①='+(opI1?opI1.price:'未検索')+' id='+(opI1?opI1.id:'?'),4000)
     if(opG) document.getElementById('st-op1').value=opG.price
     if(opI1) document.getElementById('st-op2').value=opI1.price
     if(opI2) document.getElementById('st-op3').value=opI2.price
