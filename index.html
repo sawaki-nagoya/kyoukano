@@ -3295,13 +3295,11 @@ async function openStoreSettings(){
     const c130=cs.find(c=>c.name.includes('130分'));if(c130) document.getElementById('st-c130').value=c130.price
     const cext=cs.find(c=>c.name.includes('延長'));if(cext) document.getElementById('st-ext').value=cext.price
   }
-  toast('コース保存完了、オプション保存開始',3000)
   const{data:ops}=await sb.from('options').select('*').order('id')
   if(ops){
     const opG=ops.find(o=>o.name==='極液')
     const opI1=ops.find(o=>o.name==='衣装チェンジ①')
     const opI2=ops.find(o=>o.name==='衣装チェンジ②')
-    toast('DB読込: 衣装①='+(opI1?opI1.price:'未検索')+' id='+(opI1?opI1.id:'?'),4000)
     if(opG) document.getElementById('st-op1').value=opG.price
     if(opI1) document.getElementById('st-op2').value=opI1.price
     if(opI2) document.getElementById('st-op3').value=opI2.price
@@ -3334,17 +3332,8 @@ async function saveStoreSettings(){
       const opG=ops.find(o=>o.name==='極液')
       const opI1=ops.find(o=>o.name==='衣装チェンジ①')
       const opI2=ops.find(o=>o.name==='衣装チェンジ②')
-      toast('opI1='+(opI1?opI1.id:'null')+' gv='+gv('st-op2'),4000)
       if(opG){const r=await sb.from('options').update({price:gv('st-op1')}).eq('id',opG.id);if(r.error){toast('エラー(極液):'+r.error.message,5000);btn.disabled=false;btn.textContent='保存する';return}}
-      if(opI1){
-        const updateVal=gv('st-op2')
-        const r=await sb.from('options').update({price:updateVal}).eq('id',opI1.id).select()
-        toast('衣装①update: val='+updateVal+' err='+(r.error?r.error.message:'なし')+' data='+JSON.stringify(r.data),6000)
-        if(r.error){btn.disabled=false;btn.textContent='保存する';return}
-        // 検証: 即座に再取得
-        const{data:check}=await sb.from('options').select('price').eq('id',opI1.id).single()
-        toast('DB確認: id='+opI1.id+' price='+(check?check.price:'null'),6000)
-      }
+      if(opI1){const r=await sb.from('options').update({price:gv('st-op2')}).eq('id',opI1.id);if(r.error){toast('エラー(衣装①):'+r.error.message,5000);btn.disabled=false;btn.textContent='保存する';return}}
       if(opI2){const r=await sb.from('options').update({price:gv('st-op3')}).eq('id',opI2.id);if(r.error){toast('エラー(衣装②):'+r.error.message,5000);btn.disabled=false;btn.textContent='保存する';return}}
     }
     const shimeiData={shimei_free:gv('st-shimei-free'),shimei_net:gv('st-shimei-net'),shimei_hon:gv('st-shimei-hon')}
