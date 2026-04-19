@@ -3499,16 +3499,13 @@ async function openRvDetail(rvId, shiftId, castName){
         .neq('cast_memo','')
         .order('created_at',{ascending:false})
         .limit(5)
-      if(!me.is_owner){
-        // キャストは自分の名前のメモのみ
-        memoQuery = memoQuery.eq('cast_name', me.name)
-      }
+      // キャストも全件取得（投稿者名は自分/他キャストで切り替え表示）
       const {data:memos} = await memoQuery
       if(memos&&memos.length){
-        memoHtml += `<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin:.4rem 0 .2rem">💬 接客メモ${me.is_owner?'（全キャスト）':'（自分のメモ）'}</div>`
+        memoHtml += `<div style="font-size:.75rem;font-weight:700;color:var(--text2);margin:.4rem 0 .2rem">💬 接客メモ</div>`
         memoHtml += memos.map(m=>`<div style="background:var(--surface2);border-radius:8px;padding:.4rem .7rem;font-size:.8rem;margin-bottom:.25rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
-            <span style="font-size:.65rem;color:var(--accent);font-weight:600">${m.cast_name||''}</span>
+            <span style="font-size:.65rem;color:var(--accent);font-weight:600">${me.is_owner?(m.cast_name||'不明'):(m.cast_name===me.name?me.name:'（他キャスト）')}</span>
             <span style="font-size:.62rem;color:var(--text3)">${m.created_at?.slice(0,10)||''}</span>
           </div>
           ${m.cast_memo}
