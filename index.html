@@ -2823,10 +2823,17 @@ async function openWorkSheet(shiftId,castName,date,castId){
         // 延長ごとの支払い方法
         const extPays=[]
         for(let ei=1;ei<=rvExtCount;ei++) extPays.push(rvPj['ext_'+ei]||'現金')
+        // 予約の割引をsheetDiscsと照合してdiscountsデータを生成
+        const rvDiscNames=(rv.discount||'').split(',').filter(Boolean)
+        const rvDiscounts=rvDiscNames.map(name=>{
+          const d=sheetDiscs.find(x=>x.name===name)
+          return d?{id:d.id,name:d.name,amount:d.amount,disc_type:d.disc_type||'back'}:null
+        }).filter(Boolean)
         addSession({
           course_id:matchedCourse?.id||null,
           shimei_type:shimeiType,
           options:opData,
+          discounts:rvDiscounts,
           pay_course:payCourse,
           pay_shimei:payShimei,
           pay_option:payOption,
