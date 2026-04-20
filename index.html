@@ -1421,15 +1421,12 @@ function renderCustomers(list){
   let html=''
   list.forEach(c=>{
     const banned=c.is_banned?'<span style="font-size:.65rem;background:#f44336;color:#fff;padding:1px 6px;border-radius:99px;margin-left:.4rem">出禁</span>':''
-    html+=`<div class="item" style="gap:.5rem">
-      <div class="ib" onclick="openCustomerDetail(${c.id})" style="flex:1;cursor:pointer">
+    html+=`<div class="item" onclick="openCustomerDetail(${c.id})">
+      <div class="ib">
         <div class="it">No.${c.customer_no}　${c.name}${banned}</div>
         <div class="is">${c.phone||'電話番号未登録'}</div>
       </div>
-      <div style="display:flex;align-items:center;gap:.35rem;flex-shrink:0">
-        <div class="ic" onclick="openCustomerDetail(${c.id})" style="cursor:pointer">›</div>
-        <button class="btn btn-red btn-xs" onclick="deleteCustomer(${c.id},this.dataset.n)" data-n="${c.name}" style="font-size:.65rem;padding:3px 7px;white-space:nowrap">削除</button>
-      </div>
+      <div class="ic">›</div>
     </div>`
   })
   area.innerHTML=html
@@ -1509,6 +1506,14 @@ async function openCustomerDetail(id){
   } else {
     html+='<div class="empty">メモなし</div>'
   }
+
+  // キャストメモの下に顧客削除ボタン
+  html+=`<div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border)">
+    <button class="btn btn-red btn-full" onclick="deleteCustomer(${c.id},'${c.name.replace(/'/g, '')}')">
+      🗑 この顧客データを完全に削除する
+    </button>
+    <div style="font-size:.7rem;color:var(--text3);text-align:center;margin-top:.4rem">来店記録・メモも全て削除されます</div>
+  </div>`
   
   document.getElementById('customer-detail-body').innerHTML=html
   initNgChips(ngSelected)
