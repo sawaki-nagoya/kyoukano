@@ -3103,16 +3103,19 @@ function calcTotal2(){
   if(hoshoApplied) net=hosho
   const shopDrop=totalSales-net-discFromShop
   let bd=''
-  bd+=`<div class="sal-row"><span class="sal-rl">総売上</span><span class="sal-rv">${fmt(totalSales)}</span></div>`
-  if(misc>0) bd+=`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`
+  const grossSales=totalSales+(discFromBack+discFromShop)  // 割引前の総売上
+  const shopDrop2=totalSales-net  // 粗利益（純売上 - 委託金）
+  bd+=`<div class="sal-row"><span class="sal-rl">総売上高</span><span class="sal-rv">${fmt(grossSales)}</span></div>`
+  const totalDiscAll=discFromBack+discFromShop
+  if(totalDiscAll>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(totalDiscAll)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl" style="font-weight:700">純売上高</span><span class="sal-rv tot">${fmt(totalSales)}</span></div>`
   if(hoshoApplied){
     bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv" style="color:var(--rtx);font-weight:700">${fmt(net)} <span style="font-size:.72rem">（保証）</span></span></div>`
   } else {
-    bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv tot">${fmt(net)}</span></div>`
+    bd+=`<div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(net)}</span></div>`
   }
-  bd+=`<div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt(shopDrop)}</span></div>`
-  if(discFromBack>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（委託金引き）</span><span class="sal-rv neg">-${fmt(discFromBack)}</span></div>`
-  if(discFromShop>0) bd+=`<div class="sal-row"><span class="sal-rl">└ 割引（店落ち引き）</span><span class="sal-rv neg">-${fmt(discFromShop)}</span></div>`
+  if(misc>0) bd+=`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`
+  bd+=`<div class="sal-row"><span class="sal-rl" style="font-weight:700">粗利益</span><span class="sal-rv tot">${fmt(shopDrop2)}</span></div>`
   document.getElementById('w-breakdown').innerHTML=bd
 }
 // 旧calcTotal互換
