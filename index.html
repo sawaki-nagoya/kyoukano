@@ -384,12 +384,12 @@ tr:last-child td{border-bottom:none}
         <button class="cal-nav-btn" onclick="ownerSalMove(1)">›</button>
       </div>
       <div class="kpi-row">
-        <div class="kpi"><div class="kpi-l">月間売上</div><div class="kpi-v" id="o-sales">-</div></div>
-        <div class="kpi"><div class="kpi-l">委託金総額</div><div class="kpi-v" id="o-back">-</div></div>
+        <div class="kpi"><div class="kpi-l">純売上高</div><div class="kpi-v" id="o-sales">-</div></div>
+        <div class="kpi"><div class="kpi-l">委託金</div><div class="kpi-v" id="o-back">-</div></div>
         <div class="kpi"><div class="kpi-l">施術件数</div><div class="kpi-v" id="o-count">-</div></div>
       </div>
       <div class="kpi-row" style="margin-top:-.25rem">
-        <div class="kpi"><div class="kpi-l">💴 現金売上</div><div class="kpi-v" id="o-cash" style="font-size:.9rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">粗利益</div><div class="kpi-v" id="o-cash" style="font-size:.9rem">-</div></div>
         <div class="kpi"><div class="kpi-l">💳 カード売上</div><div class="kpi-v" id="o-card" style="font-size:.9rem">-</div></div>
       </div>
       <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
@@ -1211,8 +1211,8 @@ function renderCal(){
     const cursor=isPast?'default':'pointer'
     const onclick=isPast?'':'selectDay(\''+ds+'\')'
     const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'出勤':'却下'):''
-    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span>${d}</span>${statusText?`<span style="font-size:.4rem;line-height:1.1">${statusText}</span>`:''}</div>`
-    html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-size:.68rem;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
+    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:.95rem;font-weight:700;line-height:1.1">${d}</span>${statusText?`<span style="font-size:.42rem;line-height:1.1">${statusText}</span>`:''}</div>`
+    html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
     col++
   }
   // 残りの空白
@@ -3560,39 +3560,29 @@ async function loadOwnerSalary(){
     return
   }
   const totalSales=works.reduce((s,w)=>s+(w.sales||0),0)
-  const totalBack=works.reduce((s,w)=>s+(w.back||0),0)
+  const totalNet=works.reduce((s,w)=>s+(w.net||w.back||0),0)
   const totalCount=works.reduce((s,w)=>s+(w.count||0),0)
+  const totalGrossProfit=totalSales-totalNet
+  // 割引合計を計算して純売上高と総売上高を算出
+  const totalDiscAll2=works.reduce((sum,w)=>{
+    const ss=w.sessions||[]
+    return sum+ss.reduce((s2,s)=>{
+      const disc=(s.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0)
+      return s2+disc
+    },0)
+  },0)
+  const grossSalesKpi=totalSales+totalDiscAll2
   document.getElementById('o-sales').textContent=fmt(totalSales)
-  document.getElementById('o-back').textContent=fmt(totalBack)
+  document.getElementById('o-back').textContent=fmt(totalNet)
   document.getElementById('o-count').textContent=totalCount+'件'
-  // 現金/カード売上を集計
-  let totalCash=0,totalCard=0
-  works.forEach(w=>{
-    const sessions=w.sessions||[]
-    sessions.forEach(s=>{
-      const saleAmt=s.sales||0
-      if(s.pay_course==='カード'||s.pay_shimei==='カード'||s.pay_option==='カード'){
-        // セッション内で一つでもカードがあればカード扱い（簡易）
-        const courseAmt=w.courses?.[0]?.price||0
-        if(s.pay_course==='カード') totalCard+=(s.course_back||0)+(s.sales||0)-(s.course_back||0)
-        else totalCash+=saleAmt
-      } else {
-        totalCash+=saleAmt
-      }
-    })
-    if(!sessions.length){
-      // sessionsがない古いデータ
-      totalCash+=w.sales||0
-    }
-  })
-  // 簡易計算: セッションデータがない場合は全体で計算
+  document.getElementById('o-cash').textContent=fmt(totalGrossProfit)
+  // カード売上を集計
   const realCash=works.reduce((s,w)=>{
     const ss=w.sessions||[]
     if(!ss.length) return s+(w.sales||0)
     return s+ss.filter(x=>x.pay_course!=='カード'&&x.pay_shimei!=='カード'&&x.pay_option!=='カード').reduce((a,x)=>a+(x.sales||0),0)
   },0)
   const realCard=totalSales-realCash
-  document.getElementById('o-cash').textContent=fmt(realCash)
   document.getElementById('o-card').textContent=fmt(realCard)
 
   const bycast={}
