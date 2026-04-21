@@ -383,14 +383,15 @@ tr:last-child td{border-bottom:none}
         <div class="cal-title" id="owner-sal-title">-</div>
         <button class="cal-nav-btn" onclick="ownerSalMove(1)">›</button>
       </div>
-      <div class="kpi-row">
-        <div class="kpi"><div class="kpi-l">純売上高</div><div class="kpi-v" id="o-sales">-</div></div>
-        <div class="kpi"><div class="kpi-l">委託金</div><div class="kpi-v" id="o-back">-</div></div>
-        <div class="kpi"><div class="kpi-l">施術件数</div><div class="kpi-v" id="o-count">-</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.5rem">
+        <div class="kpi"><div class="kpi-l">総売上高</div><div class="kpi-v" id="o-gross" style="font-size:.85rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">割引</div><div class="kpi-v" id="o-disc" style="font-size:.85rem;color:var(--rtx)">-</div></div>
+        <div class="kpi"><div class="kpi-l">純売上高</div><div class="kpi-v" id="o-sales" style="font-size:.85rem">-</div></div>
       </div>
-      <div class="kpi-row" style="margin-top:-.25rem">
-        <div class="kpi"><div class="kpi-l">粗利益</div><div class="kpi-v" id="o-cash" style="font-size:.9rem">-</div></div>
-        <div class="kpi"><div class="kpi-l">💳 カード売上</div><div class="kpi-v" id="o-card" style="font-size:.9rem">-</div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
+        <div class="kpi"><div class="kpi-l">委託金</div><div class="kpi-v" id="o-back" style="font-size:.85rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">雑費</div><div class="kpi-v" id="o-cash" style="font-size:.85rem">-</div></div>
+        <div class="kpi"><div class="kpi-l">粗利益</div><div class="kpi-v" id="o-card" style="font-size:.85rem">-</div></div>
       </div>
       <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
     </div>
@@ -1177,7 +1178,7 @@ function renderCal(){
   const sm={}; myShifts.forEach(s=>sm[s.date]=s)
   const days=['月','火','水','木','金','土','日']
   const firstDow=(first+6)%7
-  const cellSize='calc((100vw - 0.8rem - 14px) / 7)'
+  const cellSize='calc((100vw - 0.8rem - 14px) / 7 * 0.82)'
   // テーブル方式で描画（間隔問題を根本解決）
   let html=`<table class="cal-table" style="width:100%;table-layout:fixed"><thead><tr>`
   days.forEach((d,i)=>{
@@ -1211,7 +1212,7 @@ function renderCal(){
     const cursor=isPast?'default':'pointer'
     const onclick=isPast?'':'selectDay(\''+ds+'\')'
     const statusText=s?(s.status==='requested'?'申請中':s.status==='approved'?'出勤':'却下'):''
-    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:.95rem;font-weight:700;line-height:1.1">${d}</span>${statusText?`<span style="font-size:.42rem;line-height:1.1">${statusText}</span>`:''}</div>`
+    const inner=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0"><span style="font-size:1.2rem;font-weight:800;line-height:1.1">${d}</span>${statusText?`<span style="font-size:.45rem;line-height:1.1">${statusText}</span>`:''}</div>`
     html+=`<td onclick="${onclick}" style="width:${cellSize};height:${cellSize};text-align:center;vertical-align:middle;border-radius:5px;font-weight:${fontWeight};color:${color};background:${bg};border:${border||'1.5px solid transparent'};opacity:${opacity||1};cursor:${cursor};position:relative;padding:0">${inner}</td>`
     col++
   }
@@ -3551,6 +3552,8 @@ async function loadOwnerSalary(){
   const getName3=id=>{const c=(castList3||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
   const works=(worksRaw||[]).map(w=>({...w,casts:{name:getName3(w.cast_id)}}))
   if(!works||!works.length){
+    document.getElementById('o-gross')&&(document.getElementById('o-gross').textContent='¥0')
+    document.getElementById('o-disc')&&(document.getElementById('o-disc').textContent='¥0')
     document.getElementById('o-sales').textContent='¥0'
     document.getElementById('o-back').textContent='¥0'
     document.getElementById('o-count').textContent='0件'
@@ -3572,18 +3575,14 @@ async function loadOwnerSalary(){
     },0)
   },0)
   const grossSalesKpi=totalSales+totalDiscAll2
+  const totalMisc=works.reduce((s,w)=>s+(w.misc||0),0)
+  const totalGrossProfit2=totalSales-totalNet
+  document.getElementById('o-gross')&&(document.getElementById('o-gross').textContent=fmt(grossSalesKpi))
+  document.getElementById('o-disc')&&(document.getElementById('o-disc').textContent=totalDiscAll2>0?'-'+fmt(totalDiscAll2):'¥0')
   document.getElementById('o-sales').textContent=fmt(totalSales)
   document.getElementById('o-back').textContent=fmt(totalNet)
-  document.getElementById('o-count').textContent=totalCount+'件'
-  document.getElementById('o-cash').textContent=fmt(totalGrossProfit)
-  // カード売上を集計
-  const realCash=works.reduce((s,w)=>{
-    const ss=w.sessions||[]
-    if(!ss.length) return s+(w.sales||0)
-    return s+ss.filter(x=>x.pay_course!=='カード'&&x.pay_shimei!=='カード'&&x.pay_option!=='カード').reduce((a,x)=>a+(x.sales||0),0)
-  },0)
-  const realCard=totalSales-realCash
-  document.getElementById('o-card').textContent=fmt(realCard)
+  document.getElementById('o-cash').textContent=fmt(totalMisc)
+  document.getElementById('o-card').textContent=fmt(totalGrossProfit2)
 
   const bycast={}
   works.forEach(w=>{
