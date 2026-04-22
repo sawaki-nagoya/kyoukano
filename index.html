@@ -4030,6 +4030,18 @@ async function openRvEdit(rvId){
   const discItems=(discListAll||[]).map(d=>`<label style="display:flex;align-items:center;gap:.4rem;font-size:.88rem;padding:.2rem 0">
     <input type="checkbox" class="rve-disc" value="${d.name}" ${selectedDiscs.includes(d.name)?'checked':''} style="width:18px;height:18px;accent-color:var(--red)"> ${d.name}（-${fmt(d.amount)}）
   </label>`).join('')
+  // 延長：reservation.extensionsから取得（なければr.ext_countから推定）
+  let rvExts=[]
+  try{ if(r.extensions) rvExts=JSON.parse(r.extensions) }catch(e){}
+  if(!rvExts.length&&r.ext_count){ for(let i=0;i<r.ext_count;i++) rvExts.push({pay:'現金'}) }
+  const extRows=rvExts.map((e,i)=>`<div style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem">
+    <span style="color:var(--blue)">延長${i+1}回目</span>
+    <select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">
+      <option value="現金" ${(e.pay||'現金')==='現金'?'selected':''}>💴現金</option>
+      <option value="カード" ${e.pay==='カード'?'selected':''}>💳カード</option>
+    </select>
+    <button onclick="this.closest('div').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>
+  </div>`).join('')
   document.getElementById('rv-detail-body').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:.55rem">
       <div><div class="fi-lbl">お客様名</div><input class="fi" id="rve-name" value="${r.customer_name||''}"></div>
@@ -4067,14 +4079,19 @@ async function openRvEdit(rvId){
         <div><div class="fi-lbl">退室</div><input class="fi" id="rve-checkout" type="time" value="${r.checkout_time?.slice(0,5)||''}"></div>
       </div>
       ${optItems?`<div><div class="fi-lbl">オプション</div>
-        <div style="display:grid;grid-template-columns:1fr auto;gap:.4rem;align-items:center;margin-bottom:.3rem">
-          <div>${optItems}</div>
-          <select class="fi" id="rve-pay-opt" style="width:80px;align-self:flex-start">
+        <div style="display:flex;gap:.6rem;align-items:flex-start">
+          <div style="flex:1">${optItems}</div>
+          <select class="fi" id="rve-pay-opt" style="width:80px;flex-shrink:0">
             <option value="現金" ${(pj.option||'現金')==='現金'?'selected':''}>💴現金</option>
             <option value="カード" ${pj.option==='カード'?'selected':''}>💳カード</option>
           </select>
         </div>
       </div>`:''}
+      <div>
+        <div class="fi-lbl" style="color:var(--blue)">延長</div>
+        <div id="rve-ext-area" style="margin-bottom:.4rem">${extRows}</div>
+        <button class="btn btn-gray" style="width:100%;font-size:.82rem" onclick="rveAddExt()">＋ 延長を追加</button>
+      </div>
       ${discItems?`<div><div class="fi-lbl">割引</div>${discItems}</div>`:''}
       <div><div class="fi-lbl">備考</div><input class="fi" id="rve-note" value="${r.note||''}"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-top:.3rem">
@@ -4082,6 +4099,20 @@ async function openRvEdit(rvId){
         <button class="btn btn-gray" onclick="backToShiftReservations()">← 一覧に戻る</button>
       </div>
     </div>`
+}
+
+function rveAddExt(){
+  const area=document.getElementById('rve-ext-area')
+  if(!area) return
+  const idx=area.children.length+1
+  const div=document.createElement('div')
+  div.style.cssText='display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem'
+  div.innerHTML=`<span style="color:var(--blue)">延長${idx}回目</span>
+    <select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">
+      <option value="現金">💴現金</option><option value="カード">💳カード</option>
+    </select>
+    <button onclick="this.closest('div').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>`
+  area.appendChild(div)
 }
 
 async function saveRvEdit(rvId){
@@ -4098,7 +4129,11 @@ async function saveRvEdit(rvId){
   const payShimei=document.getElementById('rve-pay-shimei')?.value||'現金'
   const payOpt=document.getElementById('rve-pay-opt')?.value||'現金'
   const note=document.getElementById('rve-note').value.trim()
-  const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOpt})
+  // 延長
+  const extPays=[...document.querySelectorAll('.rve-ext-pay')].map(s=>s.value)
+  const ext_count=extPays.length
+  const extensions=extPays.map(pay=>({pay}))
+  const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOpt,extPay:extPays})
   const{error}=await sb.from('reservations').update({
     customer_name:name,
     customer_no:custNo?parseInt(custNo)||null:null,
@@ -4110,7 +4145,9 @@ async function saveRvEdit(rvId){
     checkin_time:checkin||null,
     checkout_time:checkout||null,
     payment,
-    note
+    note,
+    ext_count,
+    extensions:JSON.stringify(extensions)
   }).eq('id',rvId)
   if(error){toast('保存エラー: '+error.message);return}
   toast('保存しました！')
@@ -4269,57 +4306,57 @@ function monthlyMove(d){ monthlyMonth=addMonth(monthlyMonth,d); monthlyCachedDat
 
 function monthlyTabSwitch(mode){
   monthlyTabMode = mode
-  const on = 'flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
-  const off = 'flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
+  const on='flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
+  const off='flex:1;padding:.4rem;font-size:.76rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
   ;['summary','daily','expense','chart'].forEach(t=>{
     const btn=document.getElementById('monthly-tab-'+t)
-    if(btn) btn.style.cssText = t===mode ? on : off
+    if(btn) btn.style.cssText=t===mode?on:off
   })
   if(monthlyCachedData) renderMonthlyFromCache()
   else renderMonthlyContent()
 }
 
 async function loadMonthly(){
-  const [y,m] = monthlyMonth.split('-').map(Number)
-  const el = document.getElementById('monthly-title')
-  if(el) el.textContent = y+'年'+m+'月'
-  monthlyCachedData = null
+  const [y,m]=monthlyMonth.split('-').map(Number)
+  const el=document.getElementById('monthly-title')
+  if(el) el.textContent=y+'年'+m+'月'
+  monthlyCachedData=null
   await renderMonthlyContent()
 }
 
 async function renderMonthlyContent(){
-  const area = document.getElementById('monthly-area')
+  const area=document.getElementById('monthly-area')
   if(!area) return
-  area.innerHTML = '<div class="spin">読み込み中...</div>'
+  area.innerHTML='<div class="spin">読み込み中...</div>'
 
-  const [y,m] = monthlyMonth.split('-').map(Number)
-  const {data:worksRaw} = await sb.from('works').select('*').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01').order('date')
-  const {data:shiftsRaw} = await sb.from('shifts').select('id,cast_id,date,status').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01')
-  let rvs = []
+  const [y,m]=monthlyMonth.split('-').map(Number)
+  const {data:worksRaw}=await sb.from('works').select('*').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01').order('date')
+  const {data:shiftsRaw}=await sb.from('shifts').select('id,cast_id,date,status').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01')
+  let rvs=[]
   if(shiftsRaw&&shiftsRaw.length){
-    const {data:rvsRaw} = await sb.from('reservations').select('*').in('shift_id',shiftsRaw.map(s=>s.id))
-    rvs = rvsRaw||[]
+    const {data:rvsRaw}=await sb.from('reservations').select('*').in('shift_id',shiftsRaw.map(s=>s.id))
+    rvs=rvsRaw||[]
   }
-  const {data:storeRaw} = await sb.from('monthly_sales').select('*').eq('month',monthlyMonth).single()
-  const sd = storeRaw||{}
-  const {data:courseList} = await sb.from('courses').select('*')
-  const {data:optList} = await sb.from('options').select('*')
-  const {data:discListAll} = await sb.from('cast_discounts').select('*').eq('cast_id',0)
-  const ss = storeSettings||{}
+  const {data:storeRaw}=await sb.from('monthly_sales').select('*').eq('month',monthlyMonth).single()
+  const sd=storeRaw||{}
+  const {data:courseList}=await sb.from('courses').select('*')
+  const {data:optList}=await sb.from('options').select('*')
+  const {data:discListAll}=await sb.from('cast_discounts').select('*').eq('cast_id',0)
+  const ss=storeSettings||{}
 
   function calcRv(r){
     let pj={}; try{pj=JSON.parse(r.payment||'{}')}catch(e){}
     const courseObj=(courseList||[]).find(c=>c.name===r.course)
     const cp=courseObj?.price||0
     const sp=r.shimei_type==='フリー'?(ss.shimei_free||0):r.shimei_type==='ネット指名'?(ss.shimei_net||1000):r.shimei_type==='本指名'?(ss.shimei_hon||2000):0
-    const opts=r.options?r.options.split(',').filter(Boolean):[]
-    const op=opts.reduce((s,n)=>{const o=(optList||[]).find(x=>x.name===n);return s+(o?.price||0)},0)
-    const discs=r.discount?r.discount.split(',').filter(Boolean):[]
-    const dp=discs.reduce((s,n)=>{const d=(discListAll||[]).find(x=>x.name===n);return s+(d?.amount||0)},0)
+    const opts2=r.options?r.options.split(',').filter(Boolean):[]
+    const op=opts2.reduce((s,n)=>{const o=(optList||[]).find(x=>x.name===n);return s+(o?.price||0)},0)
+    const discs2=r.discount?r.discount.split(',').filter(Boolean):[]
+    const dp=discs2.reduce((s,n)=>{const d=(discListAll||[]).find(x=>x.name===n);return s+(d?.amount||0)},0)
     const total=cp+sp+op-dp
     const payCourse=pj.course||'現金',payShimei=pj.shimei||'現金',payOpt=pj.option||'現金'
     const card=(payCourse==='カード'?cp:0)+(payShimei==='カード'?sp:0)+(payOpt==='カード'?op:0)
-    return {total, card, cash:total-card, shimei:r.shimei_type||'フリー', isNew:!!r.is_new_customer}
+    return {total,card,cash:total-card,shimei:r.shimei_type||'フリー',isNew:!!(r.is_new===true||r.is_new==='true')}
   }
 
   const shiftDateMap={}
@@ -4350,7 +4387,6 @@ async function renderMonthlyContent(){
     const net=dayWorks.reduce((s,w)=>s+(w.net||w.back||0),0)
     const misc=dayWorks.reduce((s,w)=>s+(w.misc||0),0)
     const count=dayWorks.reduce((s,w)=>s+(w.count||0),0)
-    const attendance=dayWorks.length
     const disc=dayWorks.reduce((s,w)=>s+((w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)),0)
     const gross=gross_work+disc
     let card=0,cash=0,rvFree=0,rvNet=0,rvHon=0,newCount=0,repeatCount=0
@@ -4364,30 +4400,23 @@ async function renderMonthlyContent(){
     })
     const cardFee=Math.floor(card*0.1)
     const profit=gross_work-net-misc
-    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance,free:rvFree,photo_shimei:rvNet,hon_shimei:rvHon,shimei:rvNet+rvHon,newCount,repeatCount})
+    const attendance=dayWorks.length
+    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,shimei:rvNet+rvHon,newCount,repeatCount})
   }
 
   const vr=dailyRows.filter(r=>!r.noData)
   const tot={
-    gross:vr.reduce((s,r)=>s+(r.gross||0),0),
-    gross_work:vr.reduce((s,r)=>s+(r.gross_work||0),0),
-    disc:vr.reduce((s,r)=>s+(r.disc||0),0),
-    net:vr.reduce((s,r)=>s+(r.net||0),0),
-    misc:vr.reduce((s,r)=>s+(r.misc||0),0),
-    profit:vr.reduce((s,r)=>s+(r.profit||0),0),
-    card:vr.reduce((s,r)=>s+(r.card||0),0),
-    cash:vr.reduce((s,r)=>s+(r.cash||0),0),
-    cardFee:vr.reduce((s,r)=>s+(r.cardFee||0),0),
-    count:vr.reduce((s,r)=>s+(r.count||0),0),
-    attendance:vr.reduce((s,r)=>s+(r.attendance||0),0),
-    free:vr.reduce((s,r)=>s+(r.free||0),0),
-    photo_shimei:vr.reduce((s,r)=>s+(r.photo_shimei||0),0),
-    hon_shimei:vr.reduce((s,r)=>s+(r.hon_shimei||0),0),
-    shimei:vr.reduce((s,r)=>s+(r.shimei||0),0),
-    newCount:vr.reduce((s,r)=>s+(r.newCount||0),0),
+    gross:vr.reduce((s,r)=>s+(r.gross||0),0),gross_work:vr.reduce((s,r)=>s+(r.gross_work||0),0),
+    disc:vr.reduce((s,r)=>s+(r.disc||0),0),net:vr.reduce((s,r)=>s+(r.net||0),0),
+    misc:vr.reduce((s,r)=>s+(r.misc||0),0),profit:vr.reduce((s,r)=>s+(r.profit||0),0),
+    card:vr.reduce((s,r)=>s+(r.card||0),0),cash:vr.reduce((s,r)=>s+(r.cash||0),0),
+    cardFee:vr.reduce((s,r)=>s+(r.cardFee||0),0),count:vr.reduce((s,r)=>s+(r.count||0),0),
+    attendance:vr.reduce((s,r)=>s+(r.attendance||0),0),free:vr.reduce((s,r)=>s+(r.free||0),0),
+    net_shimei:vr.reduce((s,r)=>s+(r.net_shimei||0),0),hon_shimei:vr.reduce((s,r)=>s+(r.hon_shimei||0),0),
+    shimei:vr.reduce((s,r)=>s+(r.shimei||0),0),newCount:vr.reduce((s,r)=>s+(r.newCount||0),0),
     repeatCount:vr.reduce((s,r)=>s+(r.repeatCount||0),0),
   }
-  tot.avg_unit = tot.count>0 ? Math.round(tot.gross_work/tot.count) : 0
+  tot.avg_unit=tot.count>0?Math.round(tot.gross_work/tot.count):0
 
   const customExpenses=sd.custom_expenses||[]
   const total_ad=sd.total_ad_expense||0,total_rent=sd.total_rent||0,total_util=sd.total_utility||0
@@ -4403,29 +4432,29 @@ function renderMonthlyFromCache(){
   const area=document.getElementById('monthly-area')
   if(!area||!monthlyCachedData) return
   const {dailyRows,tot,sd,total_ad,total_rent,total_util,total_fixed,total_vari,total_custom,total_expenses,customExpenses}=monthlyCachedData
-  const fmt=n=>n!=null?'¥'+Number(n).toLocaleString():'-'
-  if(monthlyTabMode==='summary') renderMonthlySummary(area,tot,sd,fmt,total_expenses)
-  else if(monthlyTabMode==='daily') renderMonthlyDaily(area,dailyRows,tot,fmt)
-  else if(monthlyTabMode==='expense') renderMonthlyExpense(area,sd,fmt,total_ad,total_rent,total_util,total_fixed,total_vari,total_custom,total_expenses,customExpenses)
+  const fmt2=n=>n!=null?'¥'+Number(n).toLocaleString():'-'
+  if(monthlyTabMode==='summary') renderMonthlySummary(area,tot,sd,fmt2,total_expenses)
+  else if(monthlyTabMode==='daily') renderMonthlyDaily(area,dailyRows,tot,fmt2)
+  else if(monthlyTabMode==='expense') renderMonthlyExpense(area,sd,fmt2,total_ad,total_rent,total_util,total_fixed,total_vari,total_custom,total_expenses,customExpenses)
   else if(monthlyTabMode==='chart') renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total_util,total_fixed,total_vari)
 }
 
-function renderMonthlySummary(area,tot,sd,fmt,total_expenses){
+function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
   const pct=(a,b)=>b>0?Math.round(a/b*100)+'%':'-'
   const pctColor=(a,b)=>a>=b?'color:#4caf50':'color:var(--accent)'
   const goal_sales=sd.goal_sales,goal_count=sd.goal_count
   let html=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.65rem">`
-  ;[['総売上高',fmt(tot.gross)],['純売上高',fmt(tot.gross_work)],['割引計',tot.disc>0?'-¥'+tot.disc.toLocaleString():'¥0'],
-    ['委託金',fmt(tot.net)],['雑費',tot.misc>0?'-¥'+tot.misc.toLocaleString():'¥0'],['粗利益',fmt(tot.profit)],
-    ['現金売上',fmt(tot.cash)],['カード売上',fmt(tot.card)],['カード手数料','-¥'+(tot.cardFee||0).toLocaleString()],
-    ['出勤延べ',tot.attendance+'名'],['施術件数',tot.count+'本'],['平均客単価',fmt(tot.avg_unit)],
+  ;[['総売上高',fmt2(tot.gross)],['純売上高',fmt2(tot.gross_work)],['割引計',tot.disc>0?'-¥'+tot.disc.toLocaleString():'¥0'],
+    ['委託金',fmt2(tot.net)],['雑費',tot.misc>0?'-¥'+tot.misc.toLocaleString():'¥0'],['粗利益',fmt2(tot.profit)],
+    ['現金売上',fmt2(tot.cash)],['カード売上',fmt2(tot.card)],['カード手数料','-¥'+(tot.cardFee||0).toLocaleString()],
+    ['出勤延べ',tot.attendance+'名'],['施術件数',tot.count+'本'],['平均客単価',fmt2(tot.avg_unit)],
   ].forEach(([l,v])=>{ html+=`<div class="kpi"><div class="kpi-l" style="font-size:.6rem">${l}</div><div class="kpi-v" style="font-size:.75rem">${v}</div></div>` })
   html+='</div>'
   html+=`<div class="card" style="margin-bottom:.55rem">
     <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">🎯 月間目標</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;font-size:.8rem">
-      <div><div style="font-size:.62rem;color:var(--text3)">売上目標</div>${fmt(goal_sales)}</div>
-      <div><div style="font-size:.62rem;color:var(--text3)">実績</div>${fmt(tot.gross_work)}</div>
+      <div><div style="font-size:.62rem;color:var(--text3)">売上目標</div>${fmt2(goal_sales)}</div>
+      <div><div style="font-size:.62rem;color:var(--text3)">実績</div>${fmt2(tot.gross_work)}</div>
       <div><div style="font-size:.62rem;color:var(--text3)">達成率</div><span style="font-weight:700;${pctColor(tot.gross_work,goal_sales)}">${pct(tot.gross_work,goal_sales)}</span></div>
       <div><div style="font-size:.62rem;color:var(--text3)">本数目標</div>${goal_count!=null?goal_count+'本':'-'}</div>
       <div><div style="font-size:.62rem;color:var(--text3)">実績</div>${tot.count}本</div>
@@ -4435,7 +4464,7 @@ function renderMonthlySummary(area,tot,sd,fmt,total_expenses){
     <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">👆 指名内訳</div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;font-size:.82rem;text-align:center">
       <div><div style="font-size:.62rem;color:var(--text3)">フリー</div><div style="font-weight:700">${tot.free}本</div></div>
-      <div><div style="font-size:.62rem;color:var(--text3)">ネット指名</div><div style="font-weight:700">${tot.photo_shimei}本</div></div>
+      <div><div style="font-size:.62rem;color:var(--text3)">ネット指名</div><div style="font-weight:700">${tot.net_shimei}本</div></div>
       <div><div style="font-size:.62rem;color:var(--text3)">本指名</div><div style="font-weight:700">${tot.hon_shimei}本</div></div>
     </div></div>`
   const routeItems=[['エステ魂','esute_kon'],['パンダ','panda'],['エステラブ','esute_love'],['ランキング','ranking'],['ジャパン','japan'],['ゼロツー','zerotwo'],['HP','hp'],['SNS','sns'],['その他','other']]
@@ -4455,83 +4484,90 @@ function renderMonthlySummary(area,tot,sd,fmt,total_expenses){
   if(total_expenses>0){
     html+=`<div class="card" style="margin-bottom:.55rem">
       <div style="font-weight:700;font-size:.85rem;margin-bottom:.3rem">💸 経費合計</div>
-      <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${fmt(total_expenses)}</div></div>`
-  }
-  if(sd.next_goal_sales||sd.next_goal_count){
-    html+=`<div class="card" style="margin-bottom:.55rem">
-      <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">📅 翌月目標</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;font-size:.82rem">
-        <div><div style="font-size:.62rem;color:var(--text3)">売上目標</div>${fmt(sd.next_goal_sales)}</div>
-        <div><div style="font-size:.62rem;color:var(--text3)">本数目標</div>${sd.next_goal_count!=null?sd.next_goal_count+'本':'-'}</div>
-        <div><div style="font-size:.62rem;color:var(--text3)">求人目標</div>${sd.next_goal_recruit!=null?sd.next_goal_recruit+'名':'-'}</div>
-      </div></div>`
+      <div style="font-size:1.1rem;font-weight:700;color:var(--accent)">${fmt2(total_expenses)}</div></div>`
   }
   area.innerHTML=html
 }
 
-function renderMonthlyDaily(area,dailyRows,tot,fmt){
-  // 固定ヘッダー＋スクロール可能なtbody
+// ── 日別テーブル：固定ヘッダー（2テーブル方式） ──
+function renderMonthlyDaily(area,dailyRows,tot,fmt2){
+  const N=n=>(n||0).toLocaleString()
+  const fmtC=n=>n!=null?Number(n).toLocaleString():'0'
   const cols=[
-    {l:'日付',w:'48px',sticky:true},
-    {l:'総売上',w:'70px'},{l:'純売上',w:'70px'},{l:'割引',w:'55px'},
-    {l:'委託金',w:'70px'},{l:'粗利',w:'70px'},{l:'現金',w:'65px'},
-    {l:'カード',w:'65px'},{l:'件数',w:'40px'},{l:'F',w:'30px'},{l:'写',w:'30px'},{l:'本',w:'30px'}
+    {l:'日付',w:'52px',align:'left',sticky:true},
+    {l:'総売上',w:'68px'},{l:'純売上',w:'68px'},{l:'割引',w:'52px'},
+    {l:'委託金',w:'68px'},{l:'粗利',w:'68px'},{l:'現金',w:'62px'},
+    {l:'カード',w:'62px',color:'#1565c0'},{l:'件数',w:'36px'},
+    {l:'フリー',w:'40px'},{l:'ネット',w:'40px'},{l:'本指名',w:'44px'}
   ]
-  const th=cols.map((c,i)=>`<th style="padding:.3rem .25rem;text-align:${i===0?'left':'right'};${i===0?'position:sticky;left:0;z-index:2;':''}background:var(--surface2);min-width:${c.w};${i===7?'color:#1565c0':''}">${c.l}</th>`).join('')
-  
-  const rows=dailyRows.map(r=>{
+  const thStyle=i=>`padding:.3rem .22rem;text-align:${i===0?'left':'right'};background:var(--surface2);white-space:nowrap;font-size:.66rem;${cols[i].sticky?'position:sticky;left:0;z-index:2;':''}${cols[i].color?'color:'+cols[i].color:''}`
+  const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thStyle(i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
+
+  const rowHtml=r=>{
     if(r.noData){
       return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
-        <td style="padding:.25rem .3rem;position:sticky;left:0;background:var(--surface);font-weight:600;z-index:1">${r.day}(${r.dow})</td>
-        <td colspan="11" style="padding:.25rem .25rem;font-size:.62rem">—</td></tr>`
+        <td style="padding:.25rem .3rem;position:sticky;left:0;background:var(--surface);font-weight:600;font-size:.68rem;white-space:nowrap">${r.day}(${r.dow})</td>
+        <td colspan="11" style="padding:.25rem;font-size:.62rem;text-align:right">—</td></tr>`
     }
+    const td=(v,color='')=>`<td style="text-align:right;padding:.25rem .22rem;font-size:.68rem;${color?'color:'+color:''}">${v}</td>`
     return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:.25rem .3rem;position:sticky;left:0;background:var(--surface);font-weight:600;z-index:1">${r.day}(${r.dow})</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.gross?r.gross.toLocaleString():''}</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.gross_work?r.gross_work.toLocaleString():''}</td>
-      <td style="text-align:right;padding:.25rem .25rem;color:#c62828">${r.disc>0?r.disc.toLocaleString():''}</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.net?r.net.toLocaleString():''}</td>
-      <td style="text-align:right;padding:.25rem .25rem;font-weight:600">${r.profit!=null?r.profit.toLocaleString():''}</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.cash?r.cash.toLocaleString():''}</td>
-      <td style="text-align:right;padding:.25rem .25rem;color:#1565c0">${r.card?r.card.toLocaleString():''}</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.count||''}</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.free||''}</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.photo_shimei||''}</td>
-      <td style="text-align:right;padding:.25rem .25rem">${r.hon_shimei||''}</td>
+      <td style="padding:.25rem .3rem;position:sticky;left:0;background:var(--surface);font-weight:600;font-size:.68rem;white-space:nowrap;z-index:1">${r.day}(${r.dow})</td>
+      ${td(fmtC(r.gross))}${td(fmtC(r.gross_work))}${td(r.disc>0?r.disc.toLocaleString():'0','#c62828')}
+      ${td(fmtC(r.net))}${td(fmtC(r.profit),'',true)}${td(fmtC(r.cash))}
+      ${td(fmtC(r.card),'#1565c0')}${td(r.count||0)}
+      ${td(r.free||0)}${td(r.net_shimei||0)}${td(r.hon_shimei||0)}
     </tr>`
-  }).join('')
-
-  const totRow=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent)">
-    <td style="padding:.3rem .3rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.gross.toLocaleString()}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.gross_work.toLocaleString()}</td>
-    <td style="text-align:right;padding:.3rem .25rem;color:#c62828">${tot.disc>0?tot.disc.toLocaleString():''}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.net.toLocaleString()}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.profit.toLocaleString()}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.cash.toLocaleString()}</td>
-    <td style="text-align:right;padding:.3rem .25rem;color:#1565c0">${tot.card.toLocaleString()}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.count}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.free}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.photo_shimei}</td>
-    <td style="text-align:right;padding:.3rem .25rem">${tot.hon_shimei}</td>
+  }
+  const totRow=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.68rem">
+    <td style="padding:.3rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
+    <td style="text-align:right;padding:.3rem .22rem">${N(tot.gross)}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${N(tot.gross_work)}</td>
+    <td style="text-align:right;padding:.3rem .22rem;color:#c62828">${tot.disc>0?N(tot.disc):'0'}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${N(tot.net)}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${N(tot.profit)}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${N(tot.cash)}</td>
+    <td style="text-align:right;padding:.3rem .22rem;color:#1565c0">${N(tot.card)}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${tot.count}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${tot.free}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${tot.net_shimei}</td>
+    <td style="text-align:right;padding:.3rem .22rem">${tot.hon_shimei}</td>
   </tr>`
 
-  // 固定ヘッダーテーブル＋スクロール本体
-  area.innerHTML=`<div style="position:relative">
-    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-      <table style="width:100%;border-collapse:collapse;font-size:.68rem;min-width:540px;table-layout:fixed">
-        <thead style="position:sticky;top:0;z-index:3">${th}</thead>
-        <tbody>${rows}${totRow}</tbody>
-      </table>
-    </div>
+  // ヘッダー固定：div+overflow-x:auto でtheadをstickyにする
+  area.innerHTML=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--border)">
+    <table style="width:100%;border-collapse:collapse;min-width:560px">
+      ${thead}
+      <tbody>${dailyRows.map(rowHtml).join('')}${totRow}</tbody>
+    </table>
   </div>`
+  
+  // theadのstickyを強制（app-bodyのoverflowを使う）
+  const appBody=document.getElementById('app-body')
+  const table=area.querySelector('table')
+  const theadEl=area.querySelector('thead')
+  if(appBody&&theadEl){
+    // アプリbody基準でスクロールするためtheadをstickyにして動作させる
+    // overflow-x:autoコンテナ内ではstickyが縦方向に効かないため
+    // 代わりにscrollイベントで疑似固定する
+    let scrollHandler=null
+    const outerDiv=area.firstElementChild
+    scrollHandler=()=>{
+      const scrollTop=appBody.scrollTop
+      const areaTop=area.getBoundingClientRect().top+scrollTop-appBody.getBoundingClientRect().top
+      const offset=Math.max(0,scrollTop-areaTop)
+      theadEl.style.transform=`translateY(${offset}px)`
+    }
+    appBody.addEventListener('scroll',scrollHandler)
+    // cleanup: タブ切り替え時に解除
+    area._scrollCleanup=()=>{ appBody.removeEventListener('scroll',scrollHandler); theadEl.style.transform='' }
+  }
 }
 
-function renderMonthlyExpense(area,sd,fmt,total_ad,total_rent,total_util,total_fixed,total_vari,total_custom,total_expenses,customExpenses){
+function renderMonthlyExpense(area,sd,fmt2,total_ad,total_rent,total_util,total_fixed,total_vari,total_custom,total_expenses,customExpenses){
   const ad=sd.ad_expenses||{},rent=sd.rent_expenses||{},util=sd.utility_expenses||{}
   const fixed=sd.fixed_expenses||{},vari=sd.variable_expenses||{}
-  const row=(l,v)=>v!=null?`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.18rem 0;border-bottom:1px solid var(--border)"><span>${l}</span><span>${fmt(v)}</span></div>`:''
-  const totRow=(l,v)=>`<div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.28rem 0;margin-top:.15rem"><span>${l}</span><span>${fmt(v)}</span></div>`
+  const row=(l,v)=>v!=null?`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.18rem 0;border-bottom:1px solid var(--border)"><span>${l}</span><span>${fmt2(v)}</span></div>`:''
+  const totRow=(l,v)=>`<div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.28rem 0;margin-top:.15rem"><span>${l}</span><span>${fmt2(v)}</span></div>`
   let html=''
   html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📢 宣伝広告費</div>
     ${row('アロマパンダ',ad.aroma_panda)}${row('エステラブ',ad.esute_love)}${row('ランキング',ad.ranking)}
@@ -4551,27 +4587,22 @@ function renderMonthlyExpense(area,sd,fmt,total_ad,total_rent,total_util,total_f
     ${totRow('変動費合計',total_vari)}</div>`
   if(customExpenses.length){
     html+=`<div class="card" style="margin-bottom:.5rem"><div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">➕ 追加経費</div>
-      ${customExpenses.map(e=>row(e.label,e.amount)).join('')}
+      ${customExpenses.map(e=>row(`[${e.category||'その他'}] ${e.label}`,e.amount)).join('')}
       ${totRow('小計',total_custom)}</div>`
   }
   html+=`<div class="card" style="margin-bottom:.5rem;background:var(--surface2)">
-    <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700"><span>💸 経費合計</span><span style="color:var(--accent)">${fmt(total_expenses)}</span></div></div>`
+    <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700"><span>💸 経費合計</span><span style="color:var(--accent)">${fmt2(total_expenses)}</span></div></div>`
   html+=`<button class="btn btn-gold" style="width:100%;margin-bottom:1rem" onclick="openMonthlySalesEdit()">✏️ 経費を編集する</button>`
   area.innerHTML=html
 }
 
 function drawPieChart(canvasId,data,colors){
-  const canvas=document.getElementById(canvasId)
-  if(!canvas) return
+  const canvas=document.getElementById(canvasId); if(!canvas) return
   const ctx=canvas.getContext('2d')
-  const W=canvas.width,H=canvas.height
-  ctx.clearRect(0,0,W,H)
+  const W=canvas.width,H=canvas.height; ctx.clearRect(0,0,W,H)
   const cx=W/2,cy=H/2,r=Math.min(cx,cy)-2
   const total=data.reduce((s,d)=>s+(d.value||0),0)
-  if(!total){
-    ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill()
-    ctx.fillStyle='#999';ctx.font='11px serif';ctx.textAlign='center';ctx.fillText('データなし',cx,cy+4);return
-  }
+  if(!total){ ctx.fillStyle='#ddd';ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();return }
   let start=-Math.PI/2
   data.forEach((d,i)=>{
     const sweep=(d.value/total)*Math.PI*2
@@ -4589,10 +4620,10 @@ function drawPieChart(canvasId,data,colors){
   })
 }
 
-function legendHtml(data,colors){
+function monthlyLegendHtml(data,colors){
   return data.map((d,i)=>`<div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem">
     <div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div>
-    <span>${d.label} ${d.value}</span></div>`).join('')
+    <span>${d.label}：${d.value}</span></div>`).join('')
 }
 
 function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total_util,total_fixed,total_vari){
@@ -4602,7 +4633,7 @@ function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total
   const routeItems=[['エステ魂','esute_kon'],['パンダ','panda'],['エステラブ','esute_love'],['ランキング','ranking'],['ジャパン','japan'],['ゼロツー','zerotwo'],['HP','hp'],['SNS','sns'],['その他','other']]
   const routes=sd.acquisition_routes||{}
   const routeData=routeItems.map(([l,k])=>({label:l,value:routes[k]||0})).filter(d=>d.value>0)
-  const shimeiData=[{label:'フリー',value:tot.free},{label:'ネット指名',value:tot.photo_shimei},{label:'本指名',value:tot.hon_shimei}].filter(d=>d.value>0)
+  const shimeiData=[{label:'フリー',value:tot.free},{label:'ネット指名',value:tot.net_shimei},{label:'本指名',value:tot.hon_shimei}].filter(d=>d.value>0)
   const newV=sd.new_customers!=null?sd.new_customers:tot.newCount
   const repV=sd.repeat_customers!=null?sd.repeat_customers:tot.repeatCount
   const visitData=[{label:'新規',value:newV},{label:'再来',value:repV}].filter(d=>d.value>0)
@@ -4611,14 +4642,12 @@ function renderMonthlyChart(area,tot,sd,total_expenses,total_ad,total_rent,total
     <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">${label}</div>
     ${data.length
       ?`<div style="display:flex;justify-content:center;margin-bottom:.4rem"><canvas id="${id}" width="180" height="180"></canvas></div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.2rem">${legendHtml(data,colors)}</div>`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.2rem">${monthlyLegendHtml(data,colors)}</div>`
       :'<div style="color:var(--text3);font-size:.8rem">データなし</div>'}
   </div>`
-
   area.innerHTML=pie('chart-route',routeData,routeColors,'📣 集客経路')+
     pie('chart-shimei',shimeiData,shimeiColors,'👆 指名内訳')+
     pie('chart-visit',visitData,visitColors,'👥 来店分類（新規／再来）')
-
   requestAnimationFrame(()=>{
     if(routeData.length) drawPieChart('chart-route',routeData,routeColors)
     if(shimeiData.length) drawPieChart('chart-shimei',shimeiData,shimeiColors)
@@ -4640,39 +4669,41 @@ async function loadMonthlySalesForm(){
   const fixed=data?.fixed_expenses||{},vari=data?.variable_expenses||{}
   const routes=data?.acquisition_routes||{}
   const customExpenses=data?.custom_expenses||[]
-  const setv=(id,v)=>{const el=document.getElementById(id);if(el&&v!=null)el.value=v}
-  setv('mse-goal-sales',data?.goal_sales);setv('mse-goal-count',data?.goal_count);setv('mse-goal-recruit',data?.goal_recruit)
-  setv('mse-actual-recruit',data?.actual_recruit)
-  setv('mse-next-goal-sales',data?.next_goal_sales);setv('mse-next-goal-count',data?.next_goal_count);setv('mse-next-goal-recruit',data?.next_goal_recruit)
-  setv('mse-ad-panda',ad.aroma_panda);setv('mse-ad-estelove',ad.esute_love);setv('mse-ad-ranking',ad.ranking)
-  setv('mse-ad-bakusai',ad.bakusai);setv('mse-ad-japan',ad.japan);setv('mse-ad-estekon',ad.esute_kon);setv('mse-ad-tax',ad.tax)
-  setv('mse-rent-es',rent.es_residence);setv('mse-rent-anna',rent.anna_marie);setv('mse-rent-hani',rent.hani_lilika);setv('mse-rent-park',rent.park_flats)
-  setv('mse-util-es',util.es_residence);setv('mse-util-anna',util.anna_marie);setv('mse-util-hani',util.hani_lilika);setv('mse-util-park',util.park_flats)
-  setv('mse-fixed-personnel',fixed.personnel);setv('mse-fixed-comm',fixed.communication);setv('mse-fixed-card',fixed.card_fee)
-  setv('mse-var-fuel',vari.fuel);setv('mse-var-consumables',vari.consumables);setv('mse-var-equipment',vari.equipment)
-  setv('mse-var-meeting',vari.meeting);setv('mse-var-other',vari.other)
-  setv('mse-route-ekon',routes.esute_kon);setv('mse-route-panda',routes.panda);setv('mse-route-elove',routes.esute_love)
-  setv('mse-route-rank',routes.ranking);setv('mse-route-japan',routes.japan);setv('mse-route-zero',routes.zerotwo)
-  setv('mse-route-hp',routes.hp);setv('mse-route-sns',routes.sns);setv('mse-route-other',routes.other)
-  setv('mse-new-cust',data?.new_customers);setv('mse-repeat-cust',data?.repeat_customers)
-  setv('mse-shimei-free',data?.shimei_free);setv('mse-shimei-net',data?.shimei_net);setv('mse-shimei-hon',data?.shimei_hon)
+  // 桁区切り付きセット
+  const setvN=(id,v)=>{const el=document.getElementById(id);if(el&&v!=null)el.value=Number(v).toLocaleString()}
+  const setvR=(id,v)=>{const el=document.getElementById(id);if(el&&v!=null)el.value=v}
+  setvN('mse-goal-sales',data?.goal_sales);setvR('mse-goal-count',data?.goal_count);setvR('mse-goal-recruit',data?.goal_recruit)
+  setvR('mse-actual-recruit',data?.actual_recruit)
+  setvN('mse-next-goal-sales',data?.next_goal_sales);setvR('mse-next-goal-count',data?.next_goal_count);setvR('mse-next-goal-recruit',data?.next_goal_recruit)
+  setvN('mse-ad-panda',ad.aroma_panda);setvN('mse-ad-estelove',ad.esute_love);setvN('mse-ad-ranking',ad.ranking)
+  setvN('mse-ad-bakusai',ad.bakusai);setvN('mse-ad-japan',ad.japan);setvN('mse-ad-estekon',ad.esute_kon);setvN('mse-ad-tax',ad.tax)
+  setvN('mse-rent-es',rent.es_residence);setvN('mse-rent-anna',rent.anna_marie);setvN('mse-rent-hani',rent.hani_lilika);setvN('mse-rent-park',rent.park_flats)
+  setvN('mse-util-es',util.es_residence);setvN('mse-util-anna',util.anna_marie);setvN('mse-util-hani',util.hani_lilika);setvN('mse-util-park',util.park_flats)
+  setvN('mse-fixed-personnel',fixed.personnel);setvN('mse-fixed-comm',fixed.communication);setvN('mse-fixed-card',fixed.card_fee)
+  setvN('mse-var-fuel',vari.fuel);setvN('mse-var-consumables',vari.consumables);setvN('mse-var-equipment',vari.equipment)
+  setvN('mse-var-meeting',vari.meeting);setvN('mse-var-other',vari.other)
+  setvR('mse-route-ekon',routes.esute_kon);setvR('mse-route-panda',routes.panda);setvR('mse-route-elove',routes.esute_love)
+  setvR('mse-route-rank',routes.ranking);setvR('mse-route-japan',routes.japan);setvR('mse-route-zero',routes.zerotwo)
+  setvR('mse-route-hp',routes.hp);setvR('mse-route-sns',routes.sns);setvR('mse-route-other',routes.other)
+  setvR('mse-new-cust',data?.new_customers);setvR('mse-repeat-cust',data?.repeat_customers)
+  setvR('mse-shimei-free',data?.shimei_free);setvR('mse-shimei-net',data?.shimei_net);setvR('mse-shimei-hon',data?.shimei_hon)
   const cArea=document.getElementById('mse-custom-expense-area')
   if(cArea){
     cArea.innerHTML=customExpenses.map((e,i)=>buildCustomExpenseRow(i,e.category,e.label,e.amount)).join('')
     customExpenseCount=customExpenses.length
   }
+  // 桁区切りのイベント設定
+  document.querySelectorAll('.mse-money-input').forEach(el=>{
+    el.addEventListener('focus',()=>{ el.value=el.value.replace(/,/g,'') })
+    el.addEventListener('blur',()=>{ const n=parseInt(el.value.replace(/,/g,'')); if(!isNaN(n)) el.value=n.toLocaleString() })
+  })
 }
 
-// カテゴリ選択付きカスタム経費
-const EXPENSE_CATEGORIES={
-  ad:'📢 宣伝広告費',rent:'🏠 家賃',util:'💡 水道光熱費',fixed:'📋 固定費',
-  variable:'📦 変動費',other:'📝 その他'
-}
-
+const EXPENSE_CATEGORIES={ad:'📢 宣伝広告費',rent:'🏠 家賃',util:'💡 水道光熱費',fixed:'📋 固定費',variable:'📦 変動費',other:'📝 その他'}
 let customExpenseCount=0
 function buildCustomExpenseRow(idx,category='other',label='',amount=''){
-  const catOptions=Object.entries(EXPENSE_CATEGORIES).map(([k,v])=>
-    `<option value="${k}" ${k===category?'selected':''}>${v}</option>`).join('')
+  const catOptions=Object.entries(EXPENSE_CATEGORIES).map(([k,v])=>`<option value="${k}" ${k===category?'selected':''}>${v}</option>`).join('')
+  const amtStr=amount!=null&&amount!==''?Number(amount).toLocaleString():''
   return `<div style="background:var(--surface2);border-radius:10px;padding:.5rem .6rem;margin-bottom:.4rem;border:1px solid var(--border)" id="mse-custom-row-${idx}">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
       <select id="mse-custom-cat-${idx}" class="fi2" style="flex:1;font-size:.78rem;padding:.3rem .4rem">${catOptions}</select>
@@ -4680,14 +4711,14 @@ function buildCustomExpenseRow(idx,category='other',label='',amount=''){
     </div>
     <div style="display:flex;gap:.35rem">
       <input type="text" placeholder="項目名" value="${label}" id="mse-custom-label-${idx}" class="fi" style="flex:1;font-size:.8rem;padding:.33rem .5rem">
-      <input type="number" placeholder="金額" value="${amount||''}" id="mse-custom-amount-${idx}" class="fi" style="width:90px;font-size:.8rem;padding:.33rem .5rem">
+      <input type="text" inputmode="numeric" placeholder="金額" value="${amtStr}" id="mse-custom-amount-${idx}" class="fi mse-money-input" style="width:90px;font-size:.8rem;padding:.33rem .5rem"
+        onfocus="this.value=this.value.replace(/,/g,'')"
+        onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()">
     </div>
   </div>`
 }
-
 function addCustomExpense(){
-  const area=document.getElementById('mse-custom-expense-area')
-  if(!area) return
+  const area=document.getElementById('mse-custom-expense-area'); if(!area) return
   customExpenseCount++
   const div=document.createElement('div')
   div.innerHTML=buildCustomExpenseRow(customExpenseCount)
@@ -4695,27 +4726,32 @@ function addCustomExpense(){
 }
 function removeCustomExpense(idx){ const row=document.getElementById('mse-custom-row-'+idx);if(row)row.remove() }
 
-function getv(id){const el=document.getElementById(id);return el&&el.value!==''?Number(el.value):null}
+function parseMoneyInput(id){
+  const el=document.getElementById(id); if(!el||el.value==='') return null
+  const n=parseInt(el.value.replace(/,/g,''))
+  return isNaN(n)?null:n
+}
 function getvStr(id){const el=document.getElementById(id);return el?el.value.trim():''}
+function getvInt(id){const el=document.getElementById(id);return el&&el.value!==''?parseInt(el.value)||null:null}
 
 async function saveMonthlySales(){
   const btn=document.getElementById('mse-save-btn')
   btn.disabled=true;btn.textContent='保存中...'
-  const ad_panda=getv('mse-ad-panda'),ad_elove=getv('mse-ad-estelove'),ad_rank=getv('mse-ad-ranking')
-  const ad_baku=getv('mse-ad-bakusai'),ad_jap=getv('mse-ad-japan'),ad_ekon=getv('mse-ad-estekon'),ad_tax=getv('mse-ad-tax')
+  const ad_panda=parseMoneyInput('mse-ad-panda'),ad_elove=parseMoneyInput('mse-ad-estelove'),ad_rank=parseMoneyInput('mse-ad-ranking')
+  const ad_baku=parseMoneyInput('mse-ad-bakusai'),ad_jap=parseMoneyInput('mse-ad-japan'),ad_ekon=parseMoneyInput('mse-ad-estekon'),ad_tax=parseMoneyInput('mse-ad-tax')
   const ad_expenses={aroma_panda:ad_panda,esute_love:ad_elove,ranking:ad_rank,bakusai:ad_baku,japan:ad_jap,esute_kon:ad_ekon,tax:ad_tax}
   const total_ad_expense=[ad_panda,ad_elove,ad_rank,ad_baku,ad_jap,ad_ekon,ad_tax].filter(v=>v!=null).reduce((s,v)=>s+v,0)
-  const r_es=getv('mse-rent-es'),r_anna=getv('mse-rent-anna'),r_hani=getv('mse-rent-hani'),r_park=getv('mse-rent-park')
+  const r_es=parseMoneyInput('mse-rent-es'),r_anna=parseMoneyInput('mse-rent-anna'),r_hani=parseMoneyInput('mse-rent-hani'),r_park=parseMoneyInput('mse-rent-park')
   const rent_expenses={es_residence:r_es,anna_marie:r_anna,hani_lilika:r_hani,park_flats:r_park}
   const total_rent=[r_es,r_anna,r_hani,r_park].filter(v=>v!=null).reduce((s,v)=>s+v,0)
-  const u_es=getv('mse-util-es'),u_anna=getv('mse-util-anna'),u_hani=getv('mse-util-hani'),u_park=getv('mse-util-park')
+  const u_es=parseMoneyInput('mse-util-es'),u_anna=parseMoneyInput('mse-util-anna'),u_hani=parseMoneyInput('mse-util-hani'),u_park=parseMoneyInput('mse-util-park')
   const utility_expenses={es_residence:u_es,anna_marie:u_anna,hani_lilika:u_hani,park_flats:u_park}
   const total_utility=[u_es,u_anna,u_hani,u_park].filter(v=>v!=null).reduce((s,v)=>s+v,0)
-  const fp=getv('mse-fixed-personnel'),fc=getv('mse-fixed-comm'),fcard=getv('mse-fixed-card')
+  const fp=parseMoneyInput('mse-fixed-personnel'),fc=parseMoneyInput('mse-fixed-comm'),fcard=parseMoneyInput('mse-fixed-card')
   const fixed_expenses={personnel:fp,communication:fc,card_fee:fcard}
   const total_fixed=total_ad_expense+total_rent+[fp,fc,fcard].filter(v=>v!=null).reduce((s,v)=>s+v,0)
-  const vf=getv('mse-var-fuel'),vc=getv('mse-var-consumables'),ve=getv('mse-var-equipment')
-  const vm=getv('mse-var-meeting'),vo=getv('mse-var-other')
+  const vf=parseMoneyInput('mse-var-fuel'),vc=parseMoneyInput('mse-var-consumables'),ve=parseMoneyInput('mse-var-equipment')
+  const vm=parseMoneyInput('mse-var-meeting'),vo=parseMoneyInput('mse-var-other')
   const variable_expenses={fuel:vf,consumables:vc,equipment:ve,meeting:vm,other:vo}
   const total_variable=total_utility+[vf,vc,ve,vm,vo].filter(v=>v!=null).reduce((s,v)=>s+v,0)
   const cArea=document.getElementById('mse-custom-expense-area')
@@ -4725,7 +4761,7 @@ async function saveMonthlySales(){
       const idx=row.id.replace('mse-custom-row-','')
       const category=getvStr('mse-custom-cat-'+idx)||'other'
       const label=getvStr('mse-custom-label-'+idx)
-      const amount=getv('mse-custom-amount-'+idx)
+      const amount=parseMoneyInput('mse-custom-amount-'+idx)
       if(label&&amount!=null) custom_expenses.push({category,label,amount})
     })
   }
@@ -4733,15 +4769,14 @@ async function saveMonthlySales(){
   const total_expenses=total_fixed+total_variable+total_custom
   const payload={
     month:monthlyMonth,
-    goal_sales:getv('mse-goal-sales'),goal_count:getv('mse-goal-count'),goal_recruit:getv('mse-goal-recruit'),
-    actual_recruit:getv('mse-actual-recruit'),
-    next_goal_sales:getv('mse-next-goal-sales'),next_goal_count:getv('mse-next-goal-count'),next_goal_recruit:getv('mse-next-goal-recruit'),
+    goal_sales:parseMoneyInput('mse-goal-sales'),goal_count:getvInt('mse-goal-count'),goal_recruit:getvInt('mse-goal-recruit'),
+    actual_recruit:getvInt('mse-actual-recruit'),
+    next_goal_sales:parseMoneyInput('mse-next-goal-sales'),next_goal_count:getvInt('mse-next-goal-count'),next_goal_recruit:getvInt('mse-next-goal-recruit'),
     ad_expenses,total_ad_expense,rent_expenses,total_rent,utility_expenses,total_utility,
-    fixed_expenses,total_fixed,variable_expenses,total_variable,
-    custom_expenses,total_expenses,
-    acquisition_routes:{esute_kon:getv('mse-route-ekon'),panda:getv('mse-route-panda'),esute_love:getv('mse-route-elove'),ranking:getv('mse-route-rank'),japan:getv('mse-route-japan'),zerotwo:getv('mse-route-zero'),hp:getv('mse-route-hp'),sns:getv('mse-route-sns'),other:getv('mse-route-other')},
-    new_customers:getv('mse-new-cust'),repeat_customers:getv('mse-repeat-cust'),
-    shimei_free:getv('mse-shimei-free'),shimei_net:getv('mse-shimei-net'),shimei_hon:getv('mse-shimei-hon')
+    fixed_expenses,total_fixed,variable_expenses,total_variable,custom_expenses,total_expenses,
+    acquisition_routes:{esute_kon:getvInt('mse-route-ekon'),panda:getvInt('mse-route-panda'),esute_love:getvInt('mse-route-elove'),ranking:getvInt('mse-route-rank'),japan:getvInt('mse-route-japan'),zerotwo:getvInt('mse-route-zero'),hp:getvInt('mse-route-hp'),sns:getvInt('mse-route-sns'),other:getvInt('mse-route-other')},
+    new_customers:getvInt('mse-new-cust'),repeat_customers:getvInt('mse-repeat-cust'),
+    shimei_free:getvInt('mse-shimei-free'),shimei_net:getvInt('mse-shimei-net'),shimei_hon:getvInt('mse-shimei-hon')
   }
   const {error}=await sb.from('monthly_sales').upsert(payload,{onConflict:'month'})
   btn.disabled=false;btn.textContent='💾 保存'
@@ -4772,12 +4807,10 @@ init()
 <div class="sheet-overlay" id="monthly-edit-overlay">
   <div class="sheet" style="max-height:95vh;overflow-y:auto">
     <div class="sheet-bar"></div>
-    <!-- 上部：タイトル＋閉じる -->
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.7rem">
       <div class="sheet-title" id="mse-title" style="margin:0;font-size:.95rem">経費・目標・集客入力</div>
       <button class="btn btn-gray btn-sm2" onclick="closeSheet('monthly-edit')">✕ 閉じる</button>
     </div>
-    <!-- タブ -->
     <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.8rem;gap:3px">
       <button id="mse-tab-expense" onclick="mseSwitchTab('expense')" style="flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">💸 経費</button>
       <button id="mse-tab-goal" onclick="mseSwitchTab('goal')" style="flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">🎯 目標</button>
@@ -4787,44 +4820,44 @@ init()
     <div id="mse-body-expense">
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">📢 宣伝広告費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">アロマパンダ</div><input type="number" id="mse-ad-panda" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エステラブ</div><input type="number" id="mse-ad-estelove" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ランキング</div><input type="number" id="mse-ad-ranking" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">爆サイ</div><input type="number" id="mse-ad-bakusai" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ジャパン</div><input type="number" id="mse-ad-japan" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エステ魂</div><input type="number" id="mse-ad-estekon" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">消費税</div><input type="number" id="mse-ad-tax" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">アロマパンダ</div><input type="text" inputmode="numeric" id="mse-ad-panda" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エステラブ</div><input type="text" inputmode="numeric" id="mse-ad-estelove" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ランキング</div><input type="text" inputmode="numeric" id="mse-ad-ranking" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">爆サイ</div><input type="text" inputmode="numeric" id="mse-ad-bakusai" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ジャパン</div><input type="text" inputmode="numeric" id="mse-ad-japan" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エステ魂</div><input type="text" inputmode="numeric" id="mse-ad-estekon" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">消費税</div><input type="text" inputmode="numeric" id="mse-ad-tax" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
       </div>
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">🏠 家賃</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エスレジデンス</div><input type="number" id="mse-rent-es" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">アンナマリー</div><input type="number" id="mse-rent-anna" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ハニリリカ</div><input type="number" id="mse-rent-hani" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">パークフラッツ</div><input type="number" id="mse-rent-park" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エスレジデンス</div><input type="text" inputmode="numeric" id="mse-rent-es" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">アンナマリー</div><input type="text" inputmode="numeric" id="mse-rent-anna" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ハニリリカ</div><input type="text" inputmode="numeric" id="mse-rent-hani" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">パークフラッツ</div><input type="text" inputmode="numeric" id="mse-rent-park" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
       </div>
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">💡 水道光熱費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エスレジデンス</div><input type="number" id="mse-util-es" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">アンナマリー</div><input type="number" id="mse-util-anna" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ハニリリカ</div><input type="number" id="mse-util-hani" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">パークフラッツ</div><input type="number" id="mse-util-park" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">エスレジデンス</div><input type="text" inputmode="numeric" id="mse-util-es" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">アンナマリー</div><input type="text" inputmode="numeric" id="mse-util-anna" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">ハニリリカ</div><input type="text" inputmode="numeric" id="mse-util-hani" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">パークフラッツ</div><input type="text" inputmode="numeric" id="mse-util-park" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
       </div>
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">📋 その他固定費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">人件費</div><input type="number" id="mse-fixed-personnel" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">通信費</div><input type="number" id="mse-fixed-comm" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">カード決済手数料</div><input type="number" id="mse-fixed-card" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">人件費</div><input type="text" inputmode="numeric" id="mse-fixed-personnel" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">通信費</div><input type="text" inputmode="numeric" id="mse-fixed-comm" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">カード決済手数料</div><input type="text" inputmode="numeric" id="mse-fixed-card" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
       </div>
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">📦 変動費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">燃料費</div><input type="number" id="mse-var-fuel" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">消耗品</div><input type="number" id="mse-var-consumables" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">備品費</div><input type="number" id="mse-var-equipment" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">会議費</div><input type="number" id="mse-var-meeting" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">その他</div><input type="number" id="mse-var-other" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">燃料費</div><input type="text" inputmode="numeric" id="mse-var-fuel" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">消耗品</div><input type="text" inputmode="numeric" id="mse-var-consumables" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">備品費</div><input type="text" inputmode="numeric" id="mse-var-equipment" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">会議費</div><input type="text" inputmode="numeric" id="mse-var-meeting" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">その他</div><input type="text" inputmode="numeric" id="mse-var-other" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
       </div>
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">➕ 経費を追加</div>
-      <div style="font-size:.7rem;color:var(--text3);margin-bottom:.4rem">カテゴリを選択して項目名・金額を入力してください</div>
+      <div style="font-size:.7rem;color:var(--text3);margin-bottom:.4rem">カテゴリを選択して項目名・金額を入力</div>
       <div id="mse-custom-expense-area" style="margin-bottom:.5rem"></div>
       <button class="btn btn-gray" style="width:100%;margin-bottom:.75rem;font-size:.82rem" onclick="addCustomExpense()">＋ 経費項目を追加</button>
     </div>
@@ -4832,14 +4865,14 @@ init()
     <div id="mse-body-goal" style="display:none">
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">🎯 当月目標</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">売上目標</div><input type="number" id="mse-goal-sales" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">売上目標</div><input type="text" inputmode="numeric" id="mse-goal-sales" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">本数目標</div><input type="number" id="mse-goal-count" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">求人目標</div><input type="number" id="mse-goal-recruit" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">求人実績</div><input type="number" id="mse-actual-recruit" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
       </div>
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">📅 翌月目標</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
-        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">売上目標</div><input type="number" id="mse-next-goal-sales" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
+        <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">売上目標</div><input type="text" inputmode="numeric" id="mse-next-goal-sales" class="fi mse-money-input" style="font-size:.8rem;padding:.33rem .5rem" onfocus="this.value=this.value.replace(/,/g,'')" onblur="const n=parseInt(this.value.replace(/,/g,''));if(!isNaN(n))this.value=n.toLocaleString()"></div>
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">本数目標</div><input type="number" id="mse-next-goal-count" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">求人目標</div><input type="number" id="mse-next-goal-recruit" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
       </div>
@@ -4859,7 +4892,7 @@ init()
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">その他</div><input type="number" id="mse-route-other" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
       </div>
       <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.4rem">👥 集客内訳（手動補正）</div>
-      <div style="font-size:.7rem;color:var(--text3);margin-bottom:.35rem">※予約データから自動取得。手動で上書きも可能です</div>
+      <div style="font-size:.7rem;color:var(--text3);margin-bottom:.35rem">※予約データから自動取得。上書き可能です</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.7rem">
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">新規</div><input type="number" id="mse-new-cust" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
         <div><div style="font-size:.63rem;color:var(--text3);margin-bottom:.1rem">再来</div><input type="number" id="mse-repeat-cust" class="fi" style="font-size:.8rem;padding:.33rem .5rem"></div>
