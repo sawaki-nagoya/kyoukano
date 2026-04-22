@@ -420,14 +420,23 @@ tr:last-child td{border-bottom:none}
 
     <!-- 店舗：月次売上管理 -->
     <div class="panel" id="p-owner-monthly">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-        <div style="font-size:1rem;font-weight:700">月次売上管理</div>
-        <button class="btn btn-gold btn-sm2" onclick="openMonthlySalesEdit()">✏️ 編集</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem">
+        <div style="font-size:1rem;font-weight:700">月次売上</div>
+        <div style="display:flex;gap:.35rem">
+          <button class="btn btn-blue btn-sm2" onclick="openMonthlySalesAuto()">🔄 自動集計</button>
+          <button class="btn btn-gold btn-sm2" onclick="openMonthlySalesEdit()">✏️ 手動編集</button>
+        </div>
       </div>
-      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
         <button class="cal-nav-btn" onclick="monthlyMove(-1)">‹</button>
         <div style="flex:1;text-align:center;font-size:.95rem;font-weight:700" id="monthly-title">-</div>
         <button class="cal-nav-btn" onclick="monthlyMove(1)">›</button>
+      </div>
+      <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.6rem;gap:3px">
+        <button id="monthly-tab-summary" onclick="monthlyTabSwitch('summary')" style="flex:1;padding:.4rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">📊 月まとめ</button>
+        <button id="monthly-tab-daily" onclick="monthlyTabSwitch('daily')" style="flex:1;padding:.4rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">📅 日別</button>
+        <button id="monthly-tab-expense" onclick="monthlyTabSwitch('expense')" style="flex:1;padding:.4rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">💸 経費</button>
+        <button id="monthly-tab-chart" onclick="monthlyTabSwitch('chart')" style="flex:1;padding:.4rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">🥧 グラフ</button>
       </div>
       <div id="monthly-area"><div class="spin">読み込み中...</div></div>
     </div>
@@ -4252,275 +4261,516 @@ async function saveCastDiscTypes(){
   closeSheet('cast-disc-type')
 }
 
-init()
-
+// =============================================
 // ── 月次売上管理 ──
+// =============================================
 let monthlyMonth = ym(new Date())
+let monthlyTabMode = 'summary'
 
 function monthlyMove(d){ monthlyMonth=addMonth(monthlyMonth,d); loadMonthly() }
 
-async function loadMonthly(){
-  const [y,m]=monthlyMonth.split('-').map(Number)
-  document.getElementById('monthly-title').textContent=y+'年'+m+'月 月次売上'
-  const area=document.getElementById('monthly-area')
-  if(!area) return
-  area.innerHTML='<div class="spin">読み込み中...</div>'
-  const {data,error}=await sb.from('monthly_sales')
-    .select('*').eq('month',monthlyMonth).single()
-  if(error||!data){
-    area.innerHTML=`<div style="text-align:center;padding:2rem 0;color:var(--text3)">
-      <div style="font-size:2rem;margin-bottom:.5rem">📊</div>
-      <div style="margin-bottom:1rem">データがありません</div>
-      <button class="btn btn-gold" onclick="openMonthlySalesEdit()">✏️ データを入力する</button>
-    </div>`
-    return
-  }
-  renderMonthlyView(data)
+function monthlyTabSwitch(mode){
+  monthlyTabMode = mode
+  const tabs = ['summary','daily','expense','chart']
+  const onStyle = 'flex:1;padding:.4rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
+  const offStyle = 'flex:1;padding:.4rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
+  tabs.forEach(t=>{
+    const btn = document.getElementById('monthly-tab-'+t)
+    if(btn) btn.style.cssText = t===mode ? onStyle : offStyle
+  })
+  renderMonthlyContent()
 }
 
-function renderMonthlyView(d){
-  const area=document.getElementById('monthly-area')
-  const fmt=n=>n!=null&&n!==''?'¥'+Number(n).toLocaleString():'-'
-  const num=n=>n!=null&&n!==''?Number(n).toLocaleString()+'本':'-'
-  const pct=n=>n!=null&&n!==''?Math.round(n)+'%':'-'
-  const days=d.daily_data||[]
+async function loadMonthly(){
+  const [y,m] = monthlyMonth.split('-').map(Number)
+  const el = document.getElementById('monthly-title')
+  if(el) el.textContent = y+'年'+m+'月'
+  const area = document.getElementById('monthly-area')
+  if(!area) return
+  area.innerHTML = '<div class="spin">読み込み中...</div>'
+  renderMonthlyContent()
+}
 
-  // KPIサマリー
-  let html=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">`
-  const kpis=[
-    ['総売上',fmt(d.total_gross)],['現金売上',fmt(d.total_cash)],['カード売上',fmt(d.total_card)],
-    ['手数料',fmt(d.total_fee)],['委託金',fmt(d.total_back)],['立替金',fmt(d.total_advance)],
-    ['粗利益',fmt(d.total_profit)],['現金残',fmt(d.total_cash_balance)],['平均客単価',fmt(d.avg_unit_price)],
-    ['出勤延べ',d.total_attendance!=null?d.total_attendance+'名':'-'],['施術件数',num(d.total_count)],['フリー',num(d.total_free)],
-    ['写真指名',num(d.total_photo_shimei)],['本指名',num(d.total_hon_shimei)],['合計指名',num(d.total_shimei)]
-  ]
-  kpis.forEach(([l,v])=>{
-    html+=`<div class="kpi"><div class="kpi-l" style="font-size:.62rem">${l}</div><div class="kpi-v" style="font-size:.78rem">${v}</div></div>`
+async function renderMonthlyContent(){
+  const area = document.getElementById('monthly-area')
+  if(!area) return
+  area.innerHTML = '<div class="spin">読み込み中...</div>'
+
+  // worksから自動集計
+  const [y,m] = monthlyMonth.split('-').map(Number)
+  const {data:worksRaw} = await sb.from('works').select('*').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01').order('date')
+  const {data:shifts} = await sb.from('shifts').select('id,cast_id,date,status').gte('date',monthlyMonth+'-01').lt('date',nextYM(monthlyMonth)+'-01')
+  let rvs = []
+  if(shifts&&shifts.length){
+    const sids = shifts.map(s=>s.id)
+    const {data:rvsRaw} = await sb.from('reservations').select('*').in('shift_id',sids)
+    rvs = rvsRaw||[]
+  }
+  const {data:storeRaw} = await sb.from('monthly_sales').select('*').eq('month',monthlyMonth).single()
+  const storeData = storeRaw||{}
+
+  // 日付ごとの集計
+  const daysInMonth = new Date(y,m,0).getDate()
+  const dows = ['日','月','火','水','木','金','土']
+  const worksByDate = {}
+  ;(worksRaw||[]).forEach(w=>{
+    if(!worksByDate[w.date]) worksByDate[w.date]=[]
+    worksByDate[w.date].push(w)
   })
-  html+='</div>'
 
-  // 目標vs実績
-  html+=`<div class="card" style="margin-bottom:.6rem">
-    <div style="font-weight:700;margin-bottom:.5rem;font-size:.88rem">🎯 月間目標</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;font-size:.8rem">
-      <div><div style="color:var(--text3);font-size:.68rem">売上目標</div><div>${fmt(d.goal_sales)}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">売上実績</div><div>${fmt(d.total_gross)}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">達成率</div><div style="font-weight:700;color:${d.total_gross>=d.goal_sales?'#4caf50':'var(--accent)'}">${d.goal_sales?pct(d.total_gross/d.goal_sales*100):'-'}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">本数目標</div><div>${d.goal_count!=null?d.goal_count+'本':'-'}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">本数実績</div><div>${d.total_count!=null?d.total_count+'本':'-'}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">達成率</div><div style="font-weight:700;color:${d.total_count>=d.goal_count?'#4caf50':'var(--accent)'}">${d.goal_count?pct(d.total_count/d.goal_count*100):'-'}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">求人目標</div><div>${d.goal_recruit!=null?d.goal_recruit+'名':'-'}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">求人実績</div><div>${d.actual_recruit!=null?d.actual_recruit+'名':'-'}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">達成率</div><div style="font-weight:700;color:${d.actual_recruit>=d.goal_recruit?'#4caf50':'var(--accent)'}">${d.goal_recruit?pct(d.actual_recruit/d.goal_recruit*100):'-'}</div></div>
+  // 予約からカード/現金を日付ごとに計算
+  const {data:courseList} = await sb.from('courses').select('*')
+  const {data:optList} = await sb.from('options').select('*')
+  const {data:discListAll} = await sb.from('cast_discounts').select('*').eq('cast_id',0)
+  const ss = storeSettings||{}
+
+  function calcRvAmounts(r){
+    let pj={}
+    try{pj=JSON.parse(r.payment||'{}')}catch(e){}
+    const courseObj = (courseList||[]).find(c=>c.name===r.course)
+    const coursePrice = courseObj?.price||0
+    const shimeiPrice = r.shimei_type==='フリー'?(ss.shimei_free||0):r.shimei_type==='ネット指名'?(ss.shimei_net||1000):r.shimei_type==='本指名'?(ss.shimei_hon||2000):0
+    const opts = r.options?r.options.split(',').filter(Boolean):[]
+    const optTotal = opts.reduce((s,n)=>{const o=(optList||[]).find(x=>x.name===n);return s+(o?.price||0)},0)
+    const discs = r.discount?r.discount.split(',').filter(Boolean):[]
+    const discTotal = discs.reduce((s,n)=>{const d=(discListAll||[]).find(x=>x.name===n);return s+(d?.amount||0)},0)
+    const totalPrice = coursePrice+shimeiPrice+optTotal-discTotal
+    const payCourse=pj.course||'現金',payShimei=pj.shimei||'現金',payOpt=pj.option||'現金'
+    const cardAmt=(payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+(payOpt==='カード'?optTotal:0)
+    return {total:totalPrice, card:cardAmt, cash:totalPrice-cardAmt, disc:discTotal, shimei:r.shimei_type||'フリー'}
+  }
+
+  // 予約をシフト経由で日付に紐付け
+  const shiftDateMap = {}
+  ;(shifts||[]).forEach(s=>{ shiftDateMap[s.id]=s.date })
+  const rvsByDate = {}
+  rvs.forEach(r=>{
+    const d = shiftDateMap[r.shift_id]
+    if(!d) return
+    if(!rvsByDate[d]) rvsByDate[d]=[]
+    rvsByDate[d].push(r)
+  })
+
+  // 日別データ構築（worksを軸に、予約でカード/現金補完）
+  const dailyRows = []
+  for(let day=1;day<=daysInMonth;day++){
+    const dateStr = monthlyMonth+'-'+String(day).padStart(2,'0')
+    const dow = dows[new Date(y,m-1,day).getDay()]
+    const dayWorks = worksByDate[dateStr]||[]
+    const dayRvs = rvsByDate[dateStr]||[]
+
+    if(dayWorks.length===0&&dayRvs.length===0){
+      dailyRows.push({day,dow,dateStr,noData:true})
+      continue
+    }
+
+    // worksから基本集計
+    const gross_work = dayWorks.reduce((s,w)=>s+(w.sales||0),0)
+    const back = dayWorks.reduce((s,w)=>s+(w.back||0),0)
+    const net = dayWorks.reduce((s,w)=>s+(w.net||w.back||0),0)
+    const misc = dayWorks.reduce((s,w)=>s+(w.misc||0),0)
+    const count = dayWorks.reduce((s,w)=>s+(w.count||0),0)
+    const attendance = dayWorks.length
+    // 割引合計
+    const disc = dayWorks.reduce((s,w)=>s+((w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)),0)
+    const gross = gross_work + disc
+
+    // 予約からカード/現金/指名内訳
+    let card=0,cash=0,rvFree=0,rvNet=0,rvHon=0
+    dayRvs.forEach(r=>{
+      const am = calcRvAmounts(r)
+      card += am.card
+      cash += am.cash
+      if(am.shimei==='フリー') rvFree++
+      else if(am.shimei==='ネット指名') rvNet++
+      else if(am.shimei==='本指名') rvHon++
+    })
+    // worksベースの現金・カードが予約と一致しない場合は予約を優先
+    const cardFee = Math.floor(card*0.1)
+    const profit = gross_work - net - misc
+    const shopDrop = gross_work - net
+
+    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,back,misc,profit,shopDrop,card,cash,cardFee,count,attendance,free:rvFree,photo_shimei:rvNet,hon_shimei:rvHon,shimei:rvNet+rvHon})
+  }
+
+  // 月計
+  const validRows = dailyRows.filter(r=>!r.noData)
+  const tot = {
+    gross: validRows.reduce((s,r)=>s+(r.gross||0),0),
+    gross_work: validRows.reduce((s,r)=>s+(r.gross_work||0),0),
+    disc: validRows.reduce((s,r)=>s+(r.disc||0),0),
+    net: validRows.reduce((s,r)=>s+(r.net||0),0),
+    back: validRows.reduce((s,r)=>s+(r.back||0),0),
+    misc: validRows.reduce((s,r)=>s+(r.misc||0),0),
+    profit: validRows.reduce((s,r)=>s+(r.profit||0),0),
+    shopDrop: validRows.reduce((s,r)=>s+(r.shopDrop||0),0),
+    card: validRows.reduce((s,r)=>s+(r.card||0),0),
+    cash: validRows.reduce((s,r)=>s+(r.cash||0),0),
+    cardFee: validRows.reduce((s,r)=>s+(r.cardFee||0),0),
+    count: validRows.reduce((s,r)=>s+(r.count||0),0),
+    attendance: validRows.reduce((s,r)=>s+(r.attendance||0),0),
+    free: validRows.reduce((s,r)=>s+(r.free||0),0),
+    photo_shimei: validRows.reduce((s,r)=>s+(r.photo_shimei||0),0),
+    hon_shimei: validRows.reduce((s,r)=>s+(r.hon_shimei||0),0),
+    shimei: validRows.reduce((s,r)=>s+(r.shimei||0),0),
+  }
+  const avg_unit = tot.count>0 ? Math.round(tot.gross_work/tot.count) : 0
+
+  // 手動入力データをマージ（経費・目標・集客経路）
+  const ad = storeData.ad_expenses||{}
+  const rent = storeData.rent_expenses||{}
+  const util = storeData.utility_expenses||{}
+  const fixed = storeData.fixed_expenses||{}
+  const vari = storeData.variable_expenses||{}
+  const customExpenses = storeData.custom_expenses||[]  // [{label,amount}]
+  const routes = storeData.acquisition_routes||{}
+  const total_ad = storeData.total_ad_expense||0
+  const total_rent = storeData.total_rent||0
+  const total_util = storeData.total_utility||0
+  const total_fixed = storeData.total_fixed||0
+  const total_vari = storeData.total_variable||0
+  const total_custom = customExpenses.reduce((s,e)=>s+(e.amount||0),0)
+  const total_expenses = total_fixed + total_vari + total_custom
+
+  // ──────── 描画 ────────
+  const fmt = n=>n!=null?'¥'+Number(n).toLocaleString():'-'
+
+  if(monthlyTabMode==='summary'){
+    renderMonthlySummary(area, tot, avg_unit, storeData, fmt, total_expenses)
+  } else if(monthlyTabMode==='daily'){
+    renderMonthlyDaily(area, dailyRows, tot, fmt)
+  } else if(monthlyTabMode==='expense'){
+    renderMonthlyExpense(area, storeData, fmt, total_ad, total_rent, total_util, total_fixed, total_vari, total_custom, total_expenses, customExpenses)
+  } else if(monthlyTabMode==='chart'){
+    renderMonthlyChart(area, tot, storeData, routes, total_expenses, total_ad, total_rent, total_util, total_fixed, total_vari)
+  }
+}
+
+function renderMonthlySummary(area, tot, avg_unit, sd, fmt, total_expenses){
+  const pct = (a,b)=>b>0?Math.round(a/b*100)+'%':'-'
+  const pctColor = (a,b)=>a>=b?'color:#4caf50':'color:var(--accent)'
+  const goal_sales=sd.goal_sales, goal_count=sd.goal_count
+  let html = ''
+  // KPI
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem;margin-bottom:.65rem">`
+  const kpis=[
+    ['総売上高',fmt(tot.gross)],['純売上高',fmt(tot.gross_work)],['割引計',tot.disc>0?'-¥'+tot.disc.toLocaleString():'¥0'],
+    ['委託金',fmt(tot.net)],['雑費',tot.misc>0?'-¥'+tot.misc.toLocaleString():'¥0'],['粗利益',fmt(tot.profit)],
+    ['現金売上',fmt(tot.cash)],['カード売上',fmt(tot.card)],['カード手数料','-¥'+(tot.cardFee||0).toLocaleString()],
+    ['出勤延べ',tot.attendance+'名'],['施術件数',tot.count+'本'],['平均客単価',fmt(avg_unit)],
+  ]
+  kpis.forEach(([l,v])=>{ html+=`<div class="kpi"><div class="kpi-l" style="font-size:.6rem">${l}</div><div class="kpi-v" style="font-size:.76rem">${v}</div></div>` })
+  html += '</div>'
+
+  // 目標
+  html += `<div class="card" style="margin-bottom:.55rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">🎯 月間目標</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;font-size:.8rem">
+      <div><div style="font-size:.62rem;color:var(--text3)">売上目標</div>${fmt(goal_sales)}</div>
+      <div><div style="font-size:.62rem;color:var(--text3)">実績</div>${fmt(tot.gross_work)}</div>
+      <div><div style="font-size:.62rem;color:var(--text3)">達成率</div><span style="font-weight:700;${pctColor(tot.gross_work,goal_sales)}">${pct(tot.gross_work,goal_sales)}</span></div>
+      <div><div style="font-size:.62rem;color:var(--text3)">本数目標</div>${goal_count!=null?goal_count+'本':'-'}</div>
+      <div><div style="font-size:.62rem;color:var(--text3)">実績</div>${tot.count}本</div>
+      <div><div style="font-size:.62rem;color:var(--text3)">達成率</div><span style="font-weight:700;${pctColor(tot.count,goal_count)}">${pct(tot.count,goal_count)}</span></div>
     </div>
   </div>`
 
-  // 翌月目標
-  html+=`<div class="card" style="margin-bottom:.6rem">
-    <div style="font-weight:700;margin-bottom:.5rem;font-size:.88rem">📅 翌月目標</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;font-size:.8rem">
-      <div><div style="color:var(--text3);font-size:.68rem">売上目標</div><div>${fmt(d.next_goal_sales)}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">本数目標</div><div>${d.next_goal_count!=null?d.next_goal_count+'本':'-'}</div></div>
-      <div><div style="color:var(--text3);font-size:.68rem">求人目標</div><div>${d.next_goal_recruit!=null?d.next_goal_recruit+'名':'-'}</div></div>
+  // 指名内訳
+  html += `<div class="card" style="margin-bottom:.55rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">👆 指名内訳</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;font-size:.82rem;text-align:center">
+      <div><div style="font-size:.62rem;color:var(--text3)">フリー</div><div style="font-weight:700">${tot.free}本</div></div>
+      <div><div style="font-size:.62rem;color:var(--text3)">ネット指名</div><div style="font-weight:700">${tot.photo_shimei}本</div></div>
+      <div><div style="font-size:.62rem;color:var(--text3)">本指名</div><div style="font-weight:700">${tot.hon_shimei}本</div></div>
     </div>
   </div>`
 
   // 集客経路
-  const routes=d.acquisition_routes||{}
-  const routeItems=[['エステ魂','esute_kon'],['パンダ','panda'],['エステラブ','esute_love'],
-    ['ランキング','ranking'],['ジャパン','japan'],['ゼロツー','zerotwo'],['HP','hp'],['SNS','sns'],['その他','other']]
-  html+=`<div class="card" style="margin-bottom:.6rem">
-    <div style="font-weight:700;margin-bottom:.5rem;font-size:.88rem">📣 集客経路</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;font-size:.8rem">
-      ${routeItems.map(([l,k])=>`<div><span style="color:var(--text3);font-size:.68rem">${l}</span> <span>${routes[k]!=null?routes[k]+'人':'-'}</span></div>`).join('')}
-    </div>
-    <div style="margin-top:.5rem;font-size:.8rem;display:flex;gap:1rem">
-      <div><span style="color:var(--text3);font-size:.68rem">新規</span> <span>${d.new_customers!=null?d.new_customers+'人':'-'}</span></div>
-      <div><span style="color:var(--text3);font-size:.68rem">再来</span> <span>${d.repeat_customers!=null?d.repeat_customers+'人':'-'}</span></div>
-    </div>
-    <div style="margin-top:.4rem;font-size:.8rem;display:flex;gap:1rem">
-      <div><span style="color:var(--text3);font-size:.68rem">フリー</span> <span>${d.shimei_free!=null?d.shimei_free+'本':'-'}</span></div>
-      <div><span style="color:var(--text3);font-size:.68rem">ネット指名</span> <span>${d.shimei_net!=null?d.shimei_net+'本':'-'}</span></div>
-      <div><span style="color:var(--text3);font-size:.68rem">本指名</span> <span>${d.shimei_hon!=null?d.shimei_hon+'本':'-'}</span></div>
-    </div>
-  </div>`
-
-  // 宣伝広告費
-  const adItems=d.ad_expenses||{}
-  const adList=[['アロマパンダ','aroma_panda'],['エステラブ','esute_love'],['ランキング','ranking'],
-    ['爆サイ','bakusai'],['ジャパン','japan'],['エステ魂','esute_kon'],['消費税','tax']]
-  html+=`<div class="card" style="margin-bottom:.6rem">
-    <div style="font-weight:700;margin-bottom:.5rem;font-size:.88rem">📢 宣伝広告費</div>
-    ${adList.map(([l,k])=>`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>${l}</span><span>${fmt(adItems[k])}</span></div>`).join('')}
-    <div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.3rem 0;margin-top:.2rem"><span>合計</span><span>${fmt(d.total_ad_expense)}</span></div>
-  </div>`
-
-  // 家賃
-  const rentItems=d.rent_expenses||{}
-  const rentList=[['エスレジデンス','es_residence'],['アンナマリー','anna_marie'],['ハニリリカ','hani_lilika'],['パークフラッツ','park_flats']]
-  html+=`<div class="card" style="margin-bottom:.6rem">
-    <div style="font-weight:700;margin-bottom:.5rem;font-size:.88rem">🏠 家賃</div>
-    ${rentList.map(([l,k])=>`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>${l}</span><span>${fmt(rentItems[k])}</span></div>`).join('')}
-    <div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.3rem 0;margin-top:.2rem"><span>合計</span><span>${fmt(d.total_rent)}</span></div>
-  </div>`
-
-  // 水道光熱費
-  const utilItems=d.utility_expenses||{}
-  html+=`<div class="card" style="margin-bottom:.6rem">
-    <div style="font-weight:700;margin-bottom:.5rem;font-size:.88rem">💡 水道光熱費</div>
-    ${rentList.map(([l,k])=>`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>${l}</span><span>${fmt(utilItems[k])}</span></div>`).join('')}
-    <div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.3rem 0;margin-top:.2rem"><span>合計</span><span>${fmt(d.total_utility)}</span></div>
-  </div>`
-
-  // 固定費・変動費
-  const fixedItems=d.fixed_expenses||{}
-  const varItems=d.variable_expenses||{}
-  html+=`<div class="card" style="margin-bottom:.6rem">
-    <div style="font-weight:700;margin-bottom:.5rem;font-size:.88rem">📋 固定費・変動費</div>
-    <div style="font-size:.78rem;color:var(--text3);margin-bottom:.3rem">固定費</div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>宣伝広告費</span><span>${fmt(d.total_ad_expense)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>家賃</span><span>${fmt(d.total_rent)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>人件費</span><span>${fmt(fixedItems.personnel)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>通信費</span><span>${fmt(fixedItems.communication)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>カード決済</span><span>${fmt(fixedItems.card_fee)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.3rem 0;margin-top:.1rem"><span>固定費合計</span><span>${fmt(d.total_fixed)}</span></div>
-    <div style="font-size:.78rem;color:var(--text3);margin:.5rem 0 .3rem">変動費</div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>燃料費</span><span>${fmt(varItems.fuel)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>水道光熱費</span><span>${fmt(d.total_utility)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>消耗品</span><span>${fmt(varItems.consumables)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>備品費</span><span>${fmt(varItems.equipment)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>会議費</span><span>${fmt(varItems.meeting)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.15rem 0;border-bottom:1px solid var(--border)"><span>その他</span><span>${fmt(varItems.other)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.3rem 0;margin-top:.1rem"><span>変動費合計</span><span>${fmt(d.total_variable)}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.9rem;font-weight:700;padding:.4rem 0;border-top:2px solid var(--accent);margin-top:.2rem"><span>経費合計</span><span style="color:var(--accent)">${fmt(d.total_expenses)}</span></div>
-  </div>`
-
-  // 日別一覧
-  if(days.length){
-    html+=`<div style="font-size:.85rem;font-weight:700;margin-bottom:.4rem">📅 日別明細</div>`
-    html+=`<div style="overflow-x:auto;margin-bottom:1rem"><table style="width:100%;border-collapse:collapse;font-size:.72rem;min-width:600px">
-      <thead><tr style="background:var(--surface2);text-align:right">
-        <th style="text-align:left;padding:.3rem .4rem;position:sticky;left:0;background:var(--surface2)">日付</th>
-        <th style="padding:.3rem .4rem">総売上</th><th style="padding:.3rem .4rem">現金</th><th style="padding:.3rem .4rem">カード</th>
-        <th style="padding:.3rem .4rem">手数料</th><th style="padding:.3rem .4rem">委託金</th><th style="padding:.3rem .4rem">立替</th>
-        <th style="padding:.3rem .4rem">粗利</th><th style="padding:.3rem .4rem">現金残</th>
-        <th style="padding:.3rem .4rem">出勤</th><th style="padding:.3rem .4rem">F</th><th style="padding:.3rem .4rem">写指</th>
-        <th style="padding:.3rem .4rem">本指</th><th style="padding:.3rem .4rem">合計</th><th style="padding:.3rem .4rem">件数</th>
-      </tr></thead><tbody>
-      ${days.map(r=>{
-        const isZero=!r.gross&&r.note
-        return `<tr style="border-bottom:1px solid var(--border);${isZero?'color:var(--text3)':''}">
-          <td style="padding:.3rem .4rem;position:sticky;left:0;background:var(--surface);font-weight:600">${r.day}日(${r.dow||''})</td>
-          ${isZero?`<td colspan="14" style="padding:.3rem .4rem">${r.note||''}</td>`:`
-          <td style="text-align:right;padding:.3rem .4rem">${r.gross!=null?Number(r.gross).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.cash!=null?Number(r.cash).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.card!=null?Number(r.card).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.fee!=null?Number(r.fee).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.back!=null?Number(r.back).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.advance!=null?Number(r.advance).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem;font-weight:600">${r.profit!=null?Number(r.profit).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.cash_balance!=null?Number(r.cash_balance).toLocaleString():''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.attendance!=null?r.attendance:''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.free!=null?r.free:''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.photo_shimei!=null?r.photo_shimei:''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.hon_shimei!=null?r.hon_shimei:''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.shimei!=null?r.shimei:''}</td>
-          <td style="text-align:right;padding:.3rem .4rem">${r.count!=null?r.count:''}</td>`}
-        </tr>`
-      }).join('')}
-      </tbody>
-    </table></div>`
+  const routeItems=[['エステ魂','esute_kon'],['パンダ','panda'],['エステラブ','esute_love'],['ランキング','ranking'],['ジャパン','japan'],['ゼロツー','zerotwo'],['HP','hp'],['SNS','sns'],['その他','other']]
+  const routes = sd.acquisition_routes||{}
+  const hasRoutes = routeItems.some(([,k])=>routes[k]!=null)
+  if(hasRoutes){
+    html += `<div class="card" style="margin-bottom:.55rem">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">📣 集客経路</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;font-size:.8rem">
+        ${routeItems.map(([l,k])=>routes[k]!=null?`<div><span style="font-size:.62rem;color:var(--text3)">${l}</span> <span style="font-weight:600">${routes[k]}人</span></div>`:'').join('')}
+      </div>
+      ${(sd.new_customers!=null||sd.repeat_customers!=null)?`<div style="display:flex;gap:1.5rem;margin-top:.4rem;font-size:.82rem">
+        <div><span style="font-size:.62rem;color:var(--text3)">新規</span> <span style="font-weight:600">${sd.new_customers??'-'}人</span></div>
+        <div><span style="font-size:.62rem;color:var(--text3)">再来</span> <span style="font-weight:600">${sd.repeat_customers??'-'}人</span></div>
+      </div>`:''}
+    </div>`
   }
 
-  area.innerHTML=html
+  // 経費サマリー
+  if(total_expenses>0){
+    html += `<div class="card" style="margin-bottom:.55rem">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.3rem">💸 経費合計</div>
+      <div style="font-size:1.15rem;font-weight:700;color:var(--accent)">-${fmt(total_expenses)}</div>
+    </div>`
+  }
+
+  // 翌月目標
+  if(sd.next_goal_sales||sd.next_goal_count){
+    html += `<div class="card" style="margin-bottom:.55rem">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.45rem">📅 翌月目標</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;font-size:.82rem">
+        <div><div style="font-size:.62rem;color:var(--text3)">売上目標</div>${fmt(sd.next_goal_sales)}</div>
+        <div><div style="font-size:.62rem;color:var(--text3)">本数目標</div>${sd.next_goal_count!=null?sd.next_goal_count+'本':'-'}</div>
+        <div><div style="font-size:.62rem;color:var(--text3)">求人目標</div>${sd.next_goal_recruit!=null?sd.next_goal_recruit+'名':'-'}</div>
+      </div>
+    </div>`
+  }
+
+  area.innerHTML = html
 }
 
-function openMonthlySalesEdit(){
-  // 現在表示中の月のデータを読み込んでシートを開く
-  loadMonthlySalesForm()
+function renderMonthlyDaily(area, dailyRows, tot, fmt){
+  let html = `<div style="overflow-x:auto">
+  <table style="width:100%;border-collapse:collapse;font-size:.7rem;min-width:560px">
+    <thead><tr style="background:var(--surface2)">
+      <th style="padding:.3rem .35rem;text-align:left;position:sticky;left:0;background:var(--surface2);min-width:48px">日付</th>
+      <th style="padding:.3rem .25rem;text-align:right">総売上</th>
+      <th style="padding:.3rem .25rem;text-align:right">純売上</th>
+      <th style="padding:.3rem .25rem;text-align:right">割引</th>
+      <th style="padding:.3rem .25rem;text-align:right">委託金</th>
+      <th style="padding:.3rem .25rem;text-align:right">粗利</th>
+      <th style="padding:.3rem .25rem;text-align:right">現金</th>
+      <th style="padding:.3rem .25rem;text-align:right">カード</th>
+      <th style="padding:.3rem .25rem;text-align:right">件数</th>
+      <th style="padding:.3rem .25rem;text-align:right">F</th>
+      <th style="padding:.3rem .25rem;text-align:right">写指</th>
+      <th style="padding:.3rem .25rem;text-align:right">本指</th>
+    </tr></thead>
+    <tbody>`
+
+  dailyRows.forEach(r=>{
+    if(r.noData){
+      html += `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
+        <td style="padding:.28rem .35rem;position:sticky;left:0;background:var(--surface);font-weight:600">${r.day}(${r.dow})</td>
+        <td colspan="11" style="padding:.28rem .25rem;font-size:.65rem">-</td>
+      </tr>`
+    } else {
+      html += `<tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:.28rem .35rem;position:sticky;left:0;background:var(--surface);font-weight:600">${r.day}(${r.dow})</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.gross?r.gross.toLocaleString():''}</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.gross_work?r.gross_work.toLocaleString():''}</td>
+        <td style="text-align:right;padding:.28rem .25rem;color:#c62828">${r.disc>0?r.disc.toLocaleString():''}</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.net?r.net.toLocaleString():''}</td>
+        <td style="text-align:right;padding:.28rem .25rem;font-weight:600">${r.profit!=null?r.profit.toLocaleString():''}</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.cash?r.cash.toLocaleString():''}</td>
+        <td style="text-align:right;padding:.28rem .25rem;color:#1565c0">${r.card?r.card.toLocaleString():''}</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.count||''}</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.free||''}</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.photo_shimei||''}</td>
+        <td style="text-align:right;padding:.28rem .25rem">${r.hon_shimei||''}</td>
+      </tr>`
+    }
+  })
+
+  // 合計行
+  html += `<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent)">
+    <td style="padding:.3rem .35rem;position:sticky;left:0;background:var(--surface2)">合計</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.gross.toLocaleString()}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.gross_work.toLocaleString()}</td>
+    <td style="text-align:right;padding:.3rem .25rem;color:#c62828">${tot.disc>0?tot.disc.toLocaleString():''}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.net.toLocaleString()}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.profit.toLocaleString()}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.cash.toLocaleString()}</td>
+    <td style="text-align:right;padding:.3rem .25rem;color:#1565c0">${tot.card.toLocaleString()}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.count}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.free}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.photo_shimei}</td>
+    <td style="text-align:right;padding:.3rem .25rem">${tot.hon_shimei}</td>
+  </tr>
+  </tbody></table></div>`
+
+  area.innerHTML = html
+}
+
+function renderMonthlyExpense(area, sd, fmt, total_ad, total_rent, total_util, total_fixed, total_vari, total_custom, total_expenses, customExpenses){
+  const ad=sd.ad_expenses||{}, rent=sd.rent_expenses||{}, util=sd.utility_expenses||{}
+  const fixed=sd.fixed_expenses||{}, vari=sd.variable_expenses||{}
+
+  const row = (l,v,color='')=>`<div style="display:flex;justify-content:space-between;font-size:.82rem;padding:.18rem 0;border-bottom:1px solid var(--border)"><span style="${color?'color:'+color:''}">${l}</span><span style="${color?'color:'+color:''}">${fmt(v)}</span></div>`
+  const totRow = (l,v)=>`<div style="display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;padding:.3rem 0;margin-top:.15rem"><span>${l}</span><span>${fmt(v)}</span></div>`
+
+  let html = ''
+  html += `<div class="card" style="margin-bottom:.5rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📢 宣伝広告費</div>
+    ${row('アロマパンダ',ad.aroma_panda)}${row('エステラブ',ad.esute_love)}${row('ランキング',ad.ranking)}
+    ${row('爆サイ',ad.bakusai)}${row('ジャパン',ad.japan)}${row('エステ魂',ad.esute_kon)}${row('消費税',ad.tax)}
+    ${totRow('小計',total_ad)}
+  </div>`
+  html += `<div class="card" style="margin-bottom:.5rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">🏠 家賃</div>
+    ${row('エスレジデンス',rent.es_residence)}${row('アンナマリー',rent.anna_marie)}${row('ハニリリカ',rent.hani_lilika)}${row('パークフラッツ',rent.park_flats)}
+    ${totRow('小計',total_rent)}
+  </div>`
+  html += `<div class="card" style="margin-bottom:.5rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">💡 水道光熱費</div>
+    ${row('エスレジデンス',util.es_residence)}${row('アンナマリー',util.anna_marie)}${row('ハニリリカ',util.hani_lilika)}${row('パークフラッツ',util.park_flats)}
+    ${totRow('小計',total_util)}
+  </div>`
+  html += `<div class="card" style="margin-bottom:.5rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📋 その他固定費</div>
+    ${row('人件費',fixed.personnel)}${row('通信費',fixed.communication)}${row('カード決済',fixed.card_fee)}
+    ${totRow('固定費合計',total_fixed)}
+  </div>`
+  html += `<div class="card" style="margin-bottom:.5rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📦 変動費</div>
+    ${row('燃料費',vari.fuel)}${row('消耗品',vari.consumables)}${row('備品費',vari.equipment)}${row('会議費',vari.meeting)}${row('その他',vari.other)}
+    ${totRow('変動費合計',total_vari)}
+  </div>`
+  if(customExpenses.length){
+    html += `<div class="card" style="margin-bottom:.5rem">
+      <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">➕ カスタム経費</div>
+      ${customExpenses.map(e=>row(e.label,e.amount)).join('')}
+      ${totRow('小計',total_custom)}
+    </div>`
+  }
+  html += `<div class="card" style="margin-bottom:.5rem;background:var(--surface2)">
+    <div style="display:flex;justify-content:space-between;font-size:1rem;font-weight:700"><span>💸 経費合計</span><span style="color:var(--accent)">${fmt(total_expenses)}</span></div>
+  </div>`
+  html += `<button class="btn btn-gold" style="width:100%;margin-bottom:1rem" onclick="openMonthlySalesEdit()">✏️ 経費を編集する</button>`
+  area.innerHTML = html
+}
+
+function renderMonthlyChart(area, tot, sd, routes, total_expenses, total_ad, total_rent, total_util, total_fixed, total_vari){
+  const routeItems=[['エステ魂','esute_kon'],['パンダ','panda'],['エステラブ','esute_love'],['ランキング','ranking'],['ジャパン','japan'],['ゼロツー','zerotwo'],['HP','hp'],['SNS','sns'],['その他','other']]
+  const routeColors=['#ff6384','#36a2eb','#ffce56','#4bc0c0','#9966ff','#ff9f40','#c9cbcf','#4caf50','#ff5722']
+  const expColors=['#ff6384','#36a2eb','#ffce56','#4bc0c0','#9966ff']
+  const shimeiColors=['#36a2eb','#ffce56','#ff6384']
+
+  function drawPie(canvasId, data, colors){
+    const canvas = document.getElementById(canvasId)
+    if(!canvas) return
+    const ctx = canvas.getContext('2d')
+    const cx=canvas.width/2, cy=canvas.height/2, r=Math.min(cx,cy)-4
+    const total = data.reduce((s,d)=>s+d.value,0)
+    if(!total){ ctx.fillStyle='#ccc'; ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fill(); return }
+    let start = -Math.PI/2
+    data.forEach((d,i)=>{
+      const sweep = (d.value/total)*Math.PI*2
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.arc(cx,cy,r,start,start+sweep)
+      ctx.fillStyle=colors[i%colors.length]; ctx.fill()
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1.5; ctx.stroke()
+      start += sweep
+    })
+  }
+
+  const routeData = routeItems.map(([l,k])=>({label:l,value:routes[k]||0})).filter(d=>d.value>0)
+  const expData = [
+    {label:'宣伝広告費',value:total_ad},
+    {label:'家賃',value:total_rent},
+    {label:'水道光熱費',value:total_util},
+    {label:'固定費他',value:total_fixed-total_ad-total_rent},
+    {label:'変動費',value:total_vari},
+  ].filter(d=>d.value>0)
+  const shimeiData = [
+    {label:'フリー',value:tot.free},
+    {label:'ネット指名',value:tot.photo_shimei},
+    {label:'本指名',value:tot.hon_shimei},
+  ].filter(d=>d.value>0)
+
+  const legendHtml = (data, colors) => data.map((d,i)=>`<div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem"><div style="width:10px;height:10px;border-radius:2px;background:${colors[i%colors.length]};flex-shrink:0"></div><span>${d.label}</span></div>`).join('')
+
+  area.innerHTML = `
+  <div class="card" style="margin-bottom:.55rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">📣 集客経路</div>
+    ${routeData.length?`<div style="display:flex;justify-content:center"><canvas id="chart-route" width="160" height="160"></canvas></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;margin-top:.5rem">${legendHtml(routeData,routeColors)}</div>`:'<div style="color:var(--text3);font-size:.8rem">データなし（集客経路を入力してください）</div>'}
+  </div>
+  <div class="card" style="margin-bottom:.55rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">👆 指名内訳</div>
+    ${shimeiData.length?`<div style="display:flex;justify-content:center"><canvas id="chart-shimei" width="160" height="160"></canvas></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;margin-top:.5rem">${legendHtml(shimeiData,shimeiColors)}</div>`:'<div style="color:var(--text3);font-size:.8rem">データなし</div>'}
+  </div>
+  <div class="card" style="margin-bottom:.55rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">💸 経費内訳</div>
+    ${expData.length?`<div style="display:flex;justify-content:center"><canvas id="chart-exp" width="160" height="160"></canvas></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;margin-top:.5rem">${legendHtml(expData,expColors)}</div>`:'<div style="color:var(--text3);font-size:.8rem">データなし（経費を入力してください）</div>'}
+  </div>
+  <div class="card" style="margin-bottom:.55rem">
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">💰 売上構成</div>
+    <div style="display:flex;justify-content:center"><canvas id="chart-sales" width="160" height="160"></canvas></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.25rem;margin-top:.5rem">
+      <div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem"><div style="width:10px;height:10px;border-radius:2px;background:#4caf50;flex-shrink:0"></div>委託金</div>
+      <div style="display:flex;align-items:center;gap:.3rem;font-size:.72rem"><div style="width:10px;height:10px;border-radius:2px;background:#ff6384;flex-shrink:0"></div>粗利益</div>
+    </div>
+  </div>`
+
+  requestAnimationFrame(()=>{
+    if(routeData.length) drawPie('chart-route',routeData,routeColors)
+    if(shimeiData.length) drawPie('chart-shimei',shimeiData,shimeiColors)
+    if(expData.length) drawPie('chart-exp',expData,expColors)
+    drawPie('chart-sales',[{label:'委託金',value:tot.net},{label:'粗利益',value:tot.profit}],['#4caf50','#ff6384'])
+  })
+}
+
+// ── 月次売上 手動編集シート ──
+async function openMonthlySalesEdit(){
   document.getElementById('monthly-edit-overlay').classList.add('on')
+  loadMonthlySalesForm()
+}
+
+async function openMonthlySalesAuto(){
+  toast('委託金・予約データから自動集計済みです。経費・目標・集客経路は手動入力してください。')
+  openMonthlySalesEdit()
 }
 
 async function loadMonthlySalesForm(){
   const [y,m]=monthlyMonth.split('-').map(Number)
-  document.getElementById('mse-title').textContent=y+'年'+m+'月 月次データ入力'
+  document.getElementById('mse-title').textContent=y+'年'+m+'月 経費・目標・集客経路入力'
   const {data}=await sb.from('monthly_sales').select('*').eq('month',monthlyMonth).single()
-
-  // 日別フォーム生成
-  const daysInMonth=new Date(y,m,0).getDate()
-  const dows=['日','月','火','水','木','金','土']
-  const dailyData=data?.daily_data||[]
-  const dailyMap={}
-  dailyData.forEach(r=>{dailyMap[r.day]=r})
-
-  let rows=''
-  for(let day=1;day<=daysInMonth;day++){
-    const dow=dows[new Date(y,m-1,day).getDay()]
-    const r=dailyMap[day]||{}
-    rows+=`<div class="card" style="margin-bottom:.5rem;padding:.6rem .75rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-        <div style="font-weight:700;font-size:.88rem">${day}日 (${dow})</div>
-        <label style="display:flex;align-items:center;gap:.3rem;font-size:.75rem;color:var(--text3)">
-          <input type="checkbox" id="msd-zero-${day}" onchange="toggleDayNote(${day})" ${r.note?'checked':''}> シフト不足等
-        </label>
-      </div>
-      <div id="msd-note-${day}" style="display:${r.note?'block':'none'}">
-        <input type="text" id="msd-notetext-${day}" class="fi" placeholder="備考（例：シフト不足）" value="${r.note||''}" style="font-size:.8rem;padding:.4rem .6rem">
-      </div>
-      <div id="msd-fields-${day}" style="display:${r.note?'none':'grid'};grid-template-columns:1fr 1fr;gap:.35rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">総売上</div><input type="number" id="msd-gross-${day}" class="fi" value="${r.gross!=null?r.gross:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">現金売上</div><input type="number" id="msd-cash-${day}" class="fi" value="${r.cash!=null?r.cash:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">カード売上</div><input type="number" id="msd-card-${day}" class="fi" value="${r.card!=null?r.card:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">手数料</div><input type="number" id="msd-fee-${day}" class="fi" value="${r.fee!=null?r.fee:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">委託金</div><input type="number" id="msd-back-${day}" class="fi" value="${r.back!=null?r.back:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">立替金</div><input type="number" id="msd-adv-${day}" class="fi" value="${r.advance!=null?r.advance:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">粗利益</div><input type="number" id="msd-profit-${day}" class="fi" value="${r.profit!=null?r.profit:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">現金残高</div><input type="number" id="msd-cbal-${day}" class="fi" value="${r.cash_balance!=null?r.cash_balance:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">平均客単価</div><input type="number" id="msd-unit-${day}" class="fi" value="${r.avg_unit_price!=null?r.avg_unit_price:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">出勤</div><input type="number" id="msd-att-${day}" class="fi" value="${r.attendance!=null?r.attendance:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">フリー</div><input type="number" id="msd-free-${day}" class="fi" value="${r.free!=null?r.free:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">写真指名</div><input type="number" id="msd-ps-${day}" class="fi" value="${r.photo_shimei!=null?r.photo_shimei:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">本指名</div><input type="number" id="msd-hs-${day}" class="fi" value="${r.hon_shimei!=null?r.hon_shimei:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">合計指名</div><input type="number" id="msd-ts-${day}" class="fi" value="${r.shimei!=null?r.shimei:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">総数（施術件数）</div><input type="number" id="msd-cnt-${day}" class="fi" value="${r.count!=null?r.count:''}" style="font-size:.8rem;padding:.35rem .5rem"></div>
-      </div>
-    </div>`
-  }
-  document.getElementById('mse-daily-body').innerHTML=rows
-
-  // 月次集計・目標フォームにデータをセット
   const ad=data?.ad_expenses||{}, rent=data?.rent_expenses||{}, util=data?.utility_expenses||{}
-  const fixed=data?.fixed_expenses||{}, vari=data?.variable_expenses||{}, routes=data?.acquisition_routes||{}
+  const fixed=data?.fixed_expenses||{}, vari=data?.variable_expenses||{}
+  const routes=data?.acquisition_routes||{}
+  const customExpenses = data?.custom_expenses||[]
+
   const setv=(id,v)=>{const el=document.getElementById(id);if(el&&v!=null)el.value=v}
-  // 目標
   setv('mse-goal-sales',data?.goal_sales); setv('mse-goal-count',data?.goal_count); setv('mse-goal-recruit',data?.goal_recruit)
+  setv('mse-actual-recruit',data?.actual_recruit)
   setv('mse-next-goal-sales',data?.next_goal_sales); setv('mse-next-goal-count',data?.next_goal_count); setv('mse-next-goal-recruit',data?.next_goal_recruit)
-  // 宣伝広告費
   setv('mse-ad-panda',ad.aroma_panda); setv('mse-ad-estelove',ad.esute_love); setv('mse-ad-ranking',ad.ranking)
   setv('mse-ad-bakusai',ad.bakusai); setv('mse-ad-japan',ad.japan); setv('mse-ad-estekon',ad.esute_kon); setv('mse-ad-tax',ad.tax)
-  // 家賃
   setv('mse-rent-es',rent.es_residence); setv('mse-rent-anna',rent.anna_marie); setv('mse-rent-hani',rent.hani_lilika); setv('mse-rent-park',rent.park_flats)
-  // 水道光熱費
   setv('mse-util-es',util.es_residence); setv('mse-util-anna',util.anna_marie); setv('mse-util-hani',util.hani_lilika); setv('mse-util-park',util.park_flats)
-  // 固定費追加項目
   setv('mse-fixed-personnel',fixed.personnel); setv('mse-fixed-comm',fixed.communication); setv('mse-fixed-card',fixed.card_fee)
-  // 変動費
   setv('mse-var-fuel',vari.fuel); setv('mse-var-consumables',vari.consumables); setv('mse-var-equipment',vari.equipment)
   setv('mse-var-meeting',vari.meeting); setv('mse-var-other',vari.other)
-  // 集客経路
   setv('mse-route-ekon',routes.esute_kon); setv('mse-route-panda',routes.panda); setv('mse-route-elove',routes.esute_love)
   setv('mse-route-rank',routes.ranking); setv('mse-route-japan',routes.japan); setv('mse-route-zero',routes.zerotwo)
   setv('mse-route-hp',routes.hp); setv('mse-route-sns',routes.sns); setv('mse-route-other',routes.other)
-  // 集客内訳
   setv('mse-new-cust',data?.new_customers); setv('mse-repeat-cust',data?.repeat_customers)
-  // 指名内訳
   setv('mse-shimei-free',data?.shimei_free); setv('mse-shimei-net',data?.shimei_net); setv('mse-shimei-hon',data?.shimei_hon)
+
+  // カスタム経費を描画
+  const cArea = document.getElementById('mse-custom-expense-area')
+  if(cArea){
+    cArea.innerHTML = customExpenses.map((e,i)=>buildCustomExpenseRow(i,e.label,e.amount)).join('')
+  }
 }
 
-function toggleDayNote(day){
-  const chk=document.getElementById('msd-zero-'+day)
-  document.getElementById('msd-note-'+day).style.display=chk.checked?'block':'none'
-  document.getElementById('msd-fields-'+day).style.display=chk.checked?'none':'grid'
+let customExpenseCount = 0
+function buildCustomExpenseRow(idx, label='', amount=''){
+  return `<div style="display:flex;gap:.35rem;margin-bottom:.35rem;align-items:center" id="mse-custom-row-${idx}">
+    <input type="text" placeholder="項目名" value="${label}" id="mse-custom-label-${idx}" class="fi" style="flex:1;font-size:.8rem;padding:.35rem .5rem">
+    <input type="number" placeholder="金額" value="${amount}" id="mse-custom-amount-${idx}" class="fi" style="width:100px;font-size:.8rem;padding:.35rem .5rem">
+    <button onclick="removeCustomExpense(${idx})" style="background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text3)">✕</button>
+  </div>`
+}
+function addCustomExpense(){
+  const area = document.getElementById('mse-custom-expense-area')
+  if(!area) return
+  customExpenseCount++
+  const div = document.createElement('div')
+  div.innerHTML = buildCustomExpenseRow(customExpenseCount)
+  area.appendChild(div.firstElementChild)
+}
+function removeCustomExpense(idx){
+  const row = document.getElementById('mse-custom-row-'+idx)
+  if(row) row.remove()
 }
 
 function getv(id){const el=document.getElementById(id);return el&&el.value!==''?Number(el.value):null}
@@ -4529,98 +4779,59 @@ function getvStr(id){const el=document.getElementById(id);return el?el.value.tri
 async function saveMonthlySales(){
   const btn=document.getElementById('mse-save-btn')
   btn.disabled=true; btn.textContent='保存中...'
-  const [y,m]=monthlyMonth.split('-').map(Number)
-  const daysInMonth=new Date(y,m,0).getDate()
-  const dows=['日','月','火','水','木','金','土']
 
-  // 日別データ収集
-  const daily_data=[]
-  let total_gross=0,total_cash=0,total_card=0,total_fee=0,total_back=0,total_advance=0
-  let total_profit=0,total_cash_balance=0,total_attendance=0,total_free=0,total_photo_shimei=0
-  let total_hon_shimei=0,total_shimei=0,total_count=0,unitPriceSum=0,unitPriceCount=0
-
-  for(let day=1;day<=daysInMonth;day++){
-    const isNote=document.getElementById('msd-zero-'+day)?.checked
-    const dow=dows[new Date(y,m-1,day).getDay()]
-    if(isNote){
-      const note=getvStr('msd-notetext-'+day)||'シフト不足'
-      daily_data.push({day,dow,note})
-    } else {
-      const gross=getv('msd-gross-'+day),cash=getv('msd-cash-'+day),card=getv('msd-card-'+day)
-      const fee=getv('msd-fee-'+day),back=getv('msd-back-'+day),advance=getv('msd-adv-'+day)
-      const profit=getv('msd-profit-'+day),cash_balance=getv('msd-cbal-'+day)
-      const avg_unit_price=getv('msd-unit-'+day),attendance=getv('msd-att-'+day)
-      const free=getv('msd-free-'+day),photo_shimei=getv('msd-ps-'+day)
-      const hon_shimei=getv('msd-hs-'+day),shimei=getv('msd-ts-'+day),count=getv('msd-cnt-'+day)
-      daily_data.push({day,dow,gross,cash,card,fee,back,advance,profit,cash_balance,avg_unit_price,attendance,free,photo_shimei,hon_shimei,shimei,count})
-      if(gross!=null) total_gross+=gross
-      if(cash!=null) total_cash+=cash
-      if(card!=null) total_card+=card
-      if(fee!=null) total_fee+=fee
-      if(back!=null) total_back+=back
-      if(advance!=null) total_advance+=advance
-      if(profit!=null) total_profit+=profit
-      if(cash_balance!=null) total_cash_balance+=cash_balance
-      if(attendance!=null) total_attendance+=attendance
-      if(free!=null) total_free+=free
-      if(photo_shimei!=null) total_photo_shimei+=photo_shimei
-      if(hon_shimei!=null) total_hon_shimei+=hon_shimei
-      if(shimei!=null) total_shimei+=shimei
-      if(count!=null) total_count+=count
-      if(avg_unit_price!=null){unitPriceSum+=avg_unit_price;unitPriceCount++}
-    }
-  }
-
-  // 宣伝広告費
   const ad_panda=getv('mse-ad-panda'),ad_elove=getv('mse-ad-estelove'),ad_rank=getv('mse-ad-ranking')
   const ad_baku=getv('mse-ad-bakusai'),ad_jap=getv('mse-ad-japan'),ad_ekon=getv('mse-ad-estekon'),ad_tax=getv('mse-ad-tax')
   const ad_expenses={aroma_panda:ad_panda,esute_love:ad_elove,ranking:ad_rank,bakusai:ad_baku,japan:ad_jap,esute_kon:ad_ekon,tax:ad_tax}
   const total_ad_expense=[ad_panda,ad_elove,ad_rank,ad_baku,ad_jap,ad_ekon,ad_tax].filter(v=>v!=null).reduce((s,v)=>s+v,0)
 
-  // 家賃
   const r_es=getv('mse-rent-es'),r_anna=getv('mse-rent-anna'),r_hani=getv('mse-rent-hani'),r_park=getv('mse-rent-park')
   const rent_expenses={es_residence:r_es,anna_marie:r_anna,hani_lilika:r_hani,park_flats:r_park}
   const total_rent=[r_es,r_anna,r_hani,r_park].filter(v=>v!=null).reduce((s,v)=>s+v,0)
 
-  // 水道光熱費
   const u_es=getv('mse-util-es'),u_anna=getv('mse-util-anna'),u_hani=getv('mse-util-hani'),u_park=getv('mse-util-park')
   const utility_expenses={es_residence:u_es,anna_marie:u_anna,hani_lilika:u_hani,park_flats:u_park}
   const total_utility=[u_es,u_anna,u_hani,u_park].filter(v=>v!=null).reduce((s,v)=>s+v,0)
 
-  // 固定費
   const fp=getv('mse-fixed-personnel'),fc=getv('mse-fixed-comm'),fcard=getv('mse-fixed-card')
   const fixed_expenses={personnel:fp,communication:fc,card_fee:fcard}
   const total_fixed=total_ad_expense+total_rent+[fp,fc,fcard].filter(v=>v!=null).reduce((s,v)=>s+v,0)
 
-  // 変動費
   const vf=getv('mse-var-fuel'),vc=getv('mse-var-consumables'),ve=getv('mse-var-equipment')
   const vm=getv('mse-var-meeting'),vo=getv('mse-var-other')
   const variable_expenses={fuel:vf,consumables:vc,equipment:ve,meeting:vm,other:vo}
   const total_variable=total_utility+[vf,vc,ve,vm,vo].filter(v=>v!=null).reduce((s,v)=>s+v,0)
-  const total_expenses=total_fixed+total_variable
 
-  // 集客経路
-  const acquisition_routes={
-    esute_kon:getv('mse-route-ekon'),panda:getv('mse-route-panda'),esute_love:getv('mse-route-elove'),
-    ranking:getv('mse-route-rank'),japan:getv('mse-route-japan'),zerotwo:getv('mse-route-zero'),
-    hp:getv('mse-route-hp'),sns:getv('mse-route-sns'),other:getv('mse-route-other')
+  // カスタム経費収集
+  const cArea=document.getElementById('mse-custom-expense-area')
+  const custom_expenses=[]
+  if(cArea){
+    cArea.querySelectorAll('[id^="mse-custom-row-"]').forEach(row=>{
+      const idx=row.id.replace('mse-custom-row-','')
+      const label=getvStr('mse-custom-label-'+idx)
+      const amount=getv('mse-custom-amount-'+idx)
+      if(label&&amount!=null) custom_expenses.push({label,amount})
+    })
   }
+  const total_custom=custom_expenses.reduce((s,e)=>s+(e.amount||0),0)
+  const total_expenses=total_fixed+total_variable+total_custom
 
   const payload={
-    month:monthlyMonth,daily_data,
-    total_gross,total_cash,total_card,total_fee,total_back,total_advance,total_profit,total_cash_balance,
-    avg_unit_price:unitPriceCount?Math.round(unitPriceSum/unitPriceCount):null,
-    total_attendance,total_free,total_photo_shimei,total_hon_shimei,total_shimei,total_count,
+    month:monthlyMonth,
     goal_sales:getv('mse-goal-sales'),goal_count:getv('mse-goal-count'),goal_recruit:getv('mse-goal-recruit'),
-    next_goal_sales:getv('mse-next-goal-sales'),next_goal_count:getv('mse-next-goal-count'),next_goal_recruit:getv('mse-next-goal-recruit'),
     actual_recruit:getv('mse-actual-recruit'),
+    next_goal_sales:getv('mse-next-goal-sales'),next_goal_count:getv('mse-next-goal-count'),next_goal_recruit:getv('mse-next-goal-recruit'),
     ad_expenses,total_ad_expense,
     rent_expenses,total_rent,
     utility_expenses,total_utility,
     fixed_expenses,total_fixed,
     variable_expenses,total_variable,
-    total_expenses,
-    acquisition_routes,
+    custom_expenses,total_expenses,
+    acquisition_routes:{
+      esute_kon:getv('mse-route-ekon'),panda:getv('mse-route-panda'),esute_love:getv('mse-route-elove'),
+      ranking:getv('mse-route-rank'),japan:getv('mse-route-japan'),zerotwo:getv('mse-route-zero'),
+      hp:getv('mse-route-hp'),sns:getv('mse-route-sns'),other:getv('mse-route-other')
+    },
     new_customers:getv('mse-new-cust'),repeat_customers:getv('mse-repeat-cust'),
     shimei_free:getv('mse-shimei-free'),shimei_net:getv('mse-shimei-net'),shimei_hon:getv('mse-shimei-hon')
   }
@@ -4630,116 +4841,130 @@ async function saveMonthlySales(){
   if(error){toast('保存失敗: '+error.message);return}
   toast('保存しました')
   closeSheet('monthly-edit')
-  loadMonthly()
+  renderMonthlyContent()
 }
+
+function mseSwitchTab(tab){
+  const tabs=['expense','goal','route']
+  const onStyle='flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
+  const offStyle='flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
+  tabs.forEach(t=>{
+    const btn=document.getElementById('mse-tab-'+t)
+    const body=document.getElementById('mse-body-'+t)
+    if(btn) btn.style.cssText=t===tab?onStyle:offStyle
+    if(body) body.style.display=t===tab?'block':'none'
+  })
+}
+
+
+init()
 </script>
 
-<!-- 月次売上編集シート -->
+<!-- ===== 月次売上 手動編集シート ===== -->
 <div class="sheet-overlay" id="monthly-edit-overlay">
   <div class="sheet" style="max-height:95vh;overflow-y:auto">
     <div class="sheet-bar"></div>
-    <div class="sheet-title" id="mse-title">月次データ入力</div>
+    <div class="sheet-title" id="mse-title">経費・目標・集客経路入力</div>
 
-    <!-- タブ切り替え -->
-    <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.9rem;gap:3px">
-      <button id="mse-tab-daily" onclick="mseSwitchTab('daily')" style="flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">📅 日別</button>
-      <button id="mse-tab-expense" onclick="mseSwitchTab('expense')" style="flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">📋 経費</button>
+    <!-- タブ -->
+    <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.85rem;gap:3px">
+      <button id="mse-tab-expense" onclick="mseSwitchTab('expense')" style="flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">💸 経費</button>
       <button id="mse-tab-goal" onclick="mseSwitchTab('goal')" style="flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">🎯 目標</button>
       <button id="mse-tab-route" onclick="mseSwitchTab('route')" style="flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">📣 集客</button>
     </div>
 
-    <!-- 日別タブ -->
-    <div id="mse-body-daily">
-      <div id="mse-daily-body"></div>
-    </div>
-
     <!-- 経費タブ -->
-    <div id="mse-body-expense" style="display:none">
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">📢 宣伝広告費</div>
+    <div id="mse-body-expense">
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">📢 宣伝広告費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">アロマパンダ</div><input type="number" id="mse-ad-panda" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">エステラブ</div><input type="number" id="mse-ad-estelove" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ランキング</div><input type="number" id="mse-ad-ranking" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">爆サイ</div><input type="number" id="mse-ad-bakusai" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ジャパン</div><input type="number" id="mse-ad-japan" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">エステ魂</div><input type="number" id="mse-ad-estekon" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">消費税</div><input type="number" id="mse-ad-tax" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">アロマパンダ</div><input type="number" id="mse-ad-panda" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">エステラブ</div><input type="number" id="mse-ad-estelove" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ランキング</div><input type="number" id="mse-ad-ranking" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">爆サイ</div><input type="number" id="mse-ad-bakusai" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ジャパン</div><input type="number" id="mse-ad-japan" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">エステ魂</div><input type="number" id="mse-ad-estekon" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">消費税</div><input type="number" id="mse-ad-tax" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
 
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">🏠 家賃</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">🏠 家賃</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">エスレジデンス</div><input type="number" id="mse-rent-es" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">アンナマリー</div><input type="number" id="mse-rent-anna" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ハニリリカ</div><input type="number" id="mse-rent-hani" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">パークフラッツ</div><input type="number" id="mse-rent-park" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">エスレジデンス</div><input type="number" id="mse-rent-es" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">アンナマリー</div><input type="number" id="mse-rent-anna" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ハニリリカ</div><input type="number" id="mse-rent-hani" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">パークフラッツ</div><input type="number" id="mse-rent-park" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
 
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">💡 水道光熱費</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">💡 水道光熱費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">エスレジデンス</div><input type="number" id="mse-util-es" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">アンナマリー</div><input type="number" id="mse-util-anna" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ハニリリカ</div><input type="number" id="mse-util-hani" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">パークフラッツ</div><input type="number" id="mse-util-park" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">エスレジデンス</div><input type="number" id="mse-util-es" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">アンナマリー</div><input type="number" id="mse-util-anna" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ハニリリカ</div><input type="number" id="mse-util-hani" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">パークフラッツ</div><input type="number" id="mse-util-park" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
 
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">📋 固定費（追加項目）</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">📋 その他固定費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">人件費</div><input type="number" id="mse-fixed-personnel" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">通信費</div><input type="number" id="mse-fixed-comm" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">カード決済手数料</div><input type="number" id="mse-fixed-card" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">人件費</div><input type="number" id="mse-fixed-personnel" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">通信費</div><input type="number" id="mse-fixed-comm" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">カード決済手数料</div><input type="number" id="mse-fixed-card" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
 
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">📦 変動費</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">📦 変動費</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">燃料費</div><input type="number" id="mse-var-fuel" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">消耗品</div><input type="number" id="mse-var-consumables" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">備品費</div><input type="number" id="mse-var-equipment" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">会議費</div><input type="number" id="mse-var-meeting" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">その他</div><input type="number" id="mse-var-other" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">燃料費</div><input type="number" id="mse-var-fuel" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">消耗品</div><input type="number" id="mse-var-consumables" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">備品費</div><input type="number" id="mse-var-equipment" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">会議費</div><input type="number" id="mse-var-meeting" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">その他</div><input type="number" id="mse-var-other" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
+
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">➕ カスタム経費</div>
+      <div id="mse-custom-expense-area" style="margin-bottom:.5rem"></div>
+      <button class="btn btn-gray" style="width:100%;margin-bottom:.75rem;font-size:.82rem" onclick="addCustomExpense()">＋ 項目を追加</button>
     </div>
 
     <!-- 目標タブ -->
     <div id="mse-body-goal" style="display:none">
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">🎯 当月目標</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">🎯 当月目標</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">売上目標</div><input type="number" id="mse-goal-sales" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">本数目標</div><input type="number" id="mse-goal-count" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">求人目標</div><input type="number" id="mse-goal-recruit" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">求人実績</div><input type="number" id="mse-actual-recruit" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">売上目標</div><input type="number" id="mse-goal-sales" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">本数目標</div><input type="number" id="mse-goal-count" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">求人目標</div><input type="number" id="mse-goal-recruit" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">求人実績</div><input type="number" id="mse-actual-recruit" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">📅 翌月目標</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">📅 翌月目標</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">売上目標</div><input type="number" id="mse-next-goal-sales" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">本数目標</div><input type="number" id="mse-next-goal-count" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">求人目標</div><input type="number" id="mse-next-goal-recruit" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">売上目標</div><input type="number" id="mse-next-goal-sales" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">本数目標</div><input type="number" id="mse-next-goal-count" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">求人目標</div><input type="number" id="mse-next-goal-recruit" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
     </div>
 
     <!-- 集客タブ -->
     <div id="mse-body-route" style="display:none">
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">📣 集客経路（人数）</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">📣 集客経路（人数）</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">エステ魂</div><input type="number" id="mse-route-ekon" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">パンダ</div><input type="number" id="mse-route-panda" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">エステラブ</div><input type="number" id="mse-route-elove" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ランキング</div><input type="number" id="mse-route-rank" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ジャパン</div><input type="number" id="mse-route-japan" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ゼロツー</div><input type="number" id="mse-route-zero" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">HP</div><input type="number" id="mse-route-hp" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">SNS</div><input type="number" id="mse-route-sns" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">その他</div><input type="number" id="mse-route-other" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">エステ魂</div><input type="number" id="mse-route-ekon" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">パンダ</div><input type="number" id="mse-route-panda" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">エステラブ</div><input type="number" id="mse-route-elove" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ランキング</div><input type="number" id="mse-route-rank" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ジャパン</div><input type="number" id="mse-route-japan" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ゼロツー</div><input type="number" id="mse-route-zero" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">HP</div><input type="number" id="mse-route-hp" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">SNS</div><input type="number" id="mse-route-sns" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">その他</div><input type="number" id="mse-route-other" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">👥 集客内訳</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">👥 集客内訳</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">新規</div><input type="number" id="mse-new-cust" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">再来</div><input type="number" id="mse-repeat-cust" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">新規</div><input type="number" id="mse-new-cust" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">再来</div><input type="number" id="mse-repeat-cust" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
-      <div style="font-size:.82rem;font-weight:700;color:var(--accent);margin-bottom:.5rem">👆 指名内訳（月計）</div>
+      <div style="font-size:.8rem;font-weight:700;color:var(--accent);margin-bottom:.45rem">👆 指名内訳（月計・手動補正）</div>
+      <div style="font-size:.7rem;color:var(--text3);margin-bottom:.4rem">※自動集計がありますが手動で上書きも可能です</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.75rem">
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">フリー</div><input type="number" id="mse-shimei-free" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">ネット指名</div><input type="number" id="mse-shimei-net" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
-        <div><div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">本指名</div><input type="number" id="mse-shimei-hon" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">フリー</div><input type="number" id="mse-shimei-free" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">ネット指名</div><input type="number" id="mse-shimei-net" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
+        <div><div style="font-size:.64rem;color:var(--text3);margin-bottom:.12rem">本指名</div><input type="number" id="mse-shimei-hon" class="fi" style="font-size:.8rem;padding:.35rem .5rem"></div>
       </div>
     </div>
 
@@ -4748,18 +4973,6 @@ async function saveMonthlySales(){
   </div>
 </div>
 
-<script>
-function mseSwitchTab(tab){
-  const tabs=['daily','expense','goal','route']
-  tabs.forEach(t=>{
-    const on=t===tab
-    const btn=document.getElementById('mse-tab-'+t)
-    const body=document.getElementById('mse-body-'+t)
-    if(btn) btn.style.cssText=on?'flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)':'flex:1;padding:.42rem;font-size:.78rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
-    if(body) body.style.display=on?'block':'none'
-  })
-}
-</script>
 </body>
 </html>
 
