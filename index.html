@@ -443,10 +443,10 @@ tr:last-child td{border-bottom:none}
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
         <div style="font-size:1rem;font-weight:700">キャスト管理</div>
         <div style="display:flex;gap:.35rem">
-          <button class="btn btn-red btn-sm2" onclick="openInactiveSheet()">退店済み</button>
-          <button class="btn btn-blue btn-sm2" onclick="openStoreSettings()">⚙️ 料金設定</button>
-          <button class="btn btn-gray btn-sm2" onclick="openOwnerPinChange()">🔑 PIN変更</button>
-          <button class="btn btn-gold btn-sm2" onclick="openAddCast()">＋ 追加</button>
+          <button class="btn btn-red btn-xs" onclick="openInactiveSheet()">退店済み</button>
+          <button class="btn btn-blue btn-xs" onclick="openStoreSettings()">⚙️ 料金設定</button>
+          <button class="btn btn-gray btn-xs" onclick="openOwnerPinChange()">🔑 PIN変更</button>
+          <button class="btn btn-gold btn-xs" onclick="openAddCast()">＋ 追加</button>
         </div>
       </div>
       <div id="cast-area"><div class="spin">読み込み中...</div></div>
@@ -999,9 +999,9 @@ async function doOwnerLogin(){
   const pin=document.getElementById('owner-pin').value
   const err=document.getElementById('owner-err')
   err.textContent=''
-  const currentPin=localStorage.getItem('kyoukano_owner_pin')||OWNER_PIN_DEFAULT
+  const currentPin2=localStorage.getItem('kyoukano_owner_pin')||OWNER_PIN
   if(pin.length<1||pin.length>8){err.textContent='PINは1〜8桁で入力してください';return}
-  if(pin!==currentPin){err.textContent='PINが正しくありません';return}
+  if(pin!==currentPin2){err.textContent='PINが正しくありません';return}
   const btn=document.getElementById('btn-owner')
   btn.disabled=true; btn.textContent='確認中...'
   btn.disabled=false; btn.textContent='ログイン'
@@ -3344,12 +3344,30 @@ async function addCast(){
 }
 
 async function changePIN(castId,name){
-  const pin=prompt(name+'の新しいPIN（4桁）を入力してください')
-  if(!pin)return
-  if(pin.length!==4||isNaN(pin)){toast('PINは4桁の数字で入力してください');return}
-  const{error}=await sb.from('casts').update({pin}).eq('id',castId)
-  if(error){toast('エラーが発生しました');return}
+  // 現在のPINを取得して表示
+  const{data:castData}=await sb.from('casts').select('pin').eq('id',castId).single()
+  const currentPin=castData?.pin||'（未設定）'
+  document.getElementById('cpd-title').textContent=name+' のPIN管理'
+  document.getElementById('cpd-current-display').textContent=currentPin
+  document.getElementById('cpd-new').value=''
+  document.getElementById('cpd-confirm').value=''
+  document.getElementById('cpd-err').textContent=''
+  document.getElementById('cpd-cast-id').value=castId
+  document.getElementById('cast-pin-detail-overlay').classList.add('on')
+}
+
+async function saveCastPinDetail(){
+  const castId=document.getElementById('cpd-cast-id').value
+  const newPin=document.getElementById('cpd-new').value.trim()
+  const confirmPin=document.getElementById('cpd-confirm').value.trim()
+  const err=document.getElementById('cpd-err')
+  err.textContent=''
+  if(newPin.length!==4||isNaN(newPin)){err.textContent='PINは4桁の数字で入力してください';return}
+  if(newPin!==confirmPin){err.textContent='確認PINが一致しません';return}
+  const{error}=await sb.from('casts').update({pin:newPin}).eq('id',castId)
+  if(error){err.textContent='エラーが発生しました';return}
   toast('PINを変更しました！')
+  closeSheet('cast-pin-detail')
   loadCastMgmt()
 }
 
@@ -4033,21 +4051,6 @@ async function openRvEdit(rvId){
   const discItems=(discListAll||[]).map(d=>`<label style="display:flex;align-items:center;gap:.4rem;font-size:.88rem;padding:.2rem 0">
     <input type="checkbox" class="rve-disc" value="${d.name}" ${selectedDiscs.includes(d.name)?'checked':''} style="width:18px;height:18px;accent-color:var(--red)"> ${d.name}（-${fmt(d.amount)}）
   </label>`).join('')
-  // 延長：paymentのextCountから復元（スキーマ非依存）
-  const prevExtCount=pj.extCount||pj.ext_count||0
-  const prevExtPays=pj.extPay||[]
-  let extRowsHtml=''
-  for(let i=0;i<prevExtCount;i++){
-    const pay=prevExtPays[i]||'現金'
-    extRowsHtml+=`<div class="rve-ext-row" style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem">
-      <span style="color:var(--blue);min-width:60px">延長${i+1}回目</span>
-      <select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">
-        <option value="現金" ${pay==='現金'?'selected':''}>💴現金</option>
-        <option value="カード" ${pay==='カード'?'selected':''}>💳カード</option>
-      </select>
-      <button onclick="this.closest('.rve-ext-row').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>
-    </div>`
-  }
   document.getElementById('rv-detail-body').innerHTML=`
     <div style="display:flex;flex-direction:column;gap:.55rem">
       <div><div class="fi-lbl">お客様名</div><input class="fi" id="rve-name" value="${r.customer_name||''}"></div>
@@ -4095,7 +4098,7 @@ async function openRvEdit(rvId){
       </div>`:''}
       <div>
         <div class="fi-lbl" style="color:var(--blue)">延長</div>
-        <div id="rve-ext-area">${extRowsHtml}</div>
+        <div id="rve-ext-area">${buildExtRows(pj)}</div>
         <button class="btn btn-gray" style="width:100%;font-size:.82rem;margin-top:.3rem" onclick="rveAddExt()">＋ 延長を追加</button>
       </div>
       ${discItems?`<div><div class="fi-lbl">割引</div>${discItems}</div>`:''}
@@ -4105,20 +4108,6 @@ async function openRvEdit(rvId){
         <button class="btn btn-gray" onclick="backToShiftReservations()">← 一覧に戻る</button>
       </div>
     </div>`
-}
-
-function rveAddExt(){
-  const area=document.getElementById('rve-ext-area'); if(!area) return
-  const idx=area.querySelectorAll('.rve-ext-row').length+1
-  const div=document.createElement('div')
-  div.className='rve-ext-row'
-  div.style.cssText='display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem'
-  div.innerHTML=`<span style="color:var(--blue);min-width:60px">延長${idx}回目</span>
-    <select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">
-      <option value="現金">💴現金</option><option value="カード">💳カード</option>
-    </select>
-    <button onclick="this.closest('.rve-ext-row').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>`
-  area.appendChild(div)
 }
 
 async function saveRvEdit(rvId){
@@ -4135,7 +4124,6 @@ async function saveRvEdit(rvId){
   const payShimei=document.getElementById('rve-pay-shimei')?.value||'現金'
   const payOpt=document.getElementById('rve-pay-opt')?.value||'現金'
   const note=document.getElementById('rve-note').value.trim()
-  // 延長情報をpaymentに含める（ext_countカラム不要）
   const extPays=[...document.querySelectorAll('.rve-ext-pay')].map(s=>s.value)
   const payment=JSON.stringify({course:payCourse,shimei:payShimei,option:payOpt,extPay:extPays,extCount:extPays.length})
   const{error}=await sb.from('reservations').update({
@@ -4401,7 +4389,7 @@ async function renderMonthlyContent(){
     const cardFee=Math.floor(card*0.1)
     const profit=gross_work-net-misc
     const attendance=dayWorks.length
-    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,shimei:rvNet+rvHon,newCount,repeatCount})
+    dailyRows.push({day,dow,dateStr,gross,gross_work,disc,net,misc,profit,card,cash,cardFee,count,attendance,free:rvFree,net_shimei:rvNet,hon_shimei:rvHon,newCount,repeatCount})
   }
 
   const vr=dailyRows.filter(r=>!r.noData)
@@ -4413,8 +4401,7 @@ async function renderMonthlyContent(){
     cardFee:vr.reduce((s,r)=>s+(r.cardFee||0),0),count:vr.reduce((s,r)=>s+(r.count||0),0),
     attendance:vr.reduce((s,r)=>s+(r.attendance||0),0),free:vr.reduce((s,r)=>s+(r.free||0),0),
     net_shimei:vr.reduce((s,r)=>s+(r.net_shimei||0),0),hon_shimei:vr.reduce((s,r)=>s+(r.hon_shimei||0),0),
-    shimei:vr.reduce((s,r)=>s+(r.shimei||0),0),newCount:vr.reduce((s,r)=>s+(r.newCount||0),0),
-    repeatCount:vr.reduce((s,r)=>s+(r.repeatCount||0),0),
+    newCount:vr.reduce((s,r)=>s+(r.newCount||0),0),repeatCount:vr.reduce((s,r)=>s+(r.repeatCount||0),0),
   }
   tot.avg_unit=tot.count>0?Math.round(tot.gross_work/tot.count):0
 
@@ -4489,77 +4476,62 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
   area.innerHTML=html
 }
 
-// ── 日別テーブル：スマホ対応2段レイアウト ──
+// ── 日別テーブル：横スクロール1テーブル（スマホ対応・全列表示） ──
 function renderMonthlyDaily(area,dailyRows,tot){
   const N=n=>(n||0).toLocaleString()
-  const fmt2=n=>n!=null?'¥'+Number(n).toLocaleString():'-'
-  // 上段：日付・総売上・純売上・割引・委託金・粗利
-  // 下段（別テーブル）：日付・現金・カード・件数・フリー・ネット・本指名
-  const row1=r=>{
+  // カラム定義：幅を詰めてスマホでも全列表示できるように
+  const cols=[
+    {l:'日付',w:'46px',align:'left',sticky:true},
+    {l:'総売上',w:'58px'},{l:'純売上',w:'58px'},{l:'割引',w:'44px'},
+    {l:'委託',w:'52px'},{l:'粗利',w:'52px'},{l:'現金',w:'52px'},
+    {l:'カード',w:'52px',color:'#1565c0'},{l:'件',w:'26px'},
+    {l:'F',w:'24px'},{l:'ネット',w:'36px'},{l:'本指',w:'30px'}
+  ]
+
+  const thStyle=(c,i)=>`padding:.28rem ${i===0?.28:.18}rem;text-align:${c.align||'right'};font-size:.62rem;white-space:nowrap;background:var(--surface2);${c.sticky?'position:sticky;left:0;z-index:2;':''}${c.color?'color:'+c.color:''}`
+  const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thStyle(c,i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
+
+  const makeRow=r=>{
+    const sticky=`padding:.22rem .28rem;position:sticky;left:0;background:var(--surface);font-size:.65rem;font-weight:600;white-space:nowrap;z-index:1`
     if(r.noData){
       return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
-        <td style="padding:.22rem .3rem;position:sticky;left:0;background:var(--surface);font-size:.68rem;font-weight:600;white-space:nowrap">${r.day}(${r.dow})</td>
-        <td colspan="5" style="text-align:right;font-size:.62rem;padding:.22rem">—</td></tr>`
+        <td style="${sticky}">${r.day}(${r.dow})</td>
+        <td colspan="11" style="text-align:right;padding:.22rem .18rem;font-size:.6rem">—</td></tr>`
     }
+    const td=(v,color='',bold=false)=>`<td style="text-align:right;padding:.22rem .18rem;font-size:.65rem;${color?'color:'+color:''}${bold?';font-weight:700':''}">${v}</td>`
     return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:.22rem .3rem;position:sticky;left:0;background:var(--surface);font-size:.68rem;font-weight:600;white-space:nowrap">${r.day}(${r.dow})</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${N(r.gross)}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${N(r.gross_work)}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem;color:#c62828">${r.disc>0?N(r.disc):'0'}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${N(r.net)}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem;font-weight:600">${N(r.profit)}</td>
-    </tr>`
-  }
-  const row2=r=>{
-    if(r.noData){
-      return `<tr style="border-bottom:1px solid var(--border);color:var(--text3)">
-        <td style="padding:.22rem .3rem;position:sticky;left:0;background:var(--surface);font-size:.68rem;font-weight:600;white-space:nowrap">${r.day}</td>
-        <td colspan="5" style="text-align:right;font-size:.62rem;padding:.22rem"></td></tr>`
-    }
-    return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:.22rem .3rem;position:sticky;left:0;background:var(--surface);font-size:.68rem;font-weight:600;white-space:nowrap">${r.day}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${N(r.cash)}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem;color:#1565c0">${N(r.card)}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${r.count||0}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${r.free||0}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${r.net_shimei||0}</td>
-      <td style="text-align:right;padding:.22rem .2rem;font-size:.68rem">${r.hon_shimei||0}</td>
+      <td style="${sticky}">${r.day}(${r.dow})</td>
+      ${td(N(r.gross))}${td(N(r.gross_work))}${td(r.disc>0?N(r.disc):'0','#c62828')}
+      ${td(N(r.net))}${td(N(r.profit),'',true)}${td(N(r.cash))}
+      ${td(N(r.card),'#1565c0')}${td(r.count||0)}
+      ${td(r.free||0)}${td(r.net_shimei||0)}${td(r.hon_shimei||0)}
     </tr>`
   }
 
-  const th=(cols,sticky=true)=>`<tr style="background:var(--surface2)">${cols.map((c,i)=>`<th style="padding:.28rem ${i===0?.3:.2}rem;text-align:${i===0?'left':'right'};font-size:.66rem;white-space:nowrap;${i===0&&sticky?'position:sticky;left:0;z-index:2;background:var(--surface2)':''}">${c}</th>`).join('')}</tr>`
-
-  const totRow1=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.68rem">
-    <td style="padding:.28rem .3rem;position:sticky;left:0;background:var(--surface2)">合計</td>
-    <td style="text-align:right;padding:.28rem .2rem">${N(tot.gross)}</td>
-    <td style="text-align:right;padding:.28rem .2rem">${N(tot.gross_work)}</td>
-    <td style="text-align:right;padding:.28rem .2rem;color:#c62828">${tot.disc>0?N(tot.disc):'0'}</td>
-    <td style="text-align:right;padding:.28rem .2rem">${N(tot.net)}</td>
-    <td style="text-align:right;padding:.28rem .2rem">${N(tot.profit)}</td>
-  </tr>`
-  const totRow2=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.68rem">
-    <td style="padding:.28rem .3rem;position:sticky;left:0;background:var(--surface2)">合計</td>
-    <td style="text-align:right;padding:.28rem .2rem">${N(tot.cash)}</td>
-    <td style="text-align:right;padding:.28rem .2rem;color:#1565c0">${N(tot.card)}</td>
-    <td style="text-align:right;padding:.28rem .2rem">${tot.count}</td>
-    <td style="text-align:right;padding:.28rem .2rem">${tot.free}</td>
-    <td style="text-align:right;padding:.28rem .2rem">${tot.net_shimei}</td>
-    <td style="text-align:right;padding:.28rem .2rem">${tot.hon_shimei}</td>
+  const totRow=`<tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.65rem">
+    <td style="padding:.28rem .28rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
+    <td style="text-align:right;padding:.28rem .18rem">${N(tot.gross)}</td>
+    <td style="text-align:right;padding:.28rem .18rem">${N(tot.gross_work)}</td>
+    <td style="text-align:right;padding:.28rem .18rem;color:#c62828">${tot.disc>0?N(tot.disc):'0'}</td>
+    <td style="text-align:right;padding:.28rem .18rem">${N(tot.net)}</td>
+    <td style="text-align:right;padding:.28rem .18rem;font-weight:700">${N(tot.profit)}</td>
+    <td style="text-align:right;padding:.28rem .18rem">${N(tot.cash)}</td>
+    <td style="text-align:right;padding:.28rem .18rem;color:#1565c0">${N(tot.card)}</td>
+    <td style="text-align:right;padding:.28rem .18rem">${tot.count}</td>
+    <td style="text-align:right;padding:.28rem .18rem">${tot.free}</td>
+    <td style="text-align:right;padding:.28rem .18rem">${tot.net_shimei}</td>
+    <td style="text-align:right;padding:.28rem .18rem">${tot.hon_shimei}</td>
   </tr>`
 
-  area.innerHTML=`
-  <div style="font-size:.72rem;font-weight:700;color:var(--text3);margin-bottom:.25rem">① 売上・委託</div>
-  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid var(--border);margin-bottom:.65rem">
-    <table style="width:100%;border-collapse:collapse;min-width:340px">
-      <thead>${th(['日付','総売上','純売上','割引','委託金','粗利'])}</thead>
-      <tbody>${dailyRows.map(row1).join('')}${totRow1}</tbody>
-    </table>
-  </div>
-  <div style="font-size:.72rem;font-weight:700;color:var(--text3);margin-bottom:.25rem">② 現金・カード・指名</div>
-  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid var(--border)">
-    <table style="width:100%;border-collapse:collapse;min-width:320px">
-      <thead>${th(['日','現金','カード','件数','フリー','ネット','本指名'])}</thead>
-      <tbody>${dailyRows.map(row2).join('')}${totRow2}</tbody>
+  // 凡例
+  const legend=`<div style="display:flex;gap:.8rem;font-size:.62rem;color:var(--text3);margin-bottom:.3rem;flex-wrap:wrap">
+    <span>F=フリー</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>委=委託金</span>
+  </div>`
+
+  area.innerHTML=legend+`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid var(--border)">
+    <table style="width:100%;border-collapse:collapse;min-width:480px">
+      ${thead}
+      <tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody>
     </table>
   </div>`
 }
@@ -4784,6 +4756,40 @@ function mseSwitchTab(tab){
   })
 }
 
+// ── 延長行HTML生成（ネストしたテンプレートリテラル回避） ──
+function buildExtRows(pj){
+  const extCount=pj.extCount||pj.ext_count||0
+  const extPays=pj.extPay||[]
+  let rows=''
+  for(let i=0;i<extCount;i++){
+    const pay=extPays[i]||'現金'
+    rows+='<div class="rve-ext-row" style="display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem">'
+    rows+='<span style="color:var(--blue);min-width:60px">延長'+(i+1)+'回目</span>'
+    rows+='<select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">'
+    rows+='<option value="現金" '+(pay==='現金'?'selected':'')+'>💴現金</option>'
+    rows+='<option value="カード" '+(pay==='カード'?'selected':'')+'>💳カード</option>'
+    rows+='</select>'
+    rows+='<button onclick="this.closest(\'.rve-ext-row\').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>'
+    rows+='</div>'
+  }
+  return rows
+}
+
+// ── rveAddExt ──
+function rveAddExt(){
+  const area=document.getElementById('rve-ext-area'); if(!area) return
+  const idx=area.querySelectorAll('.rve-ext-row').length+1
+  const div=document.createElement('div')
+  div.className='rve-ext-row'
+  div.style.cssText='display:flex;align-items:center;gap:.5rem;padding:.2rem 0;font-size:.88rem'
+  div.innerHTML=`<span style="color:var(--blue);min-width:60px">延長${idx}回目</span>
+    <select class="rve-ext-pay fi" style="width:80px;padding:.3rem .4rem;font-size:.82rem">
+      <option value="現金">💴現金</option><option value="カード">💳カード</option>
+    </select>
+    <button onclick="this.closest('.rve-ext-row').remove()" style="background:none;border:none;color:var(--text3);font-size:1rem;cursor:pointer">✕</button>`
+  area.appendChild(div)
+}
+
 // ── 店舗PIN変更 ──
 function openOwnerPinChange(){
   document.getElementById('owner-pin-change-overlay').classList.add('on')
@@ -4799,13 +4805,12 @@ function saveOwnerPin(){
   const new2=document.getElementById('opc-new2').value
   const err=document.getElementById('opc-err')
   err.textContent=''
-  if(current!==OWNER_PIN){err.textContent='現在のPINが正しくありません';return}
+  const storedPin=localStorage.getItem('kyoukano_owner_pin')||OWNER_PIN_DEFAULT
+  if(current!==storedPin){err.textContent='現在のPINが正しくありません';return}
   if(new1.length<1||new1.length>8||!/^\d+$/.test(new1)){err.textContent='新しいPINは1〜8桁の数字で入力してください';return}
   if(new1!==new2){err.textContent='新しいPINが一致しません';return}
-  // PINはHTML内の定数なので変更後にリロードが必要な旨を伝える
-  // 実用上はlocalStorageに保存
   localStorage.setItem('kyoukano_owner_pin',new1)
-  toast('PINを変更しました。次回ログインから新しいPINが有効です。')
+  toast('PINを変更しました。次回ログインから有効です。')
   closeSheet('owner-pin-change')
 }
 
@@ -4920,24 +4925,43 @@ init()
     <div class="sheet-bar"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
       <div class="sheet-title" style="margin:0">🔑 店舗PINを変更</div>
-      <button class="btn btn-gray btn-sm2" onclick="closeSheet('owner-pin-change')">✕ 閉じる</button>
+      <button class="btn btn-gray btn-sm2" onclick="closeSheet('owner-pin-change')">✕</button>
     </div>
-    <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">現在のPINを入力してから、新しいPINを設定してください（1〜8桁の数字）</div>
-    <div style="margin-bottom:.65rem">
-      <div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">現在のPIN</div>
-      <input type="password" id="opc-current" class="fi" maxlength="8" inputmode="numeric" placeholder="現在のPINを入力">
-    </div>
-    <div style="margin-bottom:.65rem">
-      <div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（1〜8桁）</div>
-      <input type="password" id="opc-new1" class="fi" maxlength="8" inputmode="numeric" placeholder="新しいPINを入力">
-    </div>
-    <div style="margin-bottom:.75rem">
-      <div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（確認）</div>
-      <input type="password" id="opc-new2" class="fi" maxlength="8" inputmode="numeric" placeholder="もう一度入力">
-    </div>
+    <div style="font-size:.8rem;color:var(--text3);margin-bottom:1rem">現在のPINを確認してから新しいPINを設定（1〜8桁）</div>
+    <div style="margin-bottom:.65rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">現在のPIN</div>
+      <input type="password" id="opc-current" class="fi" maxlength="8" inputmode="numeric" placeholder="現在のPINを入力"></div>
+    <div style="margin-bottom:.65rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（1〜8桁）</div>
+      <input type="password" id="opc-new1" class="fi" maxlength="8" inputmode="numeric" placeholder="新しいPINを入力"></div>
+    <div style="margin-bottom:.75rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（確認）</div>
+      <input type="password" id="opc-new2" class="fi" maxlength="8" inputmode="numeric" placeholder="もう一度入力"></div>
     <div id="opc-err" style="color:#c62828;font-size:.82rem;margin-bottom:.5rem"></div>
     <button class="btn btn-gold" style="width:100%" onclick="saveOwnerPin()">🔑 PINを変更する</button>
     <button class="btn btn-gray" style="width:100%;margin-top:.5rem" onclick="closeSheet('owner-pin-change')">閉じる</button>
+  </div>
+</div>
+
+<!-- ===== キャストPIN詳細シート ===== -->
+<div class="sheet-overlay" id="cast-pin-detail-overlay">
+  <div class="sheet">
+    <div class="sheet-bar"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+      <div class="sheet-title" id="cpd-title" style="margin:0">PIN管理</div>
+      <button class="btn btn-gray btn-sm2" onclick="closeSheet('cast-pin-detail')">✕</button>
+    </div>
+    <input type="hidden" id="cpd-cast-id">
+    <!-- 現在のPIN表示 -->
+    <div style="background:var(--surface2);border-radius:12px;padding:.75rem 1rem;margin-bottom:1rem;text-align:center">
+      <div style="font-size:.75rem;color:var(--text3);margin-bottom:.3rem">現在のPIN</div>
+      <div id="cpd-current-display" style="font-size:2rem;font-weight:700;letter-spacing:.25em;color:var(--accent)">----</div>
+    </div>
+    <div style="font-size:.82rem;font-weight:700;color:var(--text2);margin-bottom:.75rem">PINを変更する</div>
+    <div style="margin-bottom:.65rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">新しいPIN（4桁）</div>
+      <input type="password" id="cpd-new" class="fi" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+    <div style="margin-bottom:.75rem"><div style="font-size:.78rem;color:var(--text3);margin-bottom:.25rem">確認</div>
+      <input type="password" id="cpd-confirm" class="fi" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+    <div id="cpd-err" style="color:#c62828;font-size:.82rem;margin-bottom:.5rem"></div>
+    <button class="btn btn-gold" style="width:100%" onclick="saveCastPinDetail()">💾 変更する</button>
+    <button class="btn btn-gray" style="width:100%;margin-top:.5rem" onclick="closeSheet('cast-pin-detail')">閉じる</button>
   </div>
 </div>
 
