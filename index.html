@@ -50,7 +50,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;fon
 .back-btn{background:none;border:none;font-size:1.5rem;cursor:pointer;color:var(--text3);padding:.2rem .5rem;margin-bottom:1.5rem;display:block}
 
 /* APP SHELL */
-.app-hdr{background:var(--marble) center/cover;border-bottom:1px solid rgba(255,255,255,0.3);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.app-hdr{background:#faf6f0;border-bottom:1px solid #e8dcc8;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
 .app-logo{font-family:Georgia,serif;font-size:.68rem;letter-spacing:.1em;color:var(--accent);line-height:1.3;max-width:120px}
 .hdr-r{display:flex;align-items:center;gap:.3rem;flex-shrink:0}
 .badge{font-size:.65rem;padding:2px 7px;border-radius:99px;background:rgba(255,255,255,0.85);color:var(--accent);font-weight:600;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis}
@@ -424,12 +424,12 @@ tr:last-child td{border-bottom:none}
         <div style="flex:1;text-align:center;font-size:.95rem;font-weight:700" id="monthly-title">-</div>
         <button class="cal-nav-btn" onclick="monthlyMove(1)">›</button>
       </div>
-      <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.6rem;gap:3px">
-        <button id="monthly-tab-summary" onclick="monthlyTabSwitch('summary')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)">📊 月まとめ</button>
-        <button id="monthly-tab-daily" onclick="monthlyTabSwitch('daily')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">📅 日別</button>
-        <button id="monthly-tab-cast" onclick="monthlyTabSwitch('cast')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">👤 キャスト</button>
-        <button id="monthly-tab-expense" onclick="monthlyTabSwitch('expense')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">💸 経費</button>
-        <button id="monthly-tab-chart" onclick="monthlyTabSwitch('chart')" style="flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">🥧 グラフ</button>
+      <div style="display:flex;background:var(--surface2);border-radius:var(--r);padding:3px;margin-bottom:.6rem;gap:2px;overflow:hidden">
+        <button id="monthly-tab-summary" onclick="monthlyTabSwitch('summary')" style="flex:1;padding:.35rem .1rem;font-size:.6rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh);white-space:nowrap">📊月まとめ</button>
+        <button id="monthly-tab-daily" onclick="monthlyTabSwitch('daily')" style="flex:1;padding:.35rem .1rem;font-size:.6rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3);white-space:nowrap">📅日別</button>
+        <button id="monthly-tab-cast" onclick="monthlyTabSwitch('cast')" style="flex:1;padding:.35rem .1rem;font-size:.6rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3);white-space:nowrap">👤キャスト</button>
+        <button id="monthly-tab-expense" onclick="monthlyTabSwitch('expense')" style="flex:1;padding:.35rem .1rem;font-size:.6rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3);white-space:nowrap">💸経費</button>
+        <button id="monthly-tab-chart" onclick="monthlyTabSwitch('chart')" style="flex:1;padding:.35rem .1rem;font-size:.6rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3);white-space:nowrap">🥧グラフ</button>
       </div>
       <div id="monthly-area"><div class="spin">読み込み中...</div></div>
     </div>
@@ -791,6 +791,23 @@ tr:last-child td{border-bottom:none}
       <div class="fee-row"><div class="fee-lbl">衣装チェンジ②</div><input type="number" class="fee-input" id="st-op3" min="0" step="100"><span class="fee-unit">円</span></div>
     </div>
     <button class="btn btn-gold btn-full" onclick="saveStoreSettings()" id="btn-save-store">保存する</button>
+    <!-- PIN管理 -->
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.75rem">
+      <div class="fee-sec-title">🔑 店舗PINの確認・変更</div>
+      <div style="background:var(--surface2);border-radius:var(--rs);padding:.75rem;margin-bottom:.6rem;display:flex;align-items:center;justify-content:space-between">
+        <div style="font-size:.75rem;color:var(--text3)">現在の店舗PIN</div>
+        <div id="current-owner-pin-display" style="font-size:1.5rem;font-weight:700;letter-spacing:.25em;color:var(--accent);font-family:monospace"></div>
+      </div>
+      <div class="fg"><label>新しい店舗PIN（1〜8桁の数字）</label>
+        <input type="number" class="fi2" id="new-owner-pin" maxlength="8" inputmode="numeric" placeholder="新しいPINを入力">
+      </div>
+      <button class="btn btn-ghost btn-full" onclick="changeOwnerPinFromSheet()" style="margin-bottom:.25rem">店舗PINを変更する</button>
+    </div>
+    <!-- キャストPIN一覧 -->
+    <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.75rem">
+      <div class="fee-sec-title">👥 キャストPIN一覧（店舗のみ閲覧可）</div>
+      <div id="cast-pin-list" style="font-size:.82rem;margin-top:.4rem"></div>
+    </div>
     <div style="border-top:1px solid var(--border);padding-top:.75rem;margin-top:.75rem">
       <div class="fee-sec-title">🏷️ 店舗共通割引設定</div>
       <div style="font-size:.72rem;color:var(--text3);margin-bottom:.5rem">全キャスト共通の割引を登録。各セラピストの委託金設定で「店落ち/委託金」を選択できます。</div>
@@ -895,7 +912,7 @@ tr:last-child td{border-bottom:none}
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 const SUPABASE_URL = 'https://qgcgkrcrfzonmmygcdju.supabase.co'
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE'
-const OWNER_PIN = '2580'
+const OWNER_PIN = localStorage.getItem('kyoukano_owner_pin') || '2580'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
@@ -2325,25 +2342,28 @@ async function loadOwnerCal(){
       const sstart=s.start_time?.slice(0,5)||'13:00'
       const send=s.end_time?.slice(0,5)||'22:00'
       const snote=(s.note||'').replace(/'/g,"\\'")
-      html+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
+      html+=`<div id="pending-item-${sid}" style="padding:.4rem 0;border-bottom:1px solid var(--border)">
         <div style="margin-bottom:.3rem">
           <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
           <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${sstart}〜${send}</span>
           ${s.note?`<div style="font-size:.7rem;color:var(--text3)">${s.note}</div>`:''}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.35rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.4rem">
           <button class="btn btn-green btn-xs" onclick="approveShift(${sid})">✓ 承認</button>
           <button class="btn btn-red btn-xs" onclick="rejectShift(${sid})">✕ 却下</button>
           <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${sid},'${sname}','${date}','${sstart}','${send}','${snote}')">訂正</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.25rem">
-          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'堀田Aルーム')">堀田Aルーム</button>
-          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'堀田Bルーム')">堀田Bルーム</button>
+        <div style="font-size:.67rem;color:var(--text3);margin-bottom:.25rem">ルームを選んで確定ボタンを押してください：</div>
+        <div id="room-selected-${sid}" style="font-size:.72rem;font-weight:600;color:var(--accent);margin-bottom:.3rem;min-height:1em"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.28rem;margin-bottom:.28rem">
+          <button id="rb-${sid}-A" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp(${sid},'堀田Aルーム')">堀田Aルーム</button>
+          <button id="rb-${sid}-B" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp(${sid},'堀田Bルーム')">堀田Bルーム</button>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
-          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'堀田Cルーム')">堀田Cルーム</button>
-          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'金山ルーム')">金山ルーム</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.28rem;margin-bottom:.35rem">
+          <button id="rb-${sid}-C" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp(${sid},'堀田Cルーム')">堀田Cルーム</button>
+          <button id="rb-${sid}-D" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp(${sid},'金山ルーム')">金山ルーム</button>
         </div>
+        <button id="rb-confirm-${sid}" class="btn btn-gold btn-xs btn-full" style="display:none" onclick="confirmRoomAssign(${sid})">✔ 振り分けを確定する</button>
       </div>`
     })
     html+=`</div>`
@@ -2377,22 +2397,25 @@ async function ownerSelectDay(ds){
       const send=(s.end_time||'').slice(0,5)||'22:00'
       const snote=s.note||''
       const stime=sstart+'〜'+send
-      html+='<div class="item" style="flex-direction:column;align-items:stretch;gap:.4rem;margin-bottom:.5rem">'
-      html+='<div><div style="font-size:.92rem;font-weight:600">'+sname+'</div>'
+      html+='<div id="pending-item-'+sid+'" style="background:var(--surface);border-radius:var(--r);padding:.85rem 1rem;box-shadow:var(--sh);margin-bottom:.5rem">'
+      html+='<div style="margin-bottom:.35rem"><div style="font-size:.92rem;font-weight:600">'+sname+'</div>'
       html+='<div style="font-size:.78rem;color:var(--text3)">'+stime+(snote?' / '+snote:'')+'</div></div>'
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.3rem">'
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.4rem">'
       html+='<button class="btn btn-green btn-xs" onclick="approveShift('+sid+');closeSheet(\'owner-shift-detail\')">✓ 承認</button>'
       html+='<button class="btn btn-red btn-xs" onclick="rejectShift('+sid+');closeSheet(\'owner-shift-detail\')">✕ 却下</button>'
       html+='<button class="btn btn-gray btn-xs" onclick="openShiftEdit('+sid+',\''+sname+'\',\''+ds+'\',\''+sstart+'\',\''+send+'\',\''+snote+'\')">訂正</button>'
       html+='</div>'
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.25rem">'
-      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'堀田Aルーム\')">堀田Aルーム</button>'
-      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'堀田Bルーム\')">堀田Bルーム</button>'
+      html+='<div style="font-size:.67rem;color:var(--text3);margin-bottom:.25rem">ルームを選んで確定ボタンを押してください：</div>'
+      html+='<div id="room-selected-'+sid+'" style="font-size:.72rem;font-weight:600;color:var(--accent);margin-bottom:.3rem;min-height:1em"></div>'
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.28rem;margin-bottom:.28rem">'
+      html+='<button id="rb-'+sid+'-A" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp('+sid+',\'堀田Aルーム\')">堀田Aルーム</button>'
+      html+='<button id="rb-'+sid+'-B" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp('+sid+',\'堀田Bルーム\')">堀田Bルーム</button>'
       html+='</div>'
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">'
-      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'堀田Cルーム\')">堀田Cルーム</button>'
-      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'金山ルーム\')">金山ルーム</button>'
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.28rem;margin-bottom:.35rem">'
+      html+='<button id="rb-'+sid+'-C" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp('+sid+',\'堀田Cルーム\')">堀田Cルーム</button>'
+      html+='<button id="rb-'+sid+'-D" class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="selectRoomTemp('+sid+',\'金山ルーム\')">金山ルーム</button>'
       html+='</div>'
+      html+='<button id="rb-confirm-'+sid+'" class="btn btn-gold btn-xs btn-full" style="display:none" onclick="confirmRoomAssign('+sid+')">✔ 振り分けを確定する</button>'
       html+='</div>'
     })
   }
@@ -2433,14 +2456,33 @@ async function ownerSelectDay(ds){
 }
 
 // ルームボタンから直接ルーム割り当て（承認待ちシフトに対して）
-async function assignRoomFromList(shiftId, roomName){
-  // 承認とルーム設定を同時に行う
+// 仮ルーム選択（ボタン押下時）
+const _tempRoomMap = {}
+function selectRoomTemp(shiftId, roomName){
+  _tempRoomMap[shiftId] = roomName
+  const lbl = document.getElementById('room-selected-'+shiftId)
+  if(lbl) lbl.textContent = '▶ ' + roomName + ' を選択中'
+  const keys = {A:'堀田Aルーム',B:'堀田Bルーム',C:'堀田Cルーム',D:'金山ルーム'}
+  Object.entries(keys).forEach(([k,v])=>{
+    const btn = document.getElementById('rb-'+shiftId+'-'+k)
+    if(!btn) return
+    btn.style.cssText = v===roomName
+      ? 'background:#b8893a;border:1.5px solid #b8893a;color:#fff;font-weight:700'
+      : 'background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600'
+  })
+  const confirmBtn = document.getElementById('rb-confirm-'+shiftId)
+  if(confirmBtn) confirmBtn.style.display='block'
+}
+
+async function confirmRoomAssign(shiftId){
+  const roomName = _tempRoomMap[shiftId]
+  if(!roomName){toast('ルームを選択してください');return}
   const{error}=await sb.from('shifts').update({status:'approved',room:roomName}).eq('id',shiftId)
   if(error){toast('エラー: '+error.message);return}
+  delete _tempRoomMap[shiftId]
   toast(roomName+'に振り分けました')
   loadOwnerCal()
-  // 本日のシフトなら本日ページも更新
-  const shift=ownerShiftData.pending.find(s=>s.id===shiftId)
+  const shift=(ownerShiftData.pending||[]).find(s=>s.id===shiftId)
   if(shift&&shift.date===today()){loadToday()}
 }
 
@@ -3760,6 +3802,35 @@ async function openStoreSettings(){
     const shEl=document.getElementById('st-shimei-hon');if(shEl) shEl.value=ss.shimei_hon||2000
   }
   document.getElementById('store-overlay').classList.add('on')
+  // 店舗PINを表示
+  const pinDisp = document.getElementById('current-owner-pin-display')
+  if(pinDisp) pinDisp.textContent = OWNER_PIN
+  // キャストPIN一覧を表示
+  const cpList = document.getElementById('cast-pin-list')
+  if(cpList){
+    const{data:castPins}=await sb.from('casts').select('id,name,pin').eq('active',true).order('sort_order')
+    if(castPins&&castPins.length){
+      cpList.innerHTML = castPins.map(c=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border)"><span style="font-weight:600">${c.name}</span><span style="font-family:monospace;font-size:1rem;letter-spacing:.12em;color:var(--text2);font-weight:700">${c.pin||'—'}</span></div>`).join('')
+    } else {
+      cpList.innerHTML = '<div class="empty" style="padding:.5rem 0">キャストが登録されていません</div>'
+    }
+  }
+}
+
+// 料金設定シートからオーナーPINを変更
+function changeOwnerPinFromSheet(){
+  const input = document.getElementById('new-owner-pin')
+  const pin = String(input.value).trim()
+  if(!pin || pin.length < 1 || pin.length > 8 || !/^\d+$/.test(pin)){
+    toast('PINは1〜8桁の数字で入力してください'); return
+  }
+  // localStorageに保存（リロード後も有効にするためページにも反映）
+  localStorage.setItem('kyoukano_owner_pin', pin)
+  // ページ変数も更新（ただしconst宣言のため再代入できない→保存はlocalStorageのみ）
+  input.value = ''
+  const pinDisp = document.getElementById('current-owner-pin-display')
+  if(pinDisp) pinDisp.textContent = pin
+  toast('店舗PINを変更しました。次回ログインから有効です。')
 }
 
 async function saveStoreSettings(){
@@ -4319,8 +4390,8 @@ function monthlyMove(d){ monthlyMonth=addMonth(monthlyMonth,d); monthlyCachedDat
 
 function monthlyTabSwitch(mode){
   monthlyTabMode=mode
-  const on='flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh)'
-  const off='flex:1;padding:.4rem;font-size:.7rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)'
+  const on='flex:1;padding:.35rem .1rem;font-size:.6rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:var(--surface);color:var(--accent);box-shadow:var(--sh);white-space:nowrap'
+  const off='flex:1;padding:.35rem .1rem;font-size:.6rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3);white-space:nowrap'
   ;['summary','daily','cast','expense','chart'].forEach(t=>{
     const btn=document.getElementById('monthly-tab-'+t)
     if(btn) btn.style.cssText=t===mode?on:off
@@ -4544,38 +4615,39 @@ function renderMonthlyDaily(area,dailyRows,tot){
 function renderMonthlyCast(area,castStats,fmt2){
   if(!castStats||!Object.keys(castStats).length){area.innerHTML='<div class="empty">この月の記録はありません</div>';return}
   const rows=Object.entries(castStats).map(([name,s])=>({name,total:s.count||0,free:s.free||0,net_shimei:s.net_shimei||0,hon_shimei:s.hon_shimei||0,sales:s.sales||0,net:s.net||0,hosho:s.hosho||0})).sort((a,b)=>b.sales-a.sales)
-  const colW='width:11.5%;min-width:52px'
-  const wBg='background:#fff;border-radius:6px;padding:.28rem .2rem;text-align:center;font-size:.72rem;'
-  const th=(l)=>`<th style="padding:.35rem .2rem;text-align:center;font-size:.66rem;${colW};background:var(--surface2)">${l}</th>`
-  const cell=(v,bold=false,col='')=>`<td style="padding:.2rem .15rem;text-align:center"><div style="${wBg}${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
+  const wBg='background:#fff;border-radius:6px;padding:.28rem .15rem;text-align:center;font-size:.68rem;'
+  const thS='padding:.3rem .1rem;text-align:center;font-size:.6rem;background:var(--surface2);width:52px'
+  const thM='padding:.3rem .1rem;text-align:center;font-size:.6rem;background:var(--surface2);width:72px'
+  const th=(l,w='n')=>`<th style="${w==='m'?thM:thS}">${l}</th>`
+  const cell=(v,bold=false,col='')=>`<td style="padding:.15rem .08rem;text-align:center"><div style="${wBg}${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
   const totSales=rows.reduce((s,r)=>s+r.sales,0),totNet=rows.reduce((s,r)=>s+r.net,0),totHosho=rows.reduce((s,r)=>s+r.hosho,0),totTotal=rows.reduce((s,r)=>s+r.total,0),totFree=rows.reduce((s,r)=>s+r.free,0),totNetS=rows.reduce((s,r)=>s+r.net_shimei,0),totHon=rows.reduce((s,r)=>s+r.hon_shimei,0)
   let html=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--border)">
-    <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.72rem">
+    <table style="width:100%;border-collapse:collapse;font-size:.68rem">
       <thead><tr style="background:var(--surface2)">
-        <th style="padding:.35rem .4rem;text-align:left;font-size:.66rem;width:18%;position:sticky;left:0;z-index:2;background:var(--surface2)">キャスト</th>
-        ${th('総本数')}${th('フリー')}${th('ネット')}${th('本指')}${th('売上')}${th('委託金')}${th('保証')}
+        <th style="padding:.3rem .35rem;text-align:left;font-size:.6rem;position:sticky;left:0;z-index:2;background:var(--surface2);min-width:60px">キャスト</th>
+        ${th('総本数')}${th('フリー')}${th('ネット')}${th('本指')}${th('売上','m')}${th('委託金','m')}${th('保証','m')}
       </tr></thead>
       <tbody>
         ${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
-          <td style="padding:.3rem .4rem;position:sticky;left:0;background:#faf6f0;font-weight:600;font-size:.72rem;white-space:nowrap;z-index:1">${r.name}</td>
+          <td style="padding:.25rem .35rem;position:sticky;left:0;background:#faf6f0;font-weight:600;font-size:.7rem;white-space:nowrap;z-index:1">${r.name}</td>
           ${cell(r.total,true)}${cell(r.free)}${cell(r.net_shimei)}${cell(r.hon_shimei)}
           ${cell('¥'+r.sales.toLocaleString(),true)}${cell('¥'+r.net.toLocaleString())}
           ${cell(r.hosho>0?'¥'+r.hosho.toLocaleString():'-',false,'var(--blue)')}
         </tr>`).join('')}
       </tbody>
-      <tfoot><tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.7rem">
-        <td style="padding:.3rem .4rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
-        <td style="text-align:center;padding:.3rem">${totTotal}</td>
-        <td style="text-align:center;padding:.3rem">${totFree}</td>
-        <td style="text-align:center;padding:.3rem">${totNetS}</td>
-        <td style="text-align:center;padding:.3rem">${totHon}</td>
-        <td style="text-align:center;padding:.3rem">¥${totSales.toLocaleString()}</td>
-        <td style="text-align:center;padding:.3rem">¥${totNet.toLocaleString()}</td>
-        <td style="text-align:center;padding:.3rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
+      <tfoot><tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.68rem">
+        <td style="padding:.25rem .35rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
+        <td style="text-align:center;padding:.25rem .1rem">${totTotal}</td>
+        <td style="text-align:center;padding:.25rem .1rem">${totFree}</td>
+        <td style="text-align:center;padding:.25rem .1rem">${totNetS}</td>
+        <td style="text-align:center;padding:.25rem .1rem">${totHon}</td>
+        <td style="text-align:center;padding:.25rem .1rem">¥${totSales.toLocaleString()}</td>
+        <td style="text-align:center;padding:.25rem .1rem">¥${totNet.toLocaleString()}</td>
+        <td style="text-align:center;padding:.25rem .1rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
       </tr></tfoot>
     </table>
   </div>
-  <div style="font-size:.7rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.7rem;margin-top:.4rem"><span>フリー=フリー指名</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
+  <div style="font-size:.68rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.5rem;margin-top:.4rem"><span>フリー=フリー指名</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
   area.innerHTML=html
 }
 
