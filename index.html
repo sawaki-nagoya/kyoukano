@@ -1178,12 +1178,14 @@ function refreshCurrentTab(){
     }
     if(dy<25)return // 微小な動きは無視
     if(ind){
-      ind.style.display='flex'
-      if(dy>=THRESHOLD&&!triggered){
-        txt.textContent='✓ 離して更新'
-        triggered=true
-      } else if(dy<THRESHOLD){
-        txt.textContent='↓ 引っ張って更新'
+      if(dy>=THRESHOLD){
+        ind.style.display='flex'
+        if(!triggered){
+          txt.textContent='✓ 離して更新'
+          triggered=true
+        }
+      } else {
+        ind.style.display='none'
         triggered=false
       }
     }
