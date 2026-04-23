@@ -31,7 +31,7 @@ html,body{height:100%;background:url("data:image/jpeg;base64,/9j/4AAQSkZJRgABAQA
 body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans',sans-serif;font-size:16px;color:var(--text);line-height:1.5;-webkit-text-size-adjust:100%}
 
 /* SCREENS */
-.screen{display:none;min-height:100vh;flex-direction:column}
+.screen{display:none;min-height:100vh;flex-direction:column;background:#faf6f0}
 .screen.on{display:flex}
 
 /* LOGIN */
@@ -249,8 +249,8 @@ tr:last-child td{border-bottom:none}
     <button class="back-btn" onclick="showLogin('top')">‹</button>
     <div class="login-logo" style="font-size:1.3rem;font-family:Georgia,serif;letter-spacing:.18em;font-weight:700;color:#B8893A;margin-bottom:.25rem;text-align:center">KYOUKANO NAGOYA</div>
     <div class="login-sub">店舗ログイン</div>
-    <label class="lbl">オーナーPIN（4桁）</label>
-    <input class="linput" type="password" id="owner-pin" maxlength="4" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doOwnerLogin()">
+    <label class="lbl">オーナーPIN（最大8桁）</label>
+    <input class="linput" type="password" id="owner-pin" maxlength="8" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doOwnerLogin()">
     <button class="btn-login" style="background:var(--accent)" onclick="doOwnerLogin()" id="btn-owner">ログイン</button>
     <div class="lerr" id="owner-err"></div>
   </div>
@@ -273,8 +273,8 @@ tr:last-child td{border-bottom:none}
         <div id="cast-selected-badge" style="font-size:.82rem;font-weight:700;color:var(--accent);background:rgba(184,137,58,.1);border:1.5px solid var(--accent);border-radius:99px;padding:.25rem .9rem"></div>
         <button onclick="clearCastSelection()" style="background:none;border:none;font-size:.75rem;color:var(--text3);cursor:pointer;padding:.2rem .4rem">変更</button>
       </div>
-      <label class="lbl">PIN（4桁）</label>
-      <input class="linput" type="password" id="cast-pin" maxlength="4" inputmode="numeric" placeholder="••••" onkeydown="if(event.key='Enter')doCastLogin()">
+      <label class="lbl">PIN（最大8桁）</label>
+      <input class="linput" type="password" id="cast-pin" maxlength="8" inputmode="numeric" placeholder="••••" onkeydown="if(event.key='Enter')doCastLogin()">
       <button class="btn-login" style="background:linear-gradient(135deg,#b8893a,#d4a855)" onclick="doCastLogin()" id="btn-cast">ログイン</button>
     </div>
     <div class="lerr" id="cast-err"></div>
@@ -649,7 +649,7 @@ tr:last-child td{border-bottom:none}
     <button class="sh-close" onclick="closeSheet('cast')">✕</button>
     <div class="sh-title">キャストを追加</div>
     <div class="fg"><label>名前</label><input type="text" class="fi2" id="new-name" placeholder="例：さくら"></div>
-    <div class="fg"><label>PIN（4桁）</label><input type="password" class="fi2" id="new-pin" maxlength="4" inputmode="numeric" placeholder="••••"></div>
+    <div class="fg"><label>PIN（1〜8桁）</label><input type="password" class="fi2" id="new-pin" maxlength="8" inputmode="numeric" placeholder="••••"></div>
     <div style="font-size:.76rem;color:var(--text3);background:var(--surface2);border-radius:var(--rs);padding:.65rem .85rem;margin-bottom:.75rem;line-height:1.6">バック設定は追加後に「バック設定」から変更できます</div>
     <button class="btn btn-gold btn-full" onclick="addCast()">追加する</button>
     <div class="lerr" id="cast-add-err"></div>
@@ -993,7 +993,7 @@ async function doOwnerLogin(){
   const pin=document.getElementById('owner-pin').value
   const err=document.getElementById('owner-err')
   err.textContent=''
-  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
+  if(pin.length<1||pin.length>8){err.textContent='PINは1〜8桁で入力してください';return}
   if(pin!==OWNER_PIN){err.textContent='PINが正しくありません';return}
   const btn=document.getElementById('btn-owner')
   btn.disabled=true; btn.textContent='確認中...'
@@ -1039,8 +1039,7 @@ async function doCastLogin(){
   const err=document.getElementById('cast-err')
   err.textContent=''
   if(!cid){err.textContent='名前を選んでください';return}
-  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
-  const btn=document.getElementById('btn-cast')
+  if(pin.length<1||pin.length>8){err.textContent='PINは1〜8桁で入力してください';return}
   btn.disabled=true; btn.textContent='確認中...'
   const{data:c,error}=await sb.from('casts').select('*').eq('id',cid).eq('pin',pin).single()
   btn.disabled=false; btn.textContent='ログイン'
@@ -2321,16 +2320,29 @@ async function loadOwnerCal(){
     html+=`<div class="card" style="margin-bottom:.6rem">
       <div style="font-size:.88rem;font-weight:700;margin-bottom:.4rem">${jpDate(date)}</div>`
     ss.forEach(s=>{
+      const sid=s.id
+      const sname=(s.casts?.name||'?').replace(/'/g,"\\'")
+      const sstart=s.start_time?.slice(0,5)||'13:00'
+      const send=s.end_time?.slice(0,5)||'22:00'
+      const snote=(s.note||'').replace(/'/g,"\\'")
       html+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
         <div style="margin-bottom:.3rem">
           <span style="font-size:.88rem;font-weight:600">${s.casts?.name||'?'}</span>
-          <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${s.start_time?.slice(0,5)||''}〜${s.end_time?.slice(0,5)||''}</span>
+          <span style="font-size:.72rem;color:var(--text3);margin-left:.4rem">${sstart}〜${send}</span>
           ${s.note?`<div style="font-size:.7rem;color:var(--text3)">${s.note}</div>`:''}
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">
-          <button class="btn btn-green btn-xs" onclick="approveShift(${s.id})">✓ 承認</button>
-          <button class="btn btn-red btn-xs" onclick="rejectShift(${s.id})">✕ 却下</button>
-          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${s.id},'${s.casts?.name||'?'}','${date}','${s.start_time?.slice(0,5)||'13:00'}','${s.end_time?.slice(0,5)||'22:00'}','${s.note||''}')">訂正</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.35rem">
+          <button class="btn btn-green btn-xs" onclick="approveShift(${sid})">✓ 承認</button>
+          <button class="btn btn-red btn-xs" onclick="rejectShift(${sid})">✕ 却下</button>
+          <button class="btn btn-gray btn-xs" onclick="openShiftEdit(${sid},'${sname}','${date}','${sstart}','${send}','${snote}')">訂正</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.25rem">
+          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'堀田Aルーム')">堀田Aルーム</button>
+          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'堀田Bルーム')">堀田Bルーム</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">
+          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'堀田Cルーム')">堀田Cルーム</button>
+          <button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList(${sid},'金山ルーム')">金山ルーム</button>
         </div>
       </div>`
     })
@@ -2368,11 +2380,20 @@ async function ownerSelectDay(ds){
       html+='<div class="item" style="flex-direction:column;align-items:stretch;gap:.4rem;margin-bottom:.5rem">'
       html+='<div><div style="font-size:.92rem;font-weight:600">'+sname+'</div>'
       html+='<div style="font-size:.78rem;color:var(--text3)">'+stime+(snote?' / '+snote:'')+'</div></div>'
-      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem">'
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.3rem">'
       html+='<button class="btn btn-green btn-xs" onclick="approveShift('+sid+');closeSheet(\'owner-shift-detail\')">✓ 承認</button>'
       html+='<button class="btn btn-red btn-xs" onclick="rejectShift('+sid+');closeSheet(\'owner-shift-detail\')">✕ 却下</button>'
       html+='<button class="btn btn-gray btn-xs" onclick="openShiftEdit('+sid+',\''+sname+'\',\''+ds+'\',\''+sstart+'\',\''+send+'\',\''+snote+'\')">訂正</button>'
-      html+='</div></div>'
+      html+='</div>'
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.25rem">'
+      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'堀田Aルーム\')">堀田Aルーム</button>'
+      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'堀田Bルーム\')">堀田Bルーム</button>'
+      html+='</div>'
+      html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:.3rem">'
+      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'堀田Cルーム\')">堀田Cルーム</button>'
+      html+='<button class="btn btn-xs" style="background:#fdf6ec;border:1.5px solid #b8893a;color:#b8893a;font-weight:600" onclick="assignRoomFromList('+sid+',\'金山ルーム\')">金山ルーム</button>'
+      html+='</div>'
+      html+='</div>'
     })
   }
 
@@ -2409,6 +2430,18 @@ async function ownerSelectDay(ds){
 
   document.getElementById('owner-shift-detail-body').innerHTML=html
   document.getElementById('owner-shift-detail-overlay').classList.add('on')
+}
+
+// ルームボタンから直接ルーム割り当て（承認待ちシフトに対して）
+async function assignRoomFromList(shiftId, roomName){
+  // 承認とルーム設定を同時に行う
+  const{error}=await sb.from('shifts').update({status:'approved',room:roomName}).eq('id',shiftId)
+  if(error){toast('エラー: '+error.message);return}
+  toast(roomName+'に振り分けました')
+  loadOwnerCal()
+  // 本日のシフトなら本日ページも更新
+  const shift=ownerShiftData.pending.find(s=>s.id===shiftId)
+  if(shift&&shift.date===today()){loadToday()}
 }
 
 async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
@@ -3342,7 +3375,7 @@ async function addCast(){
   const pin=document.getElementById('new-pin').value.trim()
   const err=document.getElementById('cast-add-err')
   if(!name){err.textContent='名前を入力してください';return}
-  if(pin.length!==4){err.textContent='PINは4桁で入力してください';return}
+  if(pin.length<1||pin.length>8||!/^\d+$/.test(pin)){err.textContent='PINは1〜8桁の数字で入力してください';return}
   const{data:maxData}=await sb.from('casts').select('sort_order').order('sort_order',{ascending:false}).limit(1)
   const nextOrder=((maxData||[])[0]?.sort_order||0)+1
   const{error}=await sb.from('casts').insert({name,pin,sort_order:nextOrder,active:true})
@@ -3358,9 +3391,9 @@ async function addCast(){
 }
 
 async function changePIN(castId,name){
-  const pin=prompt(name+'の新しいPIN（4桁）を入力してください')
+  const pin=prompt(name+'の新しいPIN（1〜8桁）を入力してください')
   if(!pin)return
-  if(pin.length!==4||isNaN(pin)){toast('PINは4桁の数字で入力してください');return}
+  if(pin.length<1||pin.length>8||isNaN(pin)){toast('PINは1〜8桁の数字で入力してください');return}
   const{error}=await sb.from('casts').update({pin}).eq('id',castId)
   if(error){toast('エラーが発生しました');return}
   toast('PINを変更しました！')
@@ -4511,15 +4544,16 @@ function renderMonthlyDaily(area,dailyRows,tot){
 function renderMonthlyCast(area,castStats,fmt2){
   if(!castStats||!Object.keys(castStats).length){area.innerHTML='<div class="empty">この月の記録はありません</div>';return}
   const rows=Object.entries(castStats).map(([name,s])=>({name,total:s.count||0,free:s.free||0,net_shimei:s.net_shimei||0,hon_shimei:s.hon_shimei||0,sales:s.sales||0,net:s.net||0,hosho:s.hosho||0})).sort((a,b)=>b.sales-a.sales)
-  const wBg='background:#fff;border-radius:6px;padding:.3rem .3rem;text-align:right;font-size:.72rem;'
-  const th=(l,w='')=>`<th style="padding:.35rem .3rem;text-align:right;font-size:.66rem;${w?'min-width:'+w:''};background:var(--surface2)">${l}</th>`
-  const cell=(v,bold=false,col='')=>`<td style="padding:.25rem .2rem"><div style="${wBg}${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
+  const colW='width:11.5%;min-width:52px'
+  const wBg='background:#fff;border-radius:6px;padding:.28rem .2rem;text-align:center;font-size:.72rem;'
+  const th=(l)=>`<th style="padding:.35rem .2rem;text-align:center;font-size:.66rem;${colW};background:var(--surface2)">${l}</th>`
+  const cell=(v,bold=false,col='')=>`<td style="padding:.2rem .15rem;text-align:center"><div style="${wBg}${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
   const totSales=rows.reduce((s,r)=>s+r.sales,0),totNet=rows.reduce((s,r)=>s+r.net,0),totHosho=rows.reduce((s,r)=>s+r.hosho,0),totTotal=rows.reduce((s,r)=>s+r.total,0),totFree=rows.reduce((s,r)=>s+r.free,0),totNetS=rows.reduce((s,r)=>s+r.net_shimei,0),totHon=rows.reduce((s,r)=>s+r.hon_shimei,0)
   let html=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--border)">
-    <table style="width:100%;border-collapse:collapse;min-width:480px;font-size:.72rem">
+    <table style="width:100%;border-collapse:collapse;table-layout:fixed;font-size:.72rem">
       <thead><tr style="background:var(--surface2)">
-        <th style="padding:.35rem .4rem;text-align:left;font-size:.66rem;position:sticky;left:0;z-index:2;background:var(--surface2)">キャスト</th>
-        ${th('総本数')}${th('F')}${th('ネット')}${th('本指')}${th('売上','68px')}${th('委託金','68px')}${th('保証','55px')}
+        <th style="padding:.35rem .4rem;text-align:left;font-size:.66rem;width:18%;position:sticky;left:0;z-index:2;background:var(--surface2)">キャスト</th>
+        ${th('総本数')}${th('フリー')}${th('ネット')}${th('本指')}${th('売上')}${th('委託金')}${th('保証')}
       </tr></thead>
       <tbody>
         ${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
@@ -4531,17 +4565,17 @@ function renderMonthlyCast(area,castStats,fmt2){
       </tbody>
       <tfoot><tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.7rem">
         <td style="padding:.3rem .4rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
-        <td style="text-align:right;padding:.3rem">${totTotal}</td>
-        <td style="text-align:right;padding:.3rem">${totFree}</td>
-        <td style="text-align:right;padding:.3rem">${totNetS}</td>
-        <td style="text-align:right;padding:.3rem">${totHon}</td>
-        <td style="text-align:right;padding:.3rem">¥${totSales.toLocaleString()}</td>
-        <td style="text-align:right;padding:.3rem">¥${totNet.toLocaleString()}</td>
-        <td style="text-align:right;padding:.3rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
+        <td style="text-align:center;padding:.3rem">${totTotal}</td>
+        <td style="text-align:center;padding:.3rem">${totFree}</td>
+        <td style="text-align:center;padding:.3rem">${totNetS}</td>
+        <td style="text-align:center;padding:.3rem">${totHon}</td>
+        <td style="text-align:center;padding:.3rem">¥${totSales.toLocaleString()}</td>
+        <td style="text-align:center;padding:.3rem">¥${totNet.toLocaleString()}</td>
+        <td style="text-align:center;padding:.3rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
       </tr></tfoot>
     </table>
   </div>
-  <div style="font-size:.7rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.7rem;margin-top:.4rem"><span>F=フリー</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
+  <div style="font-size:.7rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.7rem;margin-top:.4rem"><span>フリー=フリー指名</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
   area.innerHTML=html
 }
 
