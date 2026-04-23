@@ -1166,6 +1166,8 @@ function refreshCurrentTab(){
     if(!pulling)return
     const body=document.getElementById('app-body')
     if(!body||body.scrollTop>0){pulling=false;if(ind)ind.style.display='none';return}
+    // ルーム仮選択中はPTR無効
+    if(Object.keys(_tempRoomMap).length>0){pulling=false;if(ind)ind.style.display='none';return}
     const dy=e.touches[0].clientY-startY
     const dx=Math.abs(e.touches[0].clientX-startX)
     // 方向が確定していない間に横スクロールっぽければキャンセル
@@ -1192,6 +1194,11 @@ function refreshCurrentTab(){
     if(ind)ind.style.display='none'
     if(triggered){
       triggered=false
+      // ルーム仮選択中はPTR更新をスキップ
+      if(Object.keys(_tempRoomMap).length>0){
+        toast('振り分け中は更新できません')
+        return
+      }
       toast('更新中...')
       refreshCurrentTab()
     }
@@ -2249,6 +2256,8 @@ async function loadOwnerCal(){
   const pending=(pendingRaw||[]).map(s=>({...s,casts:{name:getName(s.cast_id)}}))
   const approved=(approvedRaw||[]).map(s=>({...s,casts:{name:getName(s.cast_id)}}))
   ownerShiftData={pending,approved}
+  // 仮選択中のルームをrefresh（データ再取得後も仮表示を保持）
+  refreshOwnerRoomGrid()
   // 予約件数を取得（承認済みシフトのshift_idに紐づく予約）
   const approvedIds=(approvedRaw||[]).map(s=>s.id)
   let reservationByDate={}
