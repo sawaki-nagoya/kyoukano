@@ -1938,14 +1938,32 @@ function autoFillCustomer(){
   const c=allCustomers.find(x=>x.customer_no===no)
   if(c){
     document.getElementById('rv-name').value=c.name.endsWith('様')?c.name:c.name+'様'
-    document.getElementById('rv-cust-name').textContent='✓ '+c.name
-    document.getElementById('rv-cust-name').style.color='var(--green)'
-    if(warn) warn.style.display='none'
+    // 出禁チェック
+    const banWarn=checkBanWarning(c)
+    if(banWarn){
+      document.getElementById('rv-cust-name').textContent='⛔ '+c.name
+      document.getElementById('rv-cust-name').style.color='var(--rtx)'
+      if(warn){warn.style.display='block';warn.style.color='#c62828';warn.textContent=banWarn}
+    } else {
+      document.getElementById('rv-cust-name').textContent='✓ '+c.name
+      document.getElementById('rv-cust-name').style.color='var(--green)'
+      if(warn) warn.style.display='none'
+    }
   } else {
     document.getElementById('rv-cust-name').textContent='未登録'
     document.getElementById('rv-cust-name').style.color='var(--rtx)'
-    if(warn){warn.style.display='block';warn.textContent='⚠️ 顧客番号が未登録です。予約後に顧客管理から登録してください。'}
+    if(warn){warn.style.display='block';warn.style.color='';warn.textContent='⚠️ 顧客番号が未登録です。予約後に顧客管理から登録してください。'}
   }
+}
+function checkBanWarning(c){
+  // 全出禁
+  if(c.is_banned) return `⛔ ${c.name}は出禁登録されています`
+  // キャスト指名NGチェック
+  if(_rvCastName && c.ng_casts){
+    const ngList=(c.ng_casts||'').split(/[,、]/).map(x=>x.trim()).filter(Boolean)
+    if(ngList.includes(_rvCastName)) return `⚠️ ${c.name}は${_rvCastName}のNGキャストに登録されています`
+  }
+  return null
 }
 async function lookupCustomer(){
   const no=parseInt(document.getElementById('rv-cust-id').value)
@@ -1953,8 +1971,14 @@ async function lookupCustomer(){
   const c=allCustomers.find(x=>x.customer_no===no)
   if(c){
     document.getElementById('rv-name').value=c.name.endsWith('様')?c.name:c.name+'様'
-    document.getElementById('rv-cust-name').textContent=`✓ ${c.name}`
-    document.getElementById('rv-cust-name').style.color='var(--green)'
+    const banWarn=checkBanWarning(c)
+    if(banWarn){
+      document.getElementById('rv-cust-name').textContent='⛔ '+c.name
+      document.getElementById('rv-cust-name').style.color='var(--rtx)'
+    } else {
+      document.getElementById('rv-cust-name').textContent=`✓ ${c.name}`
+      document.getElementById('rv-cust-name').style.color='var(--green)'
+    }
   } else {
     document.getElementById('rv-cust-name').textContent='顧客未登録'
     document.getElementById('rv-cust-name').style.color='var(--rtx)'
