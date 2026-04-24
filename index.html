@@ -501,7 +501,7 @@ tr:last-child td{border-bottom:none}
         <div class="sheet-hdr"><span id="customer-edit-title">顧客追加</span><button class="sheet-close" onclick="closeSheet('customer-edit')">✕</button></div>
         <div style="display:flex;flex-direction:column;gap:.75rem;padding-bottom:1rem">
           <input type="hidden" id="ce-id">
-          <div><div class="fi-lbl">名前</div><input class="fi" id="ce-name" placeholder="○○様" oninput="autoKatakana(this)" onblur="finalizeKatakana(this)"></div>
+          <div><div class="fi-lbl">名前</div><input class="fi" id="ce-name" placeholder="○○様" onblur="finalizeKatakana(this)"></div>
           <div><div class="fi-lbl">電話番号</div><input class="fi" id="ce-phone" type="tel" placeholder="090-0000-0000" oninput="autoHyphen(this)"></div>
           <div><div class="fi-lbl">NGキャスト（複数選択可）</div><div id="ce-ng-chips" style="display:flex;gap:.4rem;overflow-x:auto;padding:.4rem 0;-webkit-overflow-scrolling:touch;scrollbar-width:none"></div></div>
           <div><div class="fi-lbl">出禁</div>
@@ -4877,14 +4877,8 @@ function mseSwitchTab(tab){
 function toKatakana(str){
   return str.replace(/[ぁ-ん]/g,s=>String.fromCharCode(s.charCodeAt(0)+0x60))
 }
-function autoKatakana(el){
-  const pos=el.selectionStart
-  el.value=toKatakana(el.value)
-  try{el.setSelectionRange(pos,pos)}catch(e){}
-}
 function finalizeKatakana(el){
   let v=toKatakana(el.value.trim())
-  // 末尾に「様」がなければ付ける
   if(v && !v.endsWith('様')) v=v+'様'
   el.value=v
 }
