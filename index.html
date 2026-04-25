@@ -3098,7 +3098,13 @@ async function openWorkSheet(shiftId,castName,date,castId){
     // 保存済みデータがあればそれを使う
     if(w.misc) document.getElementById('w-misc').value=w.misc
     if(w.hosho&&document.getElementById('w-hosho')) document.getElementById('w-hosho').value=w.hosho
-    w.sessions.forEach(s=>addSession(s))
+    w.sessions.forEach(s=>{
+      // extensionsからext_count/ext_paysを復元（保存済みデータ互換）
+      const exts=s.extensions||[]
+      const extCount=s.ext_count||(exts.length>0?Math.max(...exts.map(e=>e.no||0)):0)
+      const extPays=s.ext_pays||(exts.length>0?exts.map(e=>e.pay||'現金'):[])
+      addSession({...s,ext_count:extCount,ext_pays:extPays})
+    })
   } else {
     // 予約データから自動生成
     const{data:rvs}=await sb.from('reservations').select('*').eq('shift_id',shiftId).order('checkin_time')
@@ -3119,10 +3125,11 @@ async function openWorkSheet(shiftId,castName,date,castId){
         // 延長情報を取得してセッションに渡す
         let rvPj={}
         try{rvPj=JSON.parse(rv.payment||'{}')}catch(e){}
-        const rvExtCount=rvPj.ext_count||0
-        // 延長ごとの支払い方法
+        const rvExtCount=rv.extension_count||rvPj.ext_count||0
+        // 延長の支払い方法（paymentのext キーを参照）
+        const extPayMethod=rvPj.ext||'現金'
         const extPays=[]
-        for(let ei=1;ei<=rvExtCount;ei++) extPays.push(rvPj['ext_'+ei]||'現金')
+        for(let ei=1;ei<=rvExtCount;ei++) extPays.push(rvPj['ext_'+ei]||extPayMethod)
         // 予約の割引をsheetDiscsと照合してdiscountsデータを生成
         const rvDiscNames=(rv.discount||'').split(',').filter(Boolean)
         const rvDiscounts=rvDiscNames.map(name=>{
