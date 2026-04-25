@@ -372,8 +372,13 @@ tr:last-child td{border-bottom:none}
     <!-- 店舗：本日状況 -->
     <div class="panel" id="p-today">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-        <div style="font-size:1rem;font-weight:700">本日の出勤状況</div>
-        <div style="font-size:.78rem;color:var(--text3)" id="today-lbl">-</div>
+        <div style="font-size:1rem;font-weight:700">出勤状況</div>
+        <div style="display:flex;align-items:center;gap:.4rem">
+          <button class="cal-nav-btn" onclick="todayNavMove(-1)" style="font-size:.85rem;padding:.2rem .5rem">‹</button>
+          <div style="font-size:.78rem;color:var(--text3);min-width:6em;text-align:center" id="today-lbl">-</div>
+          <button class="cal-nav-btn" onclick="todayNavMove(1)" style="font-size:.85rem;padding:.2rem .5rem">›</button>
+          <button class="cal-nav-btn" id="today-jump-btn" onclick="todayNavReset()" style="font-size:.7rem;padding:.2rem .5rem;display:none">今日</button>
+        </div>
       </div>
       <div class="sec">ルーム</div>
       <div class="room-grid" id="room-grid"></div>
@@ -2622,9 +2627,19 @@ async function deleteShift(){
 }
 
 // ── 店舗：本日状況 ──
+let todayNavDate=null
+function todayNavMove(d){
+  const base=todayNavDate||today()
+  const dt=new Date(base);dt.setDate(dt.getDate()+d)
+  todayNavDate=dt.toISOString().slice(0,10)
+  document.getElementById('today-jump-btn').style.display=todayNavDate===today()?'none':''
+  loadToday()
+}
+function todayNavReset(){todayNavDate=null;document.getElementById('today-jump-btn').style.display='none';loadToday()}
 async function loadToday(){
-  const td=today();const[y,m,d]=td.split('-')
-  document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'
+  const td=todayNavDate||today();const[y,m,d]=td.split('-')
+  const isToday2=td===today()
+  document.getElementById('today-lbl').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'+(isToday2?' (今日)':'')
   const{data:shiftsRaw}=await sb.from('shifts').select('*').eq('date',td).eq('status','approved').order('start_time')
   const{data:castList2}=await sb.from('casts').select('id,name')
   const getName2=id=>{const c=(castList2||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
@@ -2773,7 +2788,7 @@ let ganttModalRoom=null
 
 function openGanttModal(room){
   ganttModalRoom=room
-  ganttModalDate=today()
+  ganttModalDate=todayNavDate||today()
   document.getElementById('gantt-modal-title').textContent=room+' のガントチャート'
   _ganttLock()
   // 回転・レイアウト確定後にサイズを取得するため2フレーム待つ
