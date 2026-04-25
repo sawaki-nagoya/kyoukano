@@ -4788,8 +4788,9 @@ async function renderMonthlyContent(){
   const castStats={}
   works.forEach(w=>{
     const n=w.castName
-    if(!castStats[n])castStats[n]={sales:0,net:0,hosho:0,count:0}
-    castStats[n].sales+=w.sales||0;castStats[n].net+=w.net||w.back||0;castStats[n].hosho+=w.hosho||0;castStats[n].count+=w.count||0
+    if(!castStats[n])castStats[n]={sales:0,net:0,hosho:0,count:0,disc:0}
+    const wDisc=(w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)
+    castStats[n].sales+=w.sales||0;castStats[n].net+=w.net||w.back||0;castStats[n].hosho+=w.hosho||0;castStats[n].count+=w.count||0;castStats[n].disc+=wDisc
   })
   Object.entries(rvsByCast).forEach(([n,rv])=>{
     if(!castStats[n])castStats[n]={sales:0,net:0,hosho:0,count:0}
@@ -4913,8 +4914,8 @@ function renderMonthlyDaily(area,dailyRows,tot){
     const onclickAttr=multiCast?'onclick="toggleCastSub(this)"':'';
     let html=`<tr style="border-bottom:1px solid var(--border);${rowBg}${multiCast?';cursor:pointer':''}" ${onclickAttr}>`
     html+=Dsticky(r.day+'('+r.dow+')'+(multiCast?'▾':''),hasAdv?'#fff5f5':'#faf6f0')
-    html+=C(Ns(r.gross_work))
-    html+=C(Ns(r.gross_work))
+    html+=C(Ns(r.gross))
+    html+=C(r.disc>0?Ns(r.gross_work):Ns(r.gross))
     html+=C(Ns(r.cash))
     html+=C(Ns(r.card),'#1565c0')
     html+=C(r.cardFee>0?Ns(r.cardFee):'—','#999')
@@ -4939,7 +4940,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
         const cbg=cAdv?'#fff0f0':'rgba(250,246,240,.8)'
         html+=`<tr class="cast-sub" style="border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)">`
         html+=Dcast(c.castName,cbg)
-        html+=C(Ns(c.cash+c.cardBase))  // 総売上
+        html+=C(Ns(c.cash+c.cardBase))  // 総売上（キャスト個別は割引考慮済）
         html+=C(Ns(c.cash+c.cardBase))  // 純売上
         html+=C(Ns(c.cash))             // 現金売上
         html+=C(Ns(c.card),'#1565c0')  // カード
@@ -4960,7 +4961,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
   const totCashNeg=tot.cashRemain<0
   const totRow=`<tr style="background:var(--surface2);border-top:2px solid var(--accent)">
     <td style="position:sticky;left:0;background:var(--surface2);z-index:1;padding:.25rem .35rem;font-size:.65rem;font-weight:700;border-right:1px solid var(--border)">合計</td>
-    ${[Ns(tot.gross_work),Ns(tot.gross_work),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
+    ${[Ns(tot.gross),Ns(tot.disc>0?tot.gross_work:tot.gross),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
        totAdv?Ns(tot.advance):'—',Ns(tot.profit),
        totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
       .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===6&&totAdv?';color:#c62828':i===3?';color:#1565c0':i===8&&totCashNeg?';color:#c62828':''}">${v}</td>`).join('')}
@@ -4979,24 +4980,35 @@ function renderMonthlyDaily(area,dailyRows,tot){
 // ── キャスト成績表：白背景セル ──
 function renderMonthlyCast(area,castStats,fmt2){
   if(!castStats||!Object.keys(castStats).length){area.innerHTML='<div class="empty">この月の記録はありません</div>';return}
-  const rows=Object.entries(castStats).map(([name,s])=>({name,total:s.count||0,free:s.free||0,net_shimei:s.net_shimei||0,hon_shimei:s.hon_shimei||0,sales:s.sales||0,net:s.net||0,hosho:s.hosho||0})).sort((a,b)=>b.sales-a.sales)
+  const rows=Object.entries(castStats).map(([name,s])=>({
+    name,total:s.count||0,free:s.free||0,net_shimei:s.net_shimei||0,hon_shimei:s.hon_shimei||0,
+    sales:s.sales||0,disc:s.disc||0,net:s.net||0,hosho:s.hosho||0
+  })).sort((a,b)=>b.sales-a.sales)
   const wBg='background:#fff;border-radius:6px;padding:.28rem .15rem;text-align:center;font-size:.68rem;'
   const thS='padding:.3rem .1rem;text-align:center;font-size:.6rem;background:var(--surface2);width:52px'
   const thM='padding:.3rem .1rem;text-align:center;font-size:.6rem;background:var(--surface2);width:72px'
   const th=(l,w='n')=>`<th style="${w==='m'?thM:thS}">${l}</th>`
   const cell=(v,bold=false,col='')=>`<td style="padding:.15rem .08rem;text-align:center"><div style="${wBg}${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
-  const totSales=rows.reduce((s,r)=>s+r.sales,0),totNet=rows.reduce((s,r)=>s+r.net,0),totHosho=rows.reduce((s,r)=>s+r.hosho,0),totTotal=rows.reduce((s,r)=>s+r.total,0),totFree=rows.reduce((s,r)=>s+r.free,0),totNetS=rows.reduce((s,r)=>s+r.net_shimei,0),totHon=rows.reduce((s,r)=>s+r.hon_shimei,0)
-  let html=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--border)">
+  const hasDisc=rows.some(r=>r.disc>0)
+  const totSales=rows.reduce((s,r)=>s+r.sales,0)
+  const totDisc=rows.reduce((s,r)=>s+r.disc,0)
+  const totNet=rows.reduce((s,r)=>s+r.net,0),totHosho=rows.reduce((s,r)=>s+r.hosho,0)
+  const totTotal=rows.reduce((s,r)=>s+r.total,0),totFree=rows.reduce((s,r)=>s+r.free,0)
+  const totNetS=rows.reduce((s,r)=>s+r.net_shimei,0),totHon=rows.reduce((s,r)=>s+r.hon_shimei,0)
+  let html=`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:10px;border:1px solid var(--border);max-height:70vh">
     <table style="width:100%;border-collapse:collapse;font-size:.68rem">
       <thead><tr style="background:var(--surface2)">
-        <th style="padding:.3rem .35rem;text-align:left;font-size:.6rem;position:sticky;left:0;z-index:2;background:var(--surface2);min-width:60px">キャスト</th>
-        ${th('総本数')}${th('フリー')}${th('ネット')}${th('本指')}${th('売上','m')}${th('委託金','m')}${th('保証','m')}
+        <th style="padding:.3rem .35rem;text-align:left;font-size:.6rem;position:sticky;left:0;top:0;z-index:3;background:var(--surface2);min-width:60px">キャスト</th>
+        ${th('本数')}${th('F')}${th('ネット')}${th('本指')}${th('総売上','m')}${hasDisc?th('割引','m'):''}${th('純売上','m')}${th('委託金','m')}${th('保証','m')}
       </tr></thead>
       <tbody>
         ${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:.25rem .35rem;position:sticky;left:0;background:#faf6f0;font-weight:600;font-size:.7rem;white-space:nowrap;z-index:1">${r.name}</td>
           ${cell(r.total,true)}${cell(r.free)}${cell(r.net_shimei)}${cell(r.hon_shimei)}
-          ${cell('¥'+r.sales.toLocaleString(),true)}${cell('¥'+r.net.toLocaleString())}
+          ${cell('¥'+(r.sales+r.disc).toLocaleString(),true)}
+          ${hasDisc?cell(r.disc>0?'-¥'+r.disc.toLocaleString():'-',false,'var(--rtx)'):''}
+          ${cell('¥'+r.sales.toLocaleString())}
+          ${cell('¥'+r.net.toLocaleString())}
           ${cell(r.hosho>0?'¥'+r.hosho.toLocaleString():'-',false,'var(--blue)')}
         </tr>`).join('')}
       </tbody>
@@ -5006,13 +5018,15 @@ function renderMonthlyCast(area,castStats,fmt2){
         <td style="text-align:center;padding:.25rem .1rem">${totFree}</td>
         <td style="text-align:center;padding:.25rem .1rem">${totNetS}</td>
         <td style="text-align:center;padding:.25rem .1rem">${totHon}</td>
+        <td style="text-align:center;padding:.25rem .1rem">¥${(totSales+totDisc).toLocaleString()}</td>
+        ${hasDisc?`<td style="text-align:center;padding:.25rem .1rem;color:var(--rtx)">${totDisc>0?'-¥'+totDisc.toLocaleString():'-'}</td>`:''}
         <td style="text-align:center;padding:.25rem .1rem">¥${totSales.toLocaleString()}</td>
         <td style="text-align:center;padding:.25rem .1rem">¥${totNet.toLocaleString()}</td>
         <td style="text-align:center;padding:.25rem .1rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
       </tr></tfoot>
     </table>
   </div>
-  <div style="font-size:.68rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.5rem;margin-top:.4rem"><span>フリー=フリー指名</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
+  <div style="font-size:.68rem;color:var(--text3);flex-wrap:wrap;display:flex;gap:.5rem;margin-top:.4rem"><span>F=フリー指名</span><span>ネット=ネット指名</span><span>本指=本指名</span><span>保証=最低保証支払額</span></div>`
   area.innerHTML=html
 }
 
