@@ -4100,12 +4100,17 @@ async function openShiftReservations(shiftId, castName){
     })()
     const optTotal = opts.reduce((s,n)=>{const o=(optList||[]).find(x=>x.name===n);return s+(o?.price||0)},0)
     const discTotal = discs.reduce((s,n)=>{const d=(discList||[]).find(x=>x.name===n);return s+(d?.amount||0)},0)
-    const totalPrice = coursePrice+shimeiPrice+optTotal-discTotal
+    const extCount = r.extension_count||0
+    const extCourseObj = (courseList||[]).find(c=>c.name&&c.name.includes('延長'))
+    const extUnitPrice = extCourseObj?.price||6000
+    const extTotal = extCount*extUnitPrice
+    const totalPrice = coursePrice+shimeiPrice+optTotal+extTotal-discTotal
     // カード/現金内訳
     const payCourse = pj.course||'現金'
     const payShimei = pj.shimei||'現金'
     const payOpt = pj.option||'現金'
-    const cardAmt = (payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+(payOpt==='カード'?optTotal:0)
+    const payExt = pj.ext||'現金'
+    const cardAmt = (payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+(payOpt==='カード'?optTotal:0)+(payExt==='カード'?extTotal:0)
     const cashAmt = totalPrice - cardAmt
     const newLabel = r.is_new===true||r.is_new==='true'
       ? '<span style="font-size:.65rem;background:#4CAF50;color:#fff;padding:1px 7px;border-radius:99px;margin-left:.3rem">新規</span>'
@@ -4116,7 +4121,7 @@ async function openShiftReservations(shiftId, castName){
         ${r.customer_no?`<span style="font-size:.65rem;color:var(--text3)">No.${r.customer_no}</span>`:''}
       </div>
       ${r.checkin_time||r.checkout_time?`<div style="font-size:.8rem;color:var(--accent);font-weight:600">⏱ ${r.checkin_time?.slice(0,5)||'?'} 〜 ${r.checkout_time?.slice(0,5)||'?'}</div>`:''}
-      <div style="font-size:.8rem;color:var(--text2)">${[r.shimei_type,r.course,opts.join('・')].filter(Boolean).join(' / ')}</div>
+      <div style="font-size:.8rem;color:var(--text2)">${[r.shimei_type,r.course,opts.join('・'),extCount>0?('延長×'+extCount):''].filter(Boolean).join(' / ')}</div>
       ${discs.length?`<div style="font-size:.75rem;color:var(--rtx)">割引: ${discs.join('・')}</div>`:''}
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.3rem;margin-top:.2rem">
         <div style="background:var(--surface2);border-radius:8px;padding:.3rem .5rem;text-align:center">
