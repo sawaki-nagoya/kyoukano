@@ -4824,7 +4824,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     html+=C(r.net_shimei||0)
     html+=C(r.hon_shimei||0)
     html+=C(r.count||0)
-    html+=C((r.free||0)+(r.net_shimei||0)+(r.hon_shimei||0))
+    html+=C(r.inquiry>0?Ns(r.inquiry):'—',r.inquiry>0?'':'#ccc')
     html+='</tr>'
 
     // キャスト内訳行（同じ <tbody> 内に直接展開→列が揃う）
