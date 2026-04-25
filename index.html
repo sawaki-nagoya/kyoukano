@@ -4727,101 +4727,116 @@ function renderMonthlySummary(area,tot,sd,fmt2,total_expenses){
 }
 
 // ── 日別テーブル：白背景セル ──
+function toggleCastSub(row){
+  let n=row.nextElementSibling
+  while(n&&n.classList.contains('cast-sub')){
+    n.style.display=n.style.display===''?'none':''
+    n=n.nextElementSibling
+  }
+}
 function renderMonthlyDaily(area,dailyRows,tot){
   const N=n=>Math.abs(n||0).toLocaleString()
   const Ns=n=>(n||0).toLocaleString()
-  const M=n=>'¥'+(n||0).toLocaleString()
-  // ヘッダー列定義
+  // 列定義（インデックスで参照するので順番厳守）
+  // 0:日付 1:総売上 2:純売上 3:現金売上 4:カード 5:手数料 6:委託金 7:立替金 8:粗利益 9:現金残 10:客単価 11:出勤 12:フリー 13:ネット 14:本指 15:合計 16:総数
   const cols=[
-    {l:'日付',w:'44px',align:'left',sticky:true},
-    {l:'総売上',w:'58px'},{l:'純売上',w:'58px'},{l:'現金売上',w:'58px'},
-    {l:'カード',w:'52px',color:'#1565c0'},{l:'手数料',w:'46px',color:'#555'},
-    {l:'委託金',w:'52px'},{l:'立替金',w:'50px',color:'#c62828'},
-    {l:'粗利益',w:'52px'},{l:'現金残',w:'52px'},
-    {l:'客単価',w:'50px'},{l:'出勤',w:'28px'},
-    {l:'フリー',w:'28px'},{l:'ネット',w:'30px'},{l:'本指',w:'28px'},{l:'合計',w:'28px'},{l:'総数',w:'28px'}
+    {l:'日付',w:'46px',align:'left',sticky:true},
+    {l:'総売上',w:'56px'},{l:'純売上',w:'56px'},{l:'現金売上',w:'56px'},
+    {l:'カード',w:'56px',color:'#1565c0'},{l:'手数料',w:'46px',color:'#777'},
+    {l:'委託金',w:'54px'},{l:'立替金',w:'50px',color:'#c62828'},
+    {l:'粗利益',w:'54px'},{l:'現金残',w:'54px'},
+    {l:'客単価',w:'52px'},{l:'出勤',w:'30px'},
+    {l:'F',w:'26px'},{l:'ネット',w:'32px'},{l:'本指',w:'28px'},{l:'合計',w:'28px'},{l:'総数',w:'28px'}
   ]
   const COL=cols.length
-  const thS=(c,i)=>`padding:.28rem ${i===0?'.3rem':'.15rem'};text-align:${c.align||'right'};font-size:.6rem;white-space:nowrap;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:${c.sticky?3:1};${c.sticky?'left:0;':''}${c.color?'color:'+c.color:''}`
+  // ヘッダー sticky（スクロールコンテナに max-height を設定して機能させる）
+  const thS=(c,i)=>`padding:.3rem ${i===0?'.35rem':'.2rem'};text-align:${i===0?'left':'center'};font-size:.6rem;font-weight:700;white-space:nowrap;background:#fff;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:${c.sticky?3:2};${c.sticky?'left:0;':''}${c.color?'color:'+c.color:''}`
   const thead=`<thead><tr>${cols.map((c,i)=>`<th style="${thS(c,i)};min-width:${c.w}">${c.l}</th>`).join('')}</tr></thead>`
 
-  // セル生成
-  const stickyBase='position:sticky;left:0;z-index:1;white-space:nowrap;padding:.18rem .3rem;font-size:.66rem;font-weight:700;'
-  const numCell=(v,color='',bold=false,bg='')=>`<td style="padding:.15rem .1rem"><div style="background:#fff;border-radius:5px;padding:.2rem .22rem;text-align:right;font-size:.63rem;${color?'color:'+color:''}${bold?';font-weight:700':''}${bg?';background:'+bg:''}">${v}</div></td>`
+  // 数値セル：白背景・中央揃え
+  const C=(v,color='',bold=false)=>`<td style="padding:.12rem .08rem"><div style="background:#fff;border-radius:5px;padding:.2rem .15rem;text-align:center;font-size:.63rem;min-width:0;${color?'color:'+color:''}${bold?';font-weight:700':''}">${v}</div></td>`
+  // 日付列（sticky）
+  const Dsticky=(txt,bg='#faf6f0',sub='')=>`<td style="position:sticky;left:0;z-index:1;background:${bg};padding:.15rem .3rem;font-size:.66rem;font-weight:700;white-space:nowrap;border-right:1px solid var(--border)">${txt}${sub?'<div style="font-size:.5rem;color:var(--text3);font-weight:400">'+sub+'</div>':''}</td>`
+  // キャスト内訳の日付列（インデント）
+  const Dcast=(name,bg)=>`<td style="position:sticky;left:0;z-index:1;background:${bg};padding:.12rem .3rem .12rem .8rem;font-size:.62rem;font-weight:600;white-space:nowrap;border-right:1px solid var(--border);color:var(--text2)">${name}</td>`
 
   const makeRow=r=>{
     if(r.noData) return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="${stickyBase}background:#faf6f0;color:var(--text3)">${r.day}(${r.dow})</td>
-      <td colspan="${COL-1}" style="text-align:center;font-size:.6rem;color:var(--text3)">—</td></tr>`
+      ${Dsticky(r.day+'('+r.dow+')','#faf6f0')}
+      <td colspan="${COL-1}" style="text-align:center;font-size:.6rem;color:var(--text3);padding:.3rem">—</td></tr>`
 
     const castRows=r.castRows||[]
-    const hasAdvance=r.advance>0
-    const cashRemainNeg=r.cashRemain<0
-    const rowBg=hasAdvance?'background:rgba(198,40,40,.04);':''
+    const hasAdv=r.advance>0
+    const cashNeg=r.cashRemain<0
     const avgUnit=r.count>0?Math.round((r.gross_work||0)/r.count):0
+    const rowBg=hasAdv?'background:rgba(198,40,40,.03)':''
+    const multiCast=castRows.length>1
 
-    // 日付行（サマリ）
-    let html=`<tr style="border-bottom:${castRows.length?'none':'1px solid var(--border)'};cursor:pointer;${rowBg}" onclick="this.nextElementSibling&&(this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none')">`
-    html+=`<td style="${stickyBase}background:${hasAdvance?'#fff5f5':'#faf6f0'}">${r.day}(${r.dow})${castRows.length>1?'<span style="font-size:.5rem;color:var(--text3);margin-left:2px">▼</span>':''}</td>`
-    html+=numCell(Ns(r.gross_work))
-    html+=numCell(Ns(r.gross_work))
-    html+=numCell(Ns(r.cash))
-    html+=numCell(Ns(r.card),'#1565c0')
-    html+=numCell(r.cardFee>0?Ns(r.cardFee):'—','#888')
-    html+=numCell(Ns(r.net),'','',)
-    html+=numCell(hasAdvance?Ns(r.advance):'—',hasAdvance?'#c62828':'#bbb',hasAdvance)
-    html+=numCell(Ns(r.profit),'',true)
-    html+=numCell(cashRemainNeg?('-'+N(r.cashRemain)):(Ns(r.cashRemain)),cashRemainNeg?'#c62828':'')
-    html+=numCell(avgUnit>0?Ns(avgUnit):'—')
-    html+=numCell(r.attendance||0)
-    html+=numCell(r.free||0)
-    html+=numCell(r.net_shimei||0)
-    html+=numCell(r.hon_shimei||0)
-    html+=numCell(r.count||0)
-    html+=numCell((r.free||0)+(r.net_shimei||0)+(r.hon_shimei||0))
+    // サマリ行
+    const onclickAttr=multiCast?'onclick="toggleCastSub(this)"':'';
+    let html=`<tr style="border-bottom:1px solid var(--border);${rowBg}${multiCast?';cursor:pointer':''}" ${onclickAttr}>`
+    html+=Dsticky(r.day+'('+r.dow+')'+(multiCast?'▾':''),hasAdv?'#fff5f5':'#faf6f0')
+    html+=C(Ns(r.gross_work))
+    html+=C(Ns(r.gross_work))
+    html+=C(Ns(r.cash))
+    html+=C(Ns(r.card),'#1565c0')
+    html+=C(r.cardFee>0?Ns(r.cardFee):'—','#999')
+    html+=C(Ns(r.net))
+    html+=C(hasAdv?Ns(r.advance):'—',hasAdv?'#c62828':'#ccc',hasAdv)
+    html+=C(Ns(r.profit),'',true)
+    html+=C(cashNeg?'▲'+N(r.cashRemain):Ns(r.cashRemain),cashNeg?'#c62828':'')
+    html+=C(avgUnit>0?Ns(avgUnit):'—')
+    html+=C(r.attendance||0)
+    html+=C(r.free||0)
+    html+=C(r.net_shimei||0)
+    html+=C(r.hon_shimei||0)
+    html+=C(r.count||0)
+    html+=C((r.free||0)+(r.net_shimei||0)+(r.hon_shimei||0))
     html+='</tr>'
 
-    // キャスト明細行（複数人いる日のみ展開）
-    if(castRows.length>1){
-      html+=`<tr class="cast-detail-row"><td colspan="${COL}" style="padding:0">`
-      html+=`<table style="width:100%;border-collapse:collapse;background:rgba(0,0,0,.02)">`
+    // キャスト内訳行（同じ <tbody> 内に直接展開→列が揃う）
+    if(multiCast){
       castRows.forEach(c=>{
-        const cHasAdv=c.advance>0
-        const cCashNeg=c.cashRemain<0
-        html+=`<tr style="border-bottom:1px solid var(--border)">`
-        html+=`<td style="${stickyBase}background:${cHasAdv?'#fff0f0':'rgba(250,246,240,.7)'};font-weight:600;font-size:.62rem;padding:.15rem .3rem .15rem .7rem;min-width:44px">${c.castName}</td>`
-        html+=numCell(Ns(c.cash+c.cardBase))
-        html+=numCell(Ns(c.cash+c.cardBase))
-        html+=numCell(Ns(c.cash))
-        html+=numCell(Ns(c.card),'#1565c0')
-        html+=`<td></td>`
-        html+=numCell(Ns(c.net))
-        html+=numCell(cHasAdv?Ns(c.advance):'—',cHasAdv?'#c62828':'#bbb',cHasAdv)
-        html+=`<td></td>`
-        html+=numCell(cCashNeg?('-'+N(c.cashRemain)):Ns(c.cashRemain),cCashNeg?'#c62828':'')
+        const cAdv=c.advance>0
+        const cNeg=c.cashRemain<0
+        const cbg=cAdv?'#fff0f0':'rgba(250,246,240,.8)'
+        html+=`<tr class="cast-sub" style="border-bottom:1px solid var(--border);background:rgba(0,0,0,.015)">`
+        html+=Dcast(c.castName,cbg)
+        html+=C(Ns(c.cash+c.cardBase))  // 総売上
+        html+=C(Ns(c.cash+c.cardBase))  // 純売上
+        html+=C(Ns(c.cash))             // 現金売上
+        html+=C(Ns(c.card),'#1565c0')  // カード
+        html+=C('—','#ccc')            // 手数料（キャスト個別は省略）
+        html+=C(Ns(c.net))             // 委託金
+        html+=C(cAdv?Ns(c.advance):'—',cAdv?'#c62828':'#ccc',cAdv) // 立替金
+        html+=C('—','#ccc')            // 粗利益（店合計で管理）
+        html+=C(cNeg?'▲'+N(c.cashRemain):Ns(c.cashRemain),cNeg?'#c62828':'') // 現金残
         html+=`<td colspan="7"></td>`
         html+='</tr>'
       })
-      html+=`</table></td></tr>`
     }
     return html
   }
 
+  // 合計行
+  const totAdv=tot.advance>0
+  const totCashNeg=tot.cashRemain<0
   const totRow=`<tr style="background:var(--surface2);border-top:2px solid var(--accent)">
-    <td style="${stickyBase}background:var(--surface2);font-size:.65rem">合計</td>
+    <td style="position:sticky;left:0;background:var(--surface2);z-index:1;padding:.25rem .35rem;font-size:.65rem;font-weight:700;border-right:1px solid var(--border)">合計</td>
     ${[Ns(tot.gross_work),Ns(tot.gross_work),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
-       tot.advance>0?Ns(tot.advance):'—',Ns(tot.profit),
-       tot.cashRemain<0?('-'+N(tot.cashRemain)):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,(tot.free||0)+(tot.net_shimei||0)+(tot.hon_shimei||0)]
-      .map((v,i)=>`<td style="text-align:right;padding:.22rem .12rem;font-size:.63rem;font-weight:700${i===7?';color:#c62828':i===3?';color:#1565c0':i===6&&tot.advance>0?';color:#c62828':''}">${v}</td>`).join('')}
+       totAdv?Ns(tot.advance):'—',Ns(tot.profit),
+       totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,(tot.free||0)+(tot.net_shimei||0)+(tot.hon_shimei||0)]
+      .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===6&&totAdv?';color:#c62828':i===3?';color:#1565c0':i===8&&totCashNeg?';color:#c62828':''}">${v}</td>`).join('')}
   </tr>`
 
-  const legend=`<div style="display:flex;gap:.6rem;font-size:.6rem;color:var(--text3);margin-bottom:.35rem;flex-wrap:wrap;align-items:center">
-    <span style="display:flex;align-items:center;gap:.2rem"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(198,40,40,.15)"></span>立替あり</span>
-    <span>▼タップでキャスト内訳</span>
+  const legend=`<div style="display:flex;gap:.7rem;font-size:.6rem;color:var(--text3);margin-bottom:.35rem;flex-wrap:wrap;align-items:center">
+    <span style="display:flex;align-items:center;gap:.2rem"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:rgba(198,40,40,.2)"></span>立替あり</span>
+    <span>▾のある行はタップでキャスト内訳</span>
   </div>`
 
-  area.innerHTML=legend+`<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid var(--border)">
-    <table style="width:100%;border-collapse:collapse;min-width:640px">${thead}<tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody></table></div>`
+  // max-height でスクロールコンテナを作り、thead の sticky を有効化
+  area.innerHTML=legend+`<div style="overflow:auto;-webkit-overflow-scrolling:touch;border-radius:8px;border:1px solid var(--border);max-height:70vh">
+    <table style="width:100%;border-collapse:collapse;min-width:680px">${thead}<tbody>${dailyRows.map(makeRow).join('')}${totRow}</tbody></table></div>`
 }
 
 // ── キャスト成績表：白背景セル ──
