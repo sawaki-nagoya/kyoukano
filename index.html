@@ -4759,9 +4759,12 @@ async function renderMonthlyContent(){
       let wCash=0,wCard=0,wCardBase=0
       wRvs.forEach(r=>{const am=calcRv(r);wCard+=am.card;wCardBase+=am.cardBase||0;wCash+=am.cash})
       const wNet=w.net||w.back||0
+      const wDisc=(w.sessions||[]).reduce((s2,sess)=>s2+(sess.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0),0)
+      const wSales=w.sales||0
+      const wGross=wSales+wDisc  // 割引前の総売上
       const wAdvance=Math.max(0,wNet-wCash)
       const wCashRemain=wCash-wNet
-      return {castName:w.castName,net:wNet,cash:wCash,card:wCard,cardBase:wCardBase,advance:wAdvance,cashRemain:wCashRemain,count:w.count||0}
+      return {castName:w.castName,net:wNet,cash:wCash,card:wCard,cardBase:wCardBase,advance:wAdvance,cashRemain:wCashRemain,count:w.count||0,disc:wDisc,gross:wGross,sales:wSales}
     })
     const totalCash=castRows.reduce((s,c)=>s+c.cash,0)
     const totalAdvance=castRows.reduce((s,c)=>s+c.advance,0)
@@ -4964,7 +4967,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     ${[Ns(tot.gross),Ns(tot.disc>0?tot.gross_work:tot.gross),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
        totAdv?Ns(tot.advance):'—',Ns(tot.profit),
        totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
-      .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===6&&totAdv?';color:#c62828':i===3?';color:#1565c0':i===8&&totCashNeg?';color:#c62828':''}">${v}</td>`).join('')}
+      .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===2?';color:#c62828':i===7&&totAdv?';color:#c62828':i===4?';color:#1565c0':i===9&&totCashNeg?';color:#c62828':''}">${v}</td>`).join('')}
   </tr>`
 
   const legend=`<div style="display:flex;gap:.7rem;font-size:.6rem;color:var(--text3);margin-bottom:.35rem;flex-wrap:wrap;align-items:center">
