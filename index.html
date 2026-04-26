@@ -396,12 +396,14 @@ tr:last-child td{border-bottom:none}
 
     <!-- 店舗：委託金精算 -->
     <div class="panel" id="p-owner-salary">
-      <div class="cal-nav">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
         <button class="cal-nav-btn" onclick="ownerSalMove(-1)">‹</button>
-        <div class="cal-title" id="owner-sal-title">-</div>
+        <div class="cal-title" id="owner-sal-title" style="flex:1;text-align:center">-</div>
         <button class="cal-nav-btn" onclick="ownerSalMove(1)">›</button>
       </div>
-
+      <div style="text-align:center;margin-bottom:.5rem">
+        <button id="owner-sal-jump-btn" onclick="ownerSalReset()" style="display:none;font-size:.72rem;padding:.2rem .75rem;border-radius:20px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-weight:600">今日に戻る</button>
+      </div>
       <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
     </div>
 
@@ -981,7 +983,7 @@ function buildTimeOptions(selectedVal=''){
 
 let me=null, courses=[], opts=[], storeSettings={}
 let calMonth=ym(new Date()), salMonth=ym(new Date())
-let ownerCalMonth=ym(new Date()), ownerSalMonth=ym(new Date())
+let ownerCalMonth=ym(new Date()), ownerSalMonth=ym(new Date()), ownerSalDate=null
 let selectedDate=null, myShifts=[]
 let sheetCastId=null, sheetCastName='', sheetDate='', sheetFee={...DEFAULT_FEE}, sheetDiscs=[]
 let roomShiftId=null, feeCastId=null, discCastId=null, editShiftId=null
@@ -3889,107 +3891,85 @@ async function deleteDisc(id){
 }
 
 // ── 店舗委託金精算 ──
-function ownerSalMove(d){ownerSalMonth=addMonth(ownerSalMonth,d);loadOwnerSalary()}
+function ownerSalMove(d){
+  const base=ownerSalDate||bizDay()
+  const dt=new Date(base);dt.setDate(dt.getDate()+d)
+  ownerSalDate=dt.toISOString().slice(0,10)
+  const jumpBtn=document.getElementById('owner-sal-jump-btn')
+  if(jumpBtn)jumpBtn.style.display=ownerSalDate===bizDay()?'none':''
+  loadOwnerSalary()
+}
+function ownerSalReset(){
+  ownerSalDate=null
+  const jumpBtn=document.getElementById('owner-sal-jump-btn')
+  if(jumpBtn)jumpBtn.style.display='none'
+  loadOwnerSalary()
+}
 
 async function loadOwnerSalary(){
-  const[y,m]=ownerSalMonth.split('-').map(Number)
-  document.getElementById('owner-sal-title').textContent=y+'年'+m+'月'
+  const td=ownerSalDate||bizDay()
+  const[y,m,d]=td.split('-')
+  const isTodaySal=td===bizDay()
+  document.getElementById('owner-sal-title').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'+(isTodaySal?' (今日)':'')
   const area=document.getElementById('owner-sal-area')
   area.innerHTML='<div class="spin">読み込み中...</div>'
-  const{data:worksRaw}=await sb.from('works').select('*').gte('date',ownerSalMonth+'-01').lt('date',nextYM(ownerSalMonth)+'-01').order('date')
+  const{data:worksRaw}=await sb.from('works').select('*').eq('date',td).order('cast_id')
   const{data:castList3}=await sb.from('casts').select('id,name')
   const getName3=id=>{const c=(castList3||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
-  const works=(worksRaw||[]).map(w=>({...w,casts:{name:getName3(w.cast_id)}}))
-  const _setKpi=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v}
+  const works=(worksRaw||[]).map(w=>({...w,castName:getName3(w.cast_id)}))
   if(!works||!works.length){
-    _setKpi('o-gross','¥0');_setKpi('o-disc','¥0');_setKpi('o-sales','¥0')
-    _setKpi('o-back','¥0');_setKpi('o-count','0件');_setKpi('o-cash','¥0');_setKpi('o-card','¥0')
-    area.innerHTML='<div class="empty">この月の記録はまだありません</div>'
+    area.innerHTML='<div class="empty">この日の記録はありません</div>'
     return
   }
+  // 日計サマリー
   const totalSales=works.reduce((s,w)=>s+(w.sales||0),0)
   const totalNet=works.reduce((s,w)=>s+(w.net||w.back||0),0)
-  const totalCount=works.reduce((s,w)=>s+(w.count||0),0)
-  const totalGrossProfit=totalSales-totalNet
-  // 割引合計を計算して純売上高と総売上高を算出
-  const totalDiscAll2=works.reduce((sum,w)=>{
-    const ss=w.sessions||[]
-    return sum+ss.reduce((s2,s)=>{
-      const disc=(s.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0)
-      return s2+disc
+  const totalDiscAll=works.reduce((sum,w)=>{
+    return sum+(w.sessions||[]).reduce((s2,s)=>{
+      return s2+(s.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0)
     },0)
   },0)
-  const grossSalesKpi=totalSales+totalDiscAll2
-  const totalMisc=works.reduce((s,w)=>s+(w.misc||0),0)
-  const totalGrossProfit2=totalSales-totalNet
-  _setKpi('o-gross',fmt(grossSalesKpi));_setKpi('o-disc',totalDiscAll2>0?'-'+fmt(totalDiscAll2):'¥0')
-  _setKpi('o-sales',fmt(totalSales));_setKpi('o-back',fmt(totalNet))
-  _setKpi('o-cash',fmt(totalMisc));_setKpi('o-card',fmt(totalGrossProfit2))
-
-  const bycast={}
-  works.forEach(w=>{
-    const n=w.casts?.name||'不明'
-    if(!bycast[n])bycast[n]={sales:0,back:0,net:0,misc:0,shop_drop:0,count:0,works:[]}
-    bycast[n].sales+=w.sales||0
-    bycast[n].back+=w.back||0
-    bycast[n].net+=w.net||w.back||0
-    bycast[n].misc+=w.misc||0
-    bycast[n].shop_drop+=w.shop_drop||0
-    bycast[n].count+=w.count||0
-    bycast[n].works.push(w)
-  })
-  const todayStr=today()
-  area.innerHTML=Object.entries(bycast).map(([name,d])=>{
-    // 割引合計をworksから集計
-    const totalDiscAll=d.works.reduce((sum,w)=>{
-      const ss=w.sessions||[]
-      return sum+ss.reduce((s2,s)=>{
-        const disc=(s.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0)
-        return s2+disc
-      },0)
-    },0)
-    const grossSales=d.sales+totalDiscAll
-    const shopDrop=d.sales-d.net
+  const totalGross=totalSales+totalDiscAll
+  const totalProfit=totalSales-totalNet
+  const totalCount=works.reduce((s,w)=>s+(w.count||0),0)
+  const summaryHtml=`<div class="card" style="margin-bottom:.75rem">
+    <div class="sal-hero">
+      <div class="sal-row"><span class="sal-rl">総売上高</span><span class="sal-rv">${fmt(totalGross)}</span></div>
+      ${totalDiscAll>0?`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(totalDiscAll)}</span></div>`:''}
+      <div class="sal-row"><span class="sal-rl" style="font-weight:700">純売上高</span><span class="sal-rv tot">${fmt(totalSales)}</span></div>
+      <div class="sal-row"><span class="sal-rl">委託金合計</span><span class="sal-rv">${fmt(totalNet)}</span></div>
+      <div class="sal-row"><span class="sal-rl" style="font-weight:700">粗利益</span><span class="sal-rv tot">${fmt(totalProfit)}</span></div>
+      <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${totalCount}件</span></div>
+    </div>
+  </div>`
+  // キャスト別カード
+  const castCards=works.map(w=>{
+    const name=w.castName
+    const sessions=w.sessions||[]
+    const disc=sessions.reduce((s2,s)=>{return s2+(s.discounts||[]).reduce((a,dd)=>a+(dd.amount||0),0)},0)
+    const gross=(w.sales||0)+disc
+    const shopDrop=(w.sales||0)-(w.net||w.back||0)
+    const misc=w.misc||0
+    const detail=sessions.length?sessions.map((s,i)=>`<div style="font-size:.76rem;color:var(--text3);padding:.15rem 0">${i+1}本目：${s.course_name||''}${s.shimei_type?'：'+s.shimei_type:''}${(s.options||[]).map(o=>('：'+(o.name||o))).join('')}</div>`).join(''):''
     return `<div class="card">
       <div class="card-title">${name}</div>
       <div class="sal-hero">
-        <div class="sal-row"><span class="sal-rl">総売上高</span><span class="sal-rv">${fmt(grossSales)}</span></div>
-        ${totalDiscAll>0?`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(totalDiscAll)}</span></div>`:''}
-        <div class="sal-row"><span class="sal-rl" style="font-weight:700">純売上高</span><span class="sal-rv tot">${fmt(d.sales)}</span></div>
-        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(d.net)}</span></div>
-        <div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">${d.misc>0?'-'+fmt(d.misc):'¥0'}</span></div>
+        <div class="sal-row"><span class="sal-rl">総売上高</span><span class="sal-rv">${fmt(gross)}</span></div>
+        ${disc>0?`<div class="sal-row"><span class="sal-rl">└ 割引</span><span class="sal-rv neg">-${fmt(disc)}</span></div>`:''}
+        <div class="sal-row"><span class="sal-rl">純売上高</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
+        <div class="sal-row"><span class="sal-rl">委託金</span><span class="sal-rv">${fmt(w.net||w.back||0)}</span></div>
+        ${misc>0?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(misc)}</span></div>`:''}
         <div class="sal-row"><span class="sal-rl" style="font-weight:700">粗利益</span><span class="sal-rv tot">${fmt(shopDrop)}</span></div>
-        <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${d.count}件</span></div>
+        <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}件</span></div>
       </div>
-      ${d.works.map((w,wi)=>{
-        const sessions=w.sessions||[]
-        const isToday=w.date===todayStr
-        const detail=sessions.length?sessions.map((s,i)=>`<div style="font-size:.76rem;color:var(--text3);padding:.15rem 0">${i+1}本目：${s.course_name}：${s.shimei_type}${(s.options||[]).map(o=>('：'+o.name)).join('')}</div>`).join(''):''
-        if(isToday){
-          return `<div style="border-top:1px solid var(--border);padding:.5rem 0;margin-top:.5rem">
-            <div style="font-size:.8rem;font-weight:600">${jpDate(w.date)}</div>
-            ${detail}
-            <div style="font-size:.8rem;color:var(--gtx);margin-top:.25rem">委託金：${fmt(w.net||w.back)}</div>
-            <div style="display:flex;gap:.35rem;margin-top:.35rem">
-              <button class="btn btn-blue btn-xs" onclick="openWorkSheet('${w.id}','${name}','${w.date}',${w.cast_id})">修正</button>
-              <button class="btn btn-red btn-xs" onclick="deleteWork(${w.id})">削除</button>
-            </div>
-          </div>`
-        } else {
-          return `<div style="border-top:1px solid var(--border);padding:.4rem 0;margin-top:.4rem;display:flex;justify-content:space-between;align-items:center">
-            <div>
-              <div style="font-size:.8rem;font-weight:600">${jpDate(w.date)}</div>
-              <div style="font-size:.75rem;color:var(--text3)">${w.count||0}本　委託金：${fmt(w.net||w.back)}</div>
-            </div>
-            <div style="display:flex;gap:.35rem">
-              <button class="btn btn-blue btn-xs" onclick="openWorkSheet('${w.id}','${name}','${w.date}',${w.cast_id})">修正</button>
-              <button class="btn btn-red btn-xs" onclick="deleteWork(${w.id})">削除</button>
-            </div>
-          </div>`
-        }
-      }).join('')}
+      ${detail?`<div style="border-top:1px solid var(--border);padding:.4rem 0;margin-top:.4rem">${detail}</div>`:''}
+      <div style="display:flex;gap:.35rem;margin-top:.5rem">
+        <button class="btn btn-blue btn-xs" onclick="openWorkSheet('${w.id}','${name}','${w.date}',${w.cast_id})">修正</button>
+        <button class="btn btn-red btn-xs" onclick="deleteWork(${w.id})">削除</button>
+      </div>
     </div>`
   }).join('')
+  area.innerHTML=summaryHtml+castCards
 }
 
 async function deleteWork(id){
@@ -4986,7 +4966,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     <td style="position:sticky;left:0;background:var(--surface2);z-index:1;padding:.25rem .35rem;font-size:.65rem;font-weight:700;border-right:1px solid var(--border)">合計</td>
     ${[Ns(tot.gross),tot.disc>0?'-'+Ns(tot.disc):'—',Ns(tot.disc>0?tot.gross_work:tot.gross),Ns(tot.cash),Ns(tot.card),tot.cardFee>0?Ns(tot.cardFee):'—',Ns(tot.net),
        totAdv?Ns(tot.advance):'—',Ns(tot.profit),
-       totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
+       totCashNeg?'▲'+N(tot.cashRemain):Ns(tot.cashRemain),tot.count>0?Ns(Math.round(tot.gross_work/tot.count)):'—',tot.attendance,tot.free,tot.net_shimei,tot.hon_shimei,tot.count,tot.inquiry||'—']
       .map((v,i)=>`<td style="text-align:center;padding:.25rem .1rem;font-size:.63rem;font-weight:700${i===2?';color:#c62828':i===7&&totAdv?';color:#c62828':i===4?';color:#1565c0':i===9&&totCashNeg?';color:#c62828':''}">${v}</td>`).join('')}
   </tr>`
 
