@@ -2103,12 +2103,24 @@ async function saveReservation(){
     } else {
       // allCustomersにない場合はDBから直接取得
       const{data:dbCust}=await sb.from('customers').select('id').eq('customer_no',custNoInt).maybeSingle()
-      custId=dbCust?.id||null
+      if(dbCust?.id){
+        custId=dbCust.id
+      } else {
+        // DBにも存在しない（手動番号入力で未登録の新規顧客）→ 顧客を自動作成
+        const custName2=finalName.endsWith('様')?finalName:finalName+'様'
+        const{data:newCust,error:newCustErr}=await sb.from('customers').insert({
+          customer_no:custNoInt,name:custName2,phone:'',memo:'',ng_casts:'',is_banned:false
+        }).select('id').single()
+        if(!newCustErr&&newCust?.id){
+          custId=newCust.id
+          allCustomers.push({id:newCust.id,customer_no:custNoInt,name:custName2})
+        }
+      }
     }
   }
   if(custId){
     const{error:visitErr}=await sb.from('customer_visits').insert({
-      customer_id:custId,cast_name:_rvCastName||'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:today()
+      customer_id:custId,cast_name:_rvCastName||'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:bizDay()
     })
     if(visitErr) console.error('来店記録エラー:',visitErr.message)
   }
