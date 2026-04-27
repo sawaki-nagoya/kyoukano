@@ -2255,6 +2255,16 @@ async function loadGantt(){
        <div id="gantt-now-label" style="position:absolute;left:${nowPos}%;top:-14px;transform:translateX(-50%);font-size:.55rem;color:var(--rtx);font-weight:700;white-space:nowrap">${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}</div>`
     : ''
   if(ganttDate===todayStr) window._ganttNowTimer=setInterval(getNowLine,30000)
+  // インターバル設定取得
+  const castIdsL=[...new Set(shifts.map(s=>s.cast_id).filter(Boolean))]
+  let intervalBycastL={}
+  if(castIdsL.length){
+    const{data:feesL}=await sb.from('cast_fees').select('cast_id,interval_min').in('cast_id',castIdsL)
+    if(feesL) feesL.forEach(f=>{intervalBycastL[f.cast_id]=f.interval_min||0})
+  }
+  const COURSE_MINS_L={'50分':50,'80分':80,'100分':100,'130分':130,'延長':30}
+  const timeStrToMinL=t=>{if(!t)return null;const[h,m]=t.split(':').map(Number);return h<11?h*60+m+1440:h*60+m}
+  const minToTimeStrL=n=>{const h=Math.floor(n/60)%24;return String(h).padStart(2,'0')+':'+String(n%60).padStart(2,'0')}
   const CAST_COLORS=['#FF6B9D','#9B72CF','#4ECDC4','#FF9A56','#45B7D1','#96CEB4','#F7DC6F','#BB8FCE']
   let rows=''
   shifts.forEach((s,si)=>{
@@ -2262,18 +2272,46 @@ async function loadGantt(){
     const endPos=timeToPos(s.end_time?.slice(0,5))
     const color=CAST_COLORS[si%CAST_COLORS.length]
     const shiftW=endPos-startPos
+    const intervalMin=intervalBycastL[s.cast_id]||0
     const shiftRvs=rvByShift[s.id]||[]
-    // 予約バー
+    // 予約を時系列ソート
+    const sortedRvsL=[...shiftRvs].filter(r=>r.checkin_time).sort((a,b)=>timeStrToMinL(a.checkin_time?.slice(0,5))-timeStrToMinL(b.checkin_time?.slice(0,5)))
+    // 予約バー・インターバルバー・下部テキスト
     let rvBars=''
-    shiftRvs.forEach(r=>{
+    let belowBars=''
+    sortedRvsL.forEach((r,ri)=>{
       const rStart=timeToPos(r.checkin_time?.slice(0,5))
       const rEnd=timeToPos(r.checkout_time?.slice(0,5))
-      if(rStart===null||rEnd===null) return
-      const rW=rEnd-rStart
-      if(rW<=0) return
-      rvBars+=`<div title="${r.customer_name||''}\n${r.checkin_time?.slice(0,5)||''}-${r.checkout_time?.slice(0,5)||''}\n${r.course||''}" style="position:absolute;left:${rStart}%;width:${rW}%;top:2px;bottom:2px;background:rgba(255,149,0,.85);border-radius:3px;z-index:5;cursor:pointer;display:flex;align-items:center;overflow:hidden">
-        <span style="font-size:.52rem;color:#fff;font-weight:700;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.customer_name?.replace('様','')||''}</span>
+      if(rStart===null||rEnd===null||rEnd-rStart<=0) return
+      const nameStr=r.customer_name?.replace('様','')||''
+      const courseStr=r.course||''
+      const timeStr=(r.checkin_time?.slice(0,5)||'')+'〜'+(r.checkout_time?.slice(0,5)||'')
+      rvBars+=`<div title="${r.customer_name||''}\n${r.checkin_time?.slice(0,5)||''}-${r.checkout_time?.slice(0,5)||''}\n${r.course||''}" style="position:absolute;left:${rStart}%;width:${rEnd-rStart}%;top:2px;bottom:2px;background:rgba(255,149,0,.85);border-radius:3px;z-index:5;cursor:pointer;overflow:hidden;display:flex;flex-direction:column;justify-content:center;padding:0 3px">
+        <span style="font-size:.52rem;color:#fff;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nameStr}</span>
+        <span style="font-size:.45rem;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${courseStr}</span>
+        <span style="font-size:.42rem;color:rgba(255,255,255,.8);white-space:nowrap">${timeStr}</span>
       </div>`
+      // インターバルブロック
+      if(intervalMin>0&&r.checkout_time){
+        const coMin=timeStrToMinL(r.checkout_time.slice(0,5))
+        const intEndMin=coMin+intervalMin
+        const intEndStr=minToTimeStrL(intEndMin)
+        const intStart=timeToPos(r.checkout_time.slice(0,5))
+        const intEnd=timeToPos(intEndStr)
+        if(intStart!==null&&intEnd!==null&&intEnd-intStart>0){
+          rvBars+=`<div style="position:absolute;left:${intStart}%;width:${intEnd-intStart}%;top:2px;bottom:2px;background:repeating-linear-gradient(-45deg,rgba(80,80,80,.7),rgba(80,80,80,.7) 2px,rgba(40,40,40,.3) 2px,rgba(40,40,40,.3) 6px);border-radius:0 3px 3px 0;z-index:6;display:flex;align-items:center;justify-content:center;overflow:hidden">
+            <span style="font-size:.42rem;color:#fff;font-weight:700;white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.6)">ｲﾝﾀｰﾊﾞﾙ</span>
+          </div>`
+        }
+        // 次予約との空き計算
+        const nextRv=sortedRvsL[ri+1]
+        const nextCheckinMin=nextRv?.checkin_time?timeStrToMinL(nextRv.checkin_time.slice(0,5)):null
+        const gapMin=nextCheckinMin!==null?nextCheckinMin-intEndMin:null
+        let belowText=`⏱ 最短 ${intEndStr}〜`
+        if(gapMin!==null&&gapMin>0) belowText+=`　▷ 次予約まで ${gapMin}分空き`
+        else if(gapMin!==null&&gapMin<=0) belowText+=`　▷ 次予約まで余裕なし`
+        belowBars+=`<div style="font-size:.58rem;color:var(--text3);padding:.05rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${belowText}</div>`
+      }
     })
     // 空き時間バー
     let freeBars=''
@@ -2288,19 +2326,23 @@ async function loadGantt(){
       }
       prevEnd=r.checkout_time?.slice(0,5)||prevEnd
     })
-    rows+=`<div style="display:flex;align-items:center;margin-bottom:.5rem;gap:.4rem">
-      <div style="width:60px;min-width:60px;font-size:.72rem;font-weight:700;color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.casts?.name||'?'}</div>
-      <div style="flex:1;position:relative;height:28px;background:var(--surface2);border-radius:4px;overflow:visible">
-        ${hourLines.join('')}
-        <div style="position:absolute;left:${startPos}%;width:${shiftW}%;top:0;bottom:0;background:${color}22;border:1.5px solid ${color}55;border-radius:3px;z-index:2"></div>
-        ${freeBars}${rvBars}
-        ${nowLine}
+    rows+=`<div style="margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.4rem">
+        <div style="width:60px;min-width:60px;font-size:.72rem;font-weight:700;color:${color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.casts?.name||'?'}</div>
+        <div style="flex:1;position:relative;height:36px;background:var(--surface2);border-radius:4px;overflow:visible">
+          ${hourLines.join('')}
+          <div style="position:absolute;left:${startPos}%;width:${shiftW}%;top:0;bottom:0;background:${color}22;border:1.5px solid ${color}55;border-radius:3px;z-index:2"></div>
+          ${freeBars}${rvBars}
+          ${nowLine}
+        </div>
       </div>
+      ${belowBars?`<div style="margin-left:64px;margin-top:.1rem">${belowBars}</div>`:''}
     </div>`
   })
   // 凡例
   const legend=`<div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem;font-size:.65rem">
     <div style="display:flex;align-items:center;gap:.25rem"><div style="width:12px;height:8px;background:rgba(255,149,0,.85);border-radius:2px"></div>予約済み</div>
+    <div style="display:flex;align-items:center;gap:.25rem"><div style="width:12px;height:8px;background:repeating-linear-gradient(-45deg,rgba(80,80,80,.7),rgba(80,80,80,.7) 2px,rgba(40,40,40,.3) 2px,rgba(40,40,40,.3) 6px);border-radius:2px"></div>インターバル</div>
     <div style="display:flex;align-items:center;gap:.25rem"><div style="width:12px;height:8px;background:rgba(52,199,89,.25);border:1px dashed rgba(52,199,89,.5);border-radius:2px"></div>空き時間</div>
     ${ganttDate===todayStr?'<div style="display:flex;align-items:center;gap:.25rem"><div style="width:2px;height:10px;background:rgba(255,59,48,.7)"></div>現在時刻</div>':''}
   </div>`
