@@ -3927,8 +3927,10 @@ async function addCast(){
 }
 
 async function changePIN(castId,name){
-  const pin=prompt(name+'の新しいPIN（1〜8桁）を入力してください')
-  if(!pin)return
+  const{data:castData}=await sb.from('casts').select('pin').eq('id',castId).single()
+  const currentPin=castData?.pin||'未設定'
+  const pin=prompt(name+'のPIN変更\n\n現在のPIN：'+currentPin+'\n\n新しいPIN（1〜8桁）を入力してください')
+  if(pin===null)return
   if(pin.length<1||pin.length>8||isNaN(pin)){toast('PINは1〜8桁の数字で入力してください');return}
   const{error}=await sb.from('casts').update({pin}).eq('id',castId)
   if(error){toast('エラーが発生しました');return}
