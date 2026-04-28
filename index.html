@@ -404,6 +404,7 @@ tr:last-child td{border-bottom:none}
       <div style="text-align:center;margin-bottom:.5rem">
         <button id="owner-sal-jump-btn" onclick="ownerSalReset()" style="display:none;font-size:.72rem;padding:.2rem .75rem;border-radius:20px;border:1.5px solid var(--accent);background:transparent;color:var(--accent);cursor:pointer;font-weight:600">今日に戻る</button>
       </div>
+      <div id="owner-sal-warn"></div>
       <div id="owner-sal-area"><div class="spin">読み込み中...</div></div>
     </div>
 
@@ -4173,6 +4174,33 @@ async function loadOwnerSalary(){
   document.getElementById('owner-sal-title').textContent=y+'年'+parseInt(m)+'月'+parseInt(d)+'日'+(isTodaySal?' (今日)':'')
   const area=document.getElementById('owner-sal-area')
   area.innerHTML='<div class="spin">読み込み中...</div>'
+  // 当月の未入力警告チェック
+  const warnEl=document.getElementById('owner-sal-warn')
+  if(warnEl){
+    const today=bizDay()
+    const[ty,tm]=today.split('-')
+    const monthStart=ty+'-'+tm+'-01'
+    const nextM=new Date(parseInt(ty),parseInt(tm),1).toISOString().slice(0,10)
+    // 当月の承認済みシフトを取得（今日より前）
+    const{data:shiftsM}=await sb.from('shifts').select('date,cast_id').gte('date',monthStart).lt('date',today).eq('status','approved')
+    if(shiftsM&&shiftsM.length){
+      // シフトがある日付セットを作成
+      const shiftDates=[...new Set(shiftsM.map(s=>s.date))].sort()
+      // その日付のworksを取得
+      const{data:worksM}=await sb.from('works').select('date,cast_id').in('date',shiftDates)
+      // シフトはあるがworksがない日を検索
+      const workedDates=new Set((worksM||[]).map(w=>w.date))
+      const missingDates=shiftDates.filter(dt=>!workedDates.has(dt))
+      if(missingDates.length){
+        const labels=missingDates.map(dt=>{const[,dm,dd]=dt.split('-');return parseInt(dm)+'月'+parseInt(dd)+'日'}).join('、')
+        warnEl.innerHTML=`<div style="background:#fff3cd;border:1.5px solid #f0a500;border-radius:8px;padding:.6rem .85rem;margin-bottom:.6rem;font-size:.78rem;color:#7a5000;display:flex;align-items:flex-start;gap:.4rem"><span style="font-size:1rem;flex-shrink:0">⚠️</span><div><div style="font-weight:700;margin-bottom:.2rem">委託金が未入力の日があります（${missingDates.length}日）</div><div style="color:#5a3a00">${labels}</div></div></div>`
+      } else {
+        warnEl.innerHTML=''
+      }
+    } else {
+      warnEl.innerHTML=''
+    }
+  }
   const{data:worksRaw}=await sb.from('works').select('*').eq('date',td).order('cast_id')
   const{data:castList3}=await sb.from('casts').select('id,name')
   const getName3=id=>{const c=(castList3||[]).find(x=>Number(x.id)===Number(id));return c?c.name:'?'}
