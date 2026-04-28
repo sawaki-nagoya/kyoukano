@@ -3249,10 +3249,11 @@ async function loadGanttModal(){
           }
           const nextRvM2=sortedRvsM[ri+1]
           const nextCheckinMinM=nextRvM2?.checkin_time?timeStrToMinM(nextRvM2.checkin_time.slice(0,5)):null
-          const gapMinM=nextCheckinMinM!==null?nextCheckinMinM-intEndMinM:null
+          // 純粋空き時間 = インターバル終了 〜 次予約前インターバル開始
+          const pureGapMinB=nextCheckinMinM!==null?nextCheckinMinM-intervalMinM-intEndMinM:null
           let belowTextM=`⏱ 最短 ${intEndStrM}〜`
-          if(gapMinM!==null&&gapMinM>0) belowTextM+=`　▷ 次予約まで ${gapMinM}分空き`
-          else if(gapMinM!==null&&gapMinM<=0) belowTextM+=`　▷ 次予約まで余裕なし`
+          if(pureGapMinB!==null&&pureGapMinB>0) belowTextM+=`　▷ 純空き ${pureGapMinB}分（次予約まで ${nextCheckinMinM-intEndMinM}分）`
+          else if(pureGapMinB!==null&&pureGapMinB<=0) belowTextM+=`　▷ 次予約まで余裕なし`
           belowBarsM+=`<div style="font-size:.6rem;color:var(--text3);padding:.05rem ${PAD}px;white-space:nowrap">${belowTextM}</div>`
         }
       })
@@ -3264,17 +3265,20 @@ async function loadGanttModal(){
       ;[...sorted,{checkin_time:s.end_time?.slice(0,5),checkout_time:s.end_time?.slice(0,5)}].forEach((r,fi)=>{
         const fS=timeToPx(prevEnd),fE=timeToPx(r.checkin_time?.slice(0,5))
         const fSMin=timeStrToMinM(prevEnd),fEMin=timeStrToMinM(r.checkin_time?.slice(0,5))
-        const gapM=fEMin!==null&&fSMin!==null?fEMin-fSMin:0
         if(fS!==null&&fE!==null&&fE-fS>2){
-          // 入れられる最長コースを判定
-          const fitCourse=COURSE_LABELS.find(([m])=>gapM>=m)
-          const courseLabel=fitCourse?fitCourse[1]+' 可':gapM>0?gapM+'分':''
-          // 次予約の直前インターバル表示（前の予約のインターバルで埋まっている可能性）
-          const prevRv=sorted[fi-1]
-          const prevInterval=prevRv?intervalMinM:0
-          const prevCoMin=prevRv?.checkout_time?timeStrToMinM(prevRv.checkout_time.slice(0,5)):null
-          const intEndMin2=prevCoMin!==null?prevCoMin+prevInterval:null
-          // 空き帯の開始がインターバル終了より前（=インターバルが空き帯にめり込んでいる）なら補正済み
+          // 純粋な空き時間 = 空き帯開始側のインターバル終了 〜 終了側のインターバル開始
+          // 前の予約のインターバル分を除く
+          const prevRvForFree=fi>0?sorted[fi-1]:null
+          const prevCoMinFree=prevRvForFree?.checkout_time?timeStrToMinM(prevRvForFree.checkout_time.slice(0,5)):null
+          const afterIntEndMin=prevCoMinFree!==null?prevCoMinFree+intervalMinM:fSMin
+          // 次の予約の前インターバル開始を除く（次予約がシフト終了でない場合）
+          const isLastSlot=(fi===sorted.length) // 番兵（シフト終了）
+          const nextCheckinForFree=isLastSlot?null:timeStrToMinM(r.checkin_time?.slice(0,5))
+          const beforeIntStartMin=nextCheckinForFree!==null?nextCheckinForFree-intervalMinM:fEMin
+          // 純粋空き時間（分）
+          const pureGapMin=Math.max(0,(beforeIntStartMin??fEMin)-(afterIntEndMin??fSMin))
+          const fitCourse=COURSE_LABELS.find(([m])=>pureGapMin>=m)
+          const courseLabel=fitCourse?fitCourse[1]+' 可':pureGapMin>0?pureGapMin+'分':''
           freeBars+=`<div style="position:absolute;left:${fS}px;width:${fE-fS}px;top:3px;bottom:3px;background:rgba(52,199,89,.15);border-radius:3px;border:1.5px dashed rgba(52,199,89,.5);z-index:3;display:flex;align-items:center;justify-content:center;overflow:hidden">
             ${courseLabel&&fE-fS>28?`<span style="font-size:.44rem;color:rgba(52,150,89,.9);font-weight:800;white-space:nowrap;text-shadow:0 0 4px #fff">${courseLabel}</span>`:''}
           </div>`
