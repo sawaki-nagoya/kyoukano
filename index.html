@@ -5174,7 +5174,7 @@ function renderMonthlyDaily(area,dailyRows,tot){
     {l:'委託金',w:'54px'},{l:'立替金',w:'50px',color:'#c62828'},
     {l:'粗利益',w:'54px'},{l:'現金残',w:'54px'},
     {l:'客単価',w:'52px'},{l:'出勤',w:'30px'},
-    {l:'F',w:'26px'},{l:'ネット',w:'32px'},{l:'本指',w:'28px'},{l:'合計',w:'28px'},{l:'総数',w:'28px'}
+    {l:'フリー',w:'36px'},{l:'ネット',w:'32px'},{l:'本指',w:'28px'},{l:'合計',w:'28px'},{l:'総数',w:'28px'}
   ]
   const COL=cols.length
   // ヘッダー sticky（スクロールコンテナに max-height を設定して機能させる）
@@ -5297,7 +5297,7 @@ function renderMonthlyCast(area,castStats,fmt2){
     <table style="width:100%;border-collapse:collapse;font-size:.68rem">
       <thead><tr style="background:var(--surface2)">
         <th style="padding:.3rem .35rem;text-align:left;font-size:.6rem;position:sticky;left:0;top:0;z-index:3;background:var(--surface2);min-width:60px">キャスト</th>
-        ${th('本数')}${th('F')}${th('ネット')}${th('本指')}${th('総売上','m')}${hasDisc?th('割引','m'):''}${th('純売上','m')}${th('委託金','m')}${th('保証','m')}
+        ${th('本数')}${th('フリー')}${th('ネット')}${th('本指')}${th('総売上','m')}${hasDisc?th('割引','m'):''}${th('純売上','m')}${th('委託金','m')}${th('保証','m')}
       </tr></thead>
       <tbody>
         ${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
