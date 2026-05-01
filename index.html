@@ -1888,7 +1888,11 @@ async function openReservation(shiftId,castName,date){
     rvCastJoinedAt=feeData?.joined_at||null
   }
   if(storeDiscs&&storeDiscs.length){
-    discList.innerHTML=storeDiscs.map(d=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem"><input type="checkbox" class="rv-disc-chk" value="${d.name}" data-name="${d.name}" onchange="rvDiscWarnCheck(this,'${date}','${castName}',${JSON.stringify(rvCastJoinedAt)})" style="width:18px;height:18px;accent-color:var(--accent)"><span>${d.name}（-¥${(d.amount||0).toLocaleString()}）</span></label>`).join('')+'<div class="rv-disc-warn" style="display:none;background:#fff3cd;border:1.5px solid #f0a500;border-radius:7px;padding:.45rem .7rem;margin-top:.35rem;font-size:.75rem;color:#7a5000"></div>'
+    // data属性にdate・castName・joinedAtを保存
+    discList.dataset.rvDate=date
+    discList.dataset.rvCastName=castName
+    discList.dataset.rvJoinedAt=rvCastJoinedAt||''
+    discList.innerHTML=storeDiscs.map(d=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem"><input type="checkbox" class="rv-disc-chk" value="${d.name}" data-name="${d.name}" onchange="rvDiscWarnCheck()" style="width:18px;height:18px;accent-color:var(--accent)"><span>${d.name}（-¥${(d.amount||0).toLocaleString()}）</span></label>`).join('')+'<div class="rv-disc-warn" style="display:none;background:#fff3cd;border:1.5px solid #f0a500;border-radius:7px;padding:.45rem .7rem;margin-top:.35rem;font-size:.75rem;color:#7a5000"></div>'
   } else {
     discList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">店舗料金設定で割引を登録してください</div>'
   }
@@ -3512,16 +3516,19 @@ function removeSession(btn){
 }
 
 // 予約登録画面の割引警告チェック
-function rvDiscWarnCheck(cb,date,castName,joinedAt){
+function rvDiscWarnCheck(){
   const discList=document.getElementById('rv-discount-list')
   const warnEl=discList?.querySelector('.rv-disc-warn')
   if(!warnEl) return
+  const date=discList.dataset.rvDate||''
+  const castName=discList.dataset.rvCastName||''
+  const joinedAt=discList.dataset.rvJoinedAt||''
   const msgs=[]
   discList.querySelectorAll('.rv-disc-chk:checked').forEach(c=>{
     const name=c.dataset.name||c.value||''
     // 新人割チェック
     if(name.includes('新人割')){
-      const isNewbie=joinedAt&&joinedAt!=='null'&&Math.floor((new Date(date)-new Date(joinedAt))/(1000*60*60*24))<=30
+      const isNewbie=joinedAt&&Math.floor((new Date(date)-new Date(joinedAt))/(1000*60*60*24))<=30
       if(!isNewbie) msgs.push('⚠️ '+castName+'は新人割対象外です')
     }
     // 昼割チェック
