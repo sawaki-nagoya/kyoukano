@@ -2123,14 +2123,15 @@ async function saveReservation(){
     allCustomers.push({id:insertedCust?.id||null,customer_no:nextNo,name:custName2})
     toast('No.'+nextNo+' で顧客登録しました！')
   }
-  const{error}=await sb.from('reservations').insert({
+  const{data:newRvData,error}=await sb.from('reservations').insert({
     shift_id:shiftId,
     customer_name:finalName,is_new:isNew,shimei_type:shimei,
     course,options:opts.join(','),discount,payment,note:memo,
     checkin_time:checkin||null,checkout_time:checkout||null,
     customer_no:custNoInt
-  })
+  }).select('id').single()
   if(error){toast('エラー: '+error.message);return}
+  const newRvId=newRvData?.id||null
   // 顧客の来店記録にも追加
   let custId=null
   if(autoRegister){
@@ -2161,7 +2162,7 @@ async function saveReservation(){
   }
   if(custId){
     const{error:visitErr}=await sb.from('customer_visits').insert({
-      customer_id:custId,cast_name:_rvCastName||'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:bizDay()
+      customer_id:custId,cast_name:_rvCastName||'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:bizDay(),reservation_id:newRvId
     })
     if(visitErr) console.error('来店記録エラー:',visitErr.message)
   }
@@ -2826,6 +2827,15 @@ async function saveShiftEdit(){
 }
 async function deleteShift(){
   if(!confirm('このシフトを削除しますか？'))return
+  // このシフトに紐づく予約のIDを取得
+  const{data:shiftRvs}=await sb.from('reservations').select('id').eq('shift_id',editShiftId)
+  if(shiftRvs&&shiftRvs.length){
+    const rvIds=shiftRvs.map(r=>r.id)
+    // 来店履歴から対応レコードを削除
+    await sb.from('customer_visits').delete().in('reservation_id',rvIds)
+    // 予約も削除
+    await sb.from('reservations').delete().in('id',rvIds)
+  }
   const{error}=await sb.from('shifts').delete().eq('id',editShiftId)
   if(error){toast('エラー: '+error.message);console.error('deleteShift error:',error);return}
   toast('削除しました');closeSheet('shift-edit');loadOwnerCal()
@@ -4683,6 +4693,8 @@ function backToShiftReservations(){
 
 async function deleteRv(rvId){
   if(!confirm('この予約を削除しますか？'))return
+  // 来店履歴から対応レコードを先に削除
+  await sb.from('customer_visits').delete().eq('reservation_id',rvId)
   const{error}=await sb.from('reservations').delete().eq('id',rvId)
   if(error){toast('削除エラー: '+error.message);return}
   toast('削除しました')
