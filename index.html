@@ -3456,7 +3456,7 @@ function addSession(data=null){
   }).join(''):'<div style="font-size:.76rem;color:var(--text3)">割引設定なし</div>'
 
   // 割引警告エリア（discItems直後）
-  const discWarnHtml='<div id="disc-warn-area" style="display:none;background:#fff3cd;border:1.5px solid #f0a500;border-radius:7px;padding:.45rem .7rem;margin-top:.35rem;font-size:.75rem;color:#7a5000"></div>'
+  const discWarnHtml='<div class="disc-warn-area" style="display:none;background:#fff3cd;border:1.5px solid #f0a500;border-radius:7px;padding:.45rem .7rem;margin-top:.35rem;font-size:.75rem;color:#7a5000"></div>'
   const extCount=data?.ext_count||0
   const extPays=data?.ext_pays||[]
   // 延長チェックボックス・支払い列：延長がある場合のみ表示
@@ -3506,11 +3506,13 @@ function removeSession(btn){
 
 // 割引警告チェック
 function discWarnCheck(cb){
-  const warnEl=document.getElementById('disc-warn-area')
+  // チェックボックスの親セッションブロック内の警告エリアを取得
+  const block=cb.closest('.session-block')
+  const warnEl=block?block.querySelector('.disc-warn-area'):null
   if(!warnEl) return
   const msgs=[]
-  // チェックされている全割引を走査
-  document.querySelectorAll('.disc-check:checked').forEach(c=>{
+  // このブロック内でチェックされている割引を走査
+  block.querySelectorAll('.disc-check:checked').forEach(c=>{
     const name=c.dataset.name||''
     // 新人割チェック
     if(name.includes('新人割')){
@@ -3522,17 +3524,14 @@ function discWarnCheck(cb){
     if(name.includes('昼割')){
       const checkin=document.getElementById('rv-checkin')?.value
       if(!checkin){msgs.push('⚠️ 昼割：入室時間を先に入力してください');return}
-      const [h,m]=checkin.split(':').map(Number)
+      const[h,m]=checkin.split(':').map(Number)
       const totalMin=h*60+m
-      // 土日祝チェック
       const d=new Date(sheetDate)
       const dow=d.getDay()
       const isWeekend=dow===0||dow===6
-      // 祝日判定（簡易：土日のみ。祝日は別途対応）
       if(isWeekend){
         msgs.push('⚠️ 昼割：土日は対象外です')
       } else if(totalMin<660||totalMin>=1020){
-        // 660=11:00, 1020=17:00
         msgs.push('⚠️ 昼割：対象時間は平日11:00〜17:00です（入室'+checkin+'）')
       }
     }
