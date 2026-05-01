@@ -1880,8 +1880,15 @@ async function openReservation(shiftId,castName,date){
   // 割引一覧をチェックボックスで表示（店舗共通割引 cast_id=0 から読み込み）
   const discList=document.getElementById('rv-discount-list')
   const{data:storeDiscs}=await sb.from('cast_discounts').select('*').eq('cast_id',0).order('id')
+  // キャストの入店日を取得（新人割チェック用）
+  const{data:shiftData}=await sb.from('shifts').select('cast_id').eq('id',shiftId).single()
+  let rvCastJoinedAt=null
+  if(shiftData?.cast_id){
+    const{data:feeData}=await sb.from('cast_fees').select('joined_at').eq('cast_id',shiftData.cast_id).single()
+    rvCastJoinedAt=feeData?.joined_at||null
+  }
   if(storeDiscs&&storeDiscs.length){
-    discList.innerHTML=storeDiscs.map(d=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem"><input type="checkbox" class="rv-disc-chk" value="${d.name}" style="width:18px;height:18px;accent-color:var(--accent)"><span>${d.name}（-¥${(d.amount||0).toLocaleString()}）</span></label>`).join('')
+    discList.innerHTML=storeDiscs.map(d=>`<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem"><input type="checkbox" class="rv-disc-chk" value="${d.name}" data-name="${d.name}" onchange="rvDiscWarnCheck(this,'${date}','${castName}',${JSON.stringify(rvCastJoinedAt)})" style="width:18px;height:18px;accent-color:var(--accent)"><span>${d.name}（-¥${(d.amount||0).toLocaleString()}）</span></label>`).join('')+'<div class="rv-disc-warn" style="display:none;background:#fff3cd;border:1.5px solid #f0a500;border-radius:7px;padding:.45rem .7rem;margin-top:.35rem;font-size:.75rem;color:#7a5000"></div>'
   } else {
     discList.innerHTML='<div style="font-size:.83rem;color:var(--text3)">店舗料金設定で割引を登録してください</div>'
   }
@@ -3504,6 +3511,40 @@ function removeSession(btn){
   calcTotal2()
 }
 
+// 予約登録画面の割引警告チェック
+function rvDiscWarnCheck(cb,date,castName,joinedAt){
+  const discList=document.getElementById('rv-discount-list')
+  const warnEl=discList?.querySelector('.rv-disc-warn')
+  if(!warnEl) return
+  const msgs=[]
+  discList.querySelectorAll('.rv-disc-chk:checked').forEach(c=>{
+    const name=c.dataset.name||c.value||''
+    // 新人割チェック
+    if(name.includes('新人割')){
+      const isNewbie=joinedAt&&Math.floor((new Date(date)-new Date(joinedAt))/(1000*60*60*24))<=30
+      if(!isNewbie) msgs.push('⚠️ '+castName+'は新人割対象外です')
+    }
+    // 昼割チェック
+    if(name.includes('昼割')){
+      const checkin=document.getElementById('rv-checkin')?.value
+      if(!checkin){msgs.push('⚠️ 昼割：入室時間を先に入力してください');return}
+      const[h,m]=checkin.split(':').map(Number)
+      const totalMin=h*60+m
+      const dow=new Date(date).getDay()
+      if(dow===0||dow===6){
+        msgs.push('⚠️ 昼割：土日は対象外です')
+      } else if(totalMin<660||totalMin>=1020){
+        msgs.push('⚠️ 昼割：対象時間は平日11:00〜17:00です（入室'+checkin+'）')
+      }
+    }
+  })
+  if(msgs.length){
+    warnEl.innerHTML=msgs.join('<br>')
+    warnEl.style.display='block'
+  } else {
+    warnEl.style.display='none'
+  }
+}
 // 割引警告チェック
 function discWarnCheck(cb){
   // チェックボックスの親セッションブロック内の警告エリアを取得
