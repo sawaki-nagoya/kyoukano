@@ -3521,7 +3521,7 @@ function rvDiscWarnCheck(cb,date,castName,joinedAt){
     const name=c.dataset.name||c.value||''
     // 新人割チェック
     if(name.includes('新人割')){
-      const isNewbie=joinedAt&&Math.floor((new Date(date)-new Date(joinedAt))/(1000*60*60*24))<=30
+      const isNewbie=joinedAt&&joinedAt!=='null'&&Math.floor((new Date(date)-new Date(joinedAt))/(1000*60*60*24))<=30
       if(!isNewbie) msgs.push('⚠️ '+castName+'は新人割対象外です')
     }
     // 昼割チェック
