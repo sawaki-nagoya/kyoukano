@@ -2,8 +2,7 @@
   "name": "KYOUKANO NAGOYA",
   "short_name": "KYOUKANO",
   "description": "共感のSNS",
-  "start_url": "/",
-  "display": "standalone",
+  "start_url": "/kyoukano/",  "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#b8893a",
   "icons": [
