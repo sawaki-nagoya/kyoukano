@@ -1045,7 +1045,7 @@ async function init(){
           if(c){me={...c,is_owner:false};startApp();return}
           else{sessionStorage.removeItem('kyoukano_me')}
         } else if(parsed.is_owner){
-          me=parsed;startApp();return
+          me=parsed;subscribePush(cid);startApp();return
         }
       }
     }catch(e){sessionStorage.removeItem('kyoukano_me')}
@@ -1110,7 +1110,7 @@ async function doCastLogin(){
   if(error||!c){err.textContent='PINが正しくありません';return}
   me={...c,is_owner:false}
   sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
-  startApp()
+  subscribePush(cid);startApp()
 }
 
 function startApp(){
