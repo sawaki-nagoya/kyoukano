@@ -5778,15 +5778,14 @@ async function subscribePush(castId) {
   if (!sub) {
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: "BBzQVu1S62lYmEAv5ry8Ra0ufgrLAhpsKfeUgw6Rva3dcNA0Ze3u2PapVUmCxOeEHSoEsfcLmAn4O0zhzXjMspo"
+      applicationServerKey: "BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw"
     });
   }
-  const { data } = await sb.from("push_subscriptions").select("id").eq("cast_id", castId).eq("subscription->>endpoint", sub.toJSON().endpoint).maybeSingle();
+  const { data } = await sb.from("push_subscriptions").select("id").eq("cast_id", castId).eq("subscription", sub.toJSON());
   if (!data) {
     await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: sub.toJSON() });
   }
 }
-</script>
-</body>
+</script></body>
 </html>
 
