@@ -5775,17 +5775,14 @@ async function subscribePush(castId) {
   if (!("PushManager" in window)) return;
   try {
     const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: "BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw"
-      });
-    }
-    const { data } = await sb.from("push_subscriptions").select("id").eq("cast_id", castId);
-    if (!data || data.length === 0) {
-      await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: sub.toJSON() });
-    }
+    const oldSub = await reg.pushManager.getSubscription();
+    if (oldSub) await oldSub.unsubscribe();
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: "BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw"
+    });
+    await sb.from("push_subscriptions").delete().eq("cast_id", castId);
+    await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: sub.toJSON() });
   } catch (e) {
     console.warn("Push subscription failed:", e);
   }
