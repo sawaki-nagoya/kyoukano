@@ -226,7 +226,7 @@ tr:last-child td{border-bottom:none}
 .session-del{background:var(--rbg);border:1.5px solid var(--rbd);color:var(--rtx);border-radius:6px;padding:.28rem .55rem;font-size:.72rem;cursor:pointer}
 .session-label{font-size:.7rem;color:var(--text3);font-weight:600;margin-bottom:.25rem}
 </style>
-<link rel="manifest" href="manifest.json"> <script>if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js')}</script> </head>
+</head>
 <body>
 
 <!-- ===== LOGIN TOP ===== -->
@@ -955,7 +955,6 @@ const OWNER_PIN = localStorage.getItem('kyoukano_owner_pin') || '2580'
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-  async function notifyLine(type, data) {   try {     await fetch(`${SUPABASE_URL}/functions/v1/notify-line`, {       method: 'POST',       headers: {         'Authorization': `Bearer ${SUPABASE_KEY}`,         'Content-Type': 'application/json'       },       body: JSON.stringify({ type, data })     })   } catch(e) {     console.warn('LINE通知エラー:', e)   } } async function notifyLine(type, data) {   try {     await fetch(`${SUPABASE_URL}/functions/v1/notify-line`, {       method: 'POST',       headers: {         'Authorization': `Bearer ${SUPABASE_KEY}`,         'Content-Type': 'application/json'       },       body: JSON.stringify({ type, data })     })   } catch(e) {     console.warn('LINE通知エラー:', e)   } } async function notifyLine(type, data) {   try {     await fetch(`${SUPABASE_URL}/functions/v1/notify-line`, {       method: 'POST',       headers: {         'Authorization': `Bearer ${SUPABASE_KEY}`,         'Content-Type': 'application/json'       },       body: JSON.stringify({ type, data })     })   } catch(e) {     console.warn('LINE通知エラー:', e)   } } async function notifyLine(type, data) {   try {     await fetch(`${SUPABASE_URL}/functions/v1/notify-line`, {       method: 'POST',       headers: {         'Authorization': `Bearer ${SUPABASE_KEY}`,         'Content-Type': 'application/json'       },       body: JSON.stringify({ type, data })     })   } catch(e) {     console.warn('LINE通知エラー:', e)   } } async function notifyLine(type, data) {   try {     await fetch(`${SUPABASE_URL}/functions/v1/notify-line`, {       method: 'POST',       headers: {         'Authorization': `Bearer ${SUPABASE_KEY}`,         'Content-Type': 'application/json'       },       body: JSON.stringify({ type, data })     })   } catch(e) {     console.warn('LINE通知エラー:', e)   } }
 const ROOMS = ['堀田Aルーム','堀田Bルーム','堀田Cルーム','金山ルーム']
 const ROOM_COLORS = {
   '堀田Aルーム': {bg:'#fff0f6',tx:'#be185d',bd:'#fbcfe8',card:'#fce7f3'},
@@ -1045,7 +1044,7 @@ async function init(){
           if(c){me={...c,is_owner:false};startApp();return}
           else{sessionStorage.removeItem('kyoukano_me')}
         } else if(parsed.is_owner){
-          me=parsed;subscribePush(cid);startApp();return
+          me=parsed;startApp();return
         }
       }
     }catch(e){sessionStorage.removeItem('kyoukano_me')}
@@ -1110,7 +1109,7 @@ async function doCastLogin(){
   if(error||!c){err.textContent='PINが正しくありません';return}
   me={...c,is_owner:false}
   sessionStorage.setItem('kyoukano_me',JSON.stringify(me))
-  subscribePush(cid);startApp()
+  startApp()
 }
 
 function startApp(){
@@ -1131,7 +1130,7 @@ function startApp(){
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
-      subscribePush(me.id)
+    subscribePush(me.id)
   }
 }
 
@@ -2819,7 +2818,7 @@ async function confirmRoomAssign(shiftId){
   setTimeout(()=>loadOwnerCal(),2000)
 }
 
-async function approveShift(id){const{data:s}=await sb.from('shifts').select('cast_id,date,start_time,end_time').eq('id',id).single();await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');await notifyLine('shift_approved',{cast_id:s.cast_id,date:s.date,start_time:s.start_time,end_time:s.end_time});loadOwnerCal()}
+async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
 async function rejectShift(id){if(!confirm('却下しますか？'))return;await sb.from('shifts').update({status:'rejected'}).eq('id',id);toast('却下しました');loadOwnerCal()}
 
 function openShiftEdit(id,name,date,start,end,note){
@@ -5771,5 +5770,23 @@ async function runImport(){
   </div>
 </div>
 
-<script> async function subscribePush(castId) {   if (!('PushManager' in window)) return;   const reg = await navigator.serviceWorker.ready;   const existing = await reg.pushManager.getSubscription();   if (existing) return;   const sub = await reg.pushManager.subscribe({     userVisibleOnly: true,     applicationServerKey: 'BBzQVu1S62lYmEAv5ry8Ra0ufgrLAhpsKfeUgw6Rva3dcNA0Ze3u2PapVUmCxOeEHSoEsfcLmAn4O0zhzXjMspo'   });   await sb.from('push_subscriptions').insert({ cast_id: castId, subscription: sub }); } </script> </body>
+<script>
+async function subscribePush(castId) {
+  if (!("PushManager" in window)) return;
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: "BBzQVu1S62lYmEAv5ry8Ra0ufgrLAhpsKfeUgw6Rva3dcNA0Ze3u2PapVUmCxOeEHSoEsfcLmAn4O0zhzXjMspo"
+    });
+  }
+  const { data } = await sb.from("push_subscriptions").select("id").eq("cast_id", castId).eq("subscription->>endpoint", sub.toJSON().endpoint).maybeSingle();
+  if (!data) {
+    await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: sub.toJSON() });
+  }
+}
+</script>
+</body>
 </html>
+
