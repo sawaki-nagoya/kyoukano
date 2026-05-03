@@ -1131,7 +1131,7 @@ function startApp(){
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
-  }
+    subscribePush(me.id)  
 }
 
 function doLogout(){
