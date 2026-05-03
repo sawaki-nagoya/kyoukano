@@ -5771,3 +5771,5 @@ async function runImport(){
 </div>
 
 <script> async function subscribePush(castId) {   if (!('PushManager' in window)) return;   const reg = await navigator.serviceWorker.ready;   let sub = await reg.pushManager.getSubscription();   if (!sub) {     sub = await reg.pushManager.subscribe({       userVisibleOnly: true,       applicationServerKey: 'BBzQVu1S62lYmEAv5ry8Ra0ufgrLAhpsKfeUgw6Rva3dcNA0Ze3u2PapVUmCxOeEHSoEsfcLmAn4O0zhzXjMspo'     });   }   const { data, error } = await sb.from('push_subscriptions').select('id').eq('cast_id', castId).eq('subscription->>endpoint', sub.toJSON().endpoint).maybeSingle();   if (!data) {     await sb.from('push_subscriptions').insert({ cast_id: castId, subscription: sub.toJSON() });   } } </script>
+</body>
+</html>
