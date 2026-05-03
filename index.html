@@ -5778,8 +5778,7 @@ async function subscribePush(castId) {
   if (!sub) {
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: "BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw"
-    });
+      applicationServerKey: "BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw"    });
   }
   const { data } = await sb.from("push_subscriptions").select("id").eq("cast_id", castId).eq("subscription", sub.toJSON());
   if (!data) {
