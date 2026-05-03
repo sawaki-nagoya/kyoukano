@@ -5797,8 +5797,7 @@ async function subscribePush(castId) {
     const { error: delErr } = await sb.from("push_subscriptions").delete().eq("cast_id", castId);
     if (delErr) console.warn("[Push] delete error:", delErr);
     const { error: insErr } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
-    if (insErr) { console.error("[Push] insert失敗:", insErr); } else { console.log("[Push] ✅ 保存成功！"); }
-  } catch (e) {
+    if (insErr) { console.error("[Push] insert失敗:", insErr); alert("失敗: " + JSON.stringify(insErr)); } else { console.log("[Push] ✅ 保存成功！"); alert("Push登録成功！"); }  } catch (e) {
     console.error("[Push] エラー:", e.name, e.message);
   }
 }</script>
