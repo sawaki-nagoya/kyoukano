@@ -1446,8 +1446,7 @@ async function loadMySalary(){
   // ── 今日の予約リアルタイム表示 ──
   const todayStr=today()
   const todayArea=document.getElementById('sal-today-area')
-  if(todayArea){
-    if(salMonth===todayStr.slice(0,7)){
+  if(todayArea && salMonth===todayStr.slice(0,7)){
     // cast_feesを取得（予想バック計算用）
     const{data:myFee}=await sb.from('cast_fees').select('*').eq('cast_id',me.id).single()
     const fee=myFee||DEFAULT_FEE
@@ -1486,17 +1485,12 @@ async function loadMySalary(){
       const ob=opDetails.reduce((s,x)=>s+x.back,0)
       return{cb,sb2,ob,opDetails,total:cb+sb2+ob}
     }
-    // 今日のシフトを取得（ステータス問わず）
-    const{data:todayShifts}=await sb.from('shifts').select('id').eq('cast_id',me.id).eq('date',todayStr)
+    // 今日のシフトを取得
+    const{data:todayShifts}=await sb.from('shifts').select('id').eq('cast_id',me.id).eq('date',todayStr).eq('status','approved')
     let todayHtml=''
-    const todayRvs_all=[]
     if(todayShifts&&todayShifts.length){
       const sids=todayShifts.map(s=>s.id)
-      const{data:_rvs}=await sb.from('reservations').select('*').in('shift_id',sids).order('checkin_time')
-      ;(_rvs||[]).forEach(r=>todayRvs_all.push(r))
-    }
-    {
-      const todayRvs=todayRvs_all
+      const{data:todayRvs}=await sb.from('reservations').select('*').in('shift_id',sids).order('checkin_time')
       // customer_noからcustomer_nameを補完
       const custNos=[...new Set((todayRvs||[]).map(r=>r.customer_no).filter(Boolean))]
       let custMap={}
@@ -1526,7 +1520,7 @@ async function loadMySalary(){
         if(pj2.option==='カード') todayCardTotal+=optTotal; else todayCashTotal+=optTotal
         todayBackTotal+=est2.total
       })
-      // サマリーバーは常に表示（予約0本でも表示）
+      // サマリーバー：本数 / 現金・カード・合計 / バック合計（4列）
       todayHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
         <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
           <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">本数</div>
@@ -1591,16 +1585,10 @@ async function loadMySalary(){
                   <th style="${cellP};font-size:.65rem;color:var(--text3);font-weight:500;text-align:center">支払い方法</th>
                 </tr></thead>
                 <tbody>${tblRows}</tbody>
-                <tfoot>
-                  <tr style="border-top:1.5px solid rgba(0,0,0,.08)">
-                    <td colspan="2" style="${cellP};font-size:.77rem;font-weight:600">合計</td>
-                    <td colspan="2" style="${cellP};font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(est.total)}</td>
-                  </tr>
-                  <tr style="border-top:1px solid rgba(0,0,0,.06);background:rgba(0,0,0,.02)">
-                    <td colspan="2" style="${cellP};font-size:.72rem;color:var(--text3)">店舗利益（参考）</td>
-                    <td colspan="2" style="${cellP};font-size:.77rem;font-weight:600;color:var(--text3);text-align:right">${fmt(rows.reduce((s,r)=>s+r.amt,0)-est.total)}</td>
-                  </tr>
-                </tfoot>
+                <tfoot><tr style="border-top:1.5px solid rgba(0,0,0,.08)">
+                  <td colspan="2" style="${cellP};font-size:.77rem;font-weight:600">合計</td>
+                  <td colspan="2" style="${cellP};font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(est.total)}</td>
+                </tr></tfoot>
               </table>
             </div>
           </div>`
@@ -1608,11 +1596,7 @@ async function loadMySalary(){
       }
     }
     todayArea.innerHTML=todayHtml
-    todayArea.style.display=salTabMode==='daily'?'block':'none'
-    } else {
-      todayArea.innerHTML=''
-      todayArea.style.display='none'
-    }
+    todayArea.style.display=(todayHtml&&salTabMode==='daily')?'block':'none'
   } else if(todayArea){
     todayArea.innerHTML=''
     todayArea.style.display='none'
@@ -1666,8 +1650,6 @@ async function loadMySalary(){
       const optBack=s.opt_back||0
       const extBackTotal=(s.extensions||[]).reduce((sum,e)=>sum+(e.back||0),0)
       const sessionNet=courseBack+shimeiBack+optBack+extBackTotal
-      const sessionSalesAmt=s.sales||0
-      const sessionProfit=sessionSalesAmt-sessionNet
       const hasShimei=s.shimei_type&&s.shimei_type!=='フリー'
       const opts=(s.options||[]).map(o=>o.name).filter(Boolean)
       const exts=(s.extensions||[])
@@ -1714,16 +1696,10 @@ async function loadMySalary(){
               <th style="padding:.3rem .5rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:center">支払い方法</th>
             </tr></thead>
             <tbody>${sTblRows}</tbody>
-            <tfoot>
-              <tr style="border-top:1.5px solid rgba(0,0,0,.08)">
-                <td colspan="2" style="padding:.5rem .5rem;font-size:.77rem;font-weight:600">合計</td>
-                <td colspan="2" style="padding:.5rem .5rem;font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(sessionNet)}</td>
-              </tr>
-              ${sessionSalesAmt>0?`<tr style="border-top:1px solid rgba(0,0,0,.06);background:rgba(0,0,0,.02)">
-                <td colspan="2" style="padding:.4rem .5rem;font-size:.72rem;color:var(--text3)">店舗利益</td>
-                <td colspan="2" style="padding:.4rem .5rem;font-size:.77rem;font-weight:600;color:var(--text3);text-align:right">${fmt(sessionProfit)}</td>
-              </tr>`:''}
-            </tfoot>
+            <tfoot><tr style="border-top:1.5px solid rgba(0,0,0,.08)">
+              <td colspan="2" style="padding:.5rem .5rem;font-size:.77rem;font-weight:600">合計</td>
+              <td colspan="2" style="padding:.5rem .5rem;font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(sessionNet)}</td>
+            </tr></tfoot>
           </table>
         </div>
       </div>`
