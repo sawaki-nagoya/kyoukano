@@ -1135,7 +1135,25 @@ function startApp(){
     const pushBtn = document.createElement('button');
     pushBtn.textContent = '🔔 通知を有効にする';
     pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
-    pushBtn.onclick = function() { pushBtn.remove(); subscribePush(me.id); };
+    pushBtn.onclick = async function() {
+      pushBtn.remove();
+      const castId = me.id;
+      try {
+        const reg = await navigator.serviceWorker.register("/kyoukano/sw.js");
+        const oldSub = await reg.pushManager.getSubscription();
+        if (oldSub) await oldSub.unsubscribe();
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array("BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw")
+        });
+        const subJson = sub.toJSON();
+        await sb.from("push_subscriptions").delete().eq("cast_id", castId);
+        const { error } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+        if (error) { alert("登録失敗: " + JSON.stringify(error)); } else { alert("Push登録成功！"); }
+      } catch(e) {
+        alert("Pushエラー: " + e.name + " / " + e.message);
+      }
+    };
     document.body.appendChild(pushBtn);
   }
 }
