@@ -5784,20 +5784,19 @@ alert("subscribePush呼ばれた! castId=" + castId);
     const raw = atob(base64);
     return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
   }
-  try {
-    let reg; try { reg = await navigator.serviceWorker.register("/kyoukano/sw.js"); alert("SW登録成功: " + reg.scope); } catch(swErr) { alert("SW登録失敗: " + swErr.message); return; }
-    console.log("[Push] SW ready:", reg.scope);
-    const oldSub = await reg.pushManager.getSubscription();
-    if (oldSub) { await oldSub.unsubscribe(); console.log("[Push] 旧subscription解除"); }
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array("BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw")
-    });
-    const subJson = sub.toJSON();
-    console.log("[Push] subscription取得:", subJson.endpoint);
-    const { error: delErr } = await sb.from("push_subscriptions").delete().eq("cast_id", castId);
-    if (delErr) console.warn("[Push] delete error:", delErr);
-    const { error: insErr } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+  navigator.serviceWorker.register("/kyoukano/sw.js").then(function(reg) {
+    alert("SW登録成功: " + reg.scope);
+    reg.pushManager.getSubscription().then(function(oldSub) {
+      var p = oldSub ? oldSub.unsubscribe() : Promise.resolve();
+      p.then(function() {
+        reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array("BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw")
+        }).then(function(sub) {
+          var subJson = sub.toJSON();
+          alert("subscription取得: " + subJson.endpoint);
+          sb.from("push_subscriptions").delete().eq("cast_id", castId).then(function() {
+            sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson }).then(function(res) {
     if (insErr) { console.error("[Push] insert失敗:", insErr); alert("失敗: " + JSON.stringify(insErr)); } else { console.log("[Push] ✅ 保存成功！"); alert("Push登録成功！"); }  } catch (e) {
     console.error("[Push] エラー:", e.name, e.message);
     alert("Pushエラー: " + e.name + " / " + e.message);  }
