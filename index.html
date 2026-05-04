@@ -1454,37 +1454,51 @@ async function loadMySalary(){
       const sids=todayShifts.map(s=>s.id)
       const{data:todayRvs}=await sb.from('reservations').select('*').in('shift_id',sids).order('checkin_time')
       const dn=['日','月','火','水','木','金','土'][new Date(todayStr).getDay()]
-      todayHtml=`<div class="card" style="margin-bottom:.55rem;border:1.5px solid var(--accent)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
-          <span style="font-size:.88rem;font-weight:700">${jpDate(todayStr)}（${dn}）</span>
-          <span style="font-size:.7rem;color:var(--accent);font-weight:600">${todayRvs&&todayRvs.length?todayRvs.length+'本':''}</span>
-        </div>`
+      const rvCount=todayRvs?todayRvs.length:0
+      // サマリーバー
+      todayHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem">
+        <div style="background:var(--surface);border-radius:12px;padding:.7rem .5rem;text-align:center;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">本数</div>
+          <div style="font-size:1.4rem;font-weight:700">${rvCount}<span style="font-size:.8rem;font-weight:600">本</span></div>
+        </div>
+        <div style="background:var(--surface);border-radius:12px;padding:.7rem .5rem;text-align:center;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">売上合計</div>
+          <div style="font-size:.95rem;font-weight:700">¥-</div>
+        </div>
+        <div style="background:var(--surface);border-radius:12px;padding:.7rem .5rem;text-align:center;border:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">バック合計</div>
+          <div style="font-size:.95rem;font-weight:700">¥-</div>
+        </div>
+      </div>`
       if(!todayRvs||!todayRvs.length){
-        todayHtml+=`<div style="font-size:.8rem;color:var(--text3);text-align:center;padding:.5rem 0">本日の予約はまだありません</div>`
+        todayHtml+=`<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の予約はまだありません</div>`
       } else {
         todayRvs.forEach((r,i)=>{
-          const timeStr=r.checkin_time?r.checkin_time+'〜':''
+          const timeStr=r.checkin_time||''
           const opts=r.options?r.options.split(',').filter(Boolean):[]
           let pj={};try{pj=JSON.parse(r.payment||'{}')}catch(e){}
-          const payParts=[]
-          if(pj.course) payParts.push('コース:'+pj.course)
-          if(pj.shimei) payParts.push('指名:'+pj.shimei)
-          if(pj.option) payParts.push('OP:'+pj.option)
-          if(pj.ext) payParts.push('延長:'+pj.ext)
-          todayHtml+=`<div style="padding:.5rem 0;${i<todayRvs.length-1?'border-bottom:1px solid var(--border)':''}">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.25rem">
-              <span style="font-size:.82rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
-              <span style="font-size:.75rem;color:var(--text3)">${timeStr}</span>
+          const payMethod=pj.course||'現金'
+          const hasShimei=r.shimei_type&&r.shimei_type!=='フリー'
+          todayHtml+=`<div class="card" style="margin-bottom:.5rem;padding:.75rem 1rem">
+            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:start">
+              <div style="min-width:2.8rem">
+                <div style="font-size:.75rem;font-weight:700;color:var(--text)">${i+1}本目</div>
+                <div style="font-size:.72rem;color:var(--text3);margin-top:.1rem">${timeStr}</div>
+              </div>
+              <div style="border-left:1px solid var(--border);padding-left:.6rem">
+                <div style="font-size:.88rem;font-weight:700;margin-bottom:.15rem">${r.customer_name||'お客様'} <span style="font-weight:400;font-size:.75rem">様</span></div>
+                <div style="font-size:.75rem;color:var(--text2);margin-bottom:.25rem">${r.course||''}</div>
+                ${hasShimei?`<span style="font-size:.65rem;background:var(--accent-f);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:.05rem .35rem;font-weight:600;margin-right:.3rem">指名あり</span><span style="font-size:.65rem;background:rgba(184,137,58,.12);color:var(--accent);border-radius:4px;padding:.05rem .35rem;font-weight:600">${r.shimei_type}</span>`:`<span style="font-size:.65rem;background:var(--surface2);color:var(--text3);border-radius:4px;padding:.05rem .35rem">指名なし</span>`}
+                ${opts.length?`<div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">${opts.map(o=>'・'+o).join('<br>')}</div>`:''}
+              </div>
+              <div style="text-align:right;min-width:4rem">
+                <div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">支払い方法</div>
+                <div style="font-size:.78rem;font-weight:600">${payMethod}</div>
+              </div>
             </div>
-            <div style="font-size:.82rem;font-weight:600;margin-bottom:.15rem">${r.customer_name||'お客様'}</div>
-            <div style="font-size:.75rem;color:var(--text2);margin-bottom:.1rem">${r.course||''}</div>
-            ${r.shimei_type?`<div style="font-size:.72rem;color:var(--text3)">指名: ${r.shimei_type}</div>`:''}
-            ${opts.length?`<div style="font-size:.72rem;color:var(--text3)">OP: ${opts.join('・')}</div>`:''}
-            ${payParts.length?`<div style="font-size:.7rem;color:var(--text3);margin-top:.1rem">${payParts.join(' / ')}</div>`:''}
           </div>`
         })
       }
-      todayHtml+=`</div>`
     }
     todayArea.innerHTML=todayHtml
     todayArea.style.display=(todayHtml&&salTabMode==='daily')?'block':'none'
@@ -1525,20 +1539,30 @@ async function loadMySalary(){
       const optBack=s.opt_back||0
       const extBackTotal=(s.extensions||[]).reduce((sum,e)=>sum+(e.back||0),0)
       const sessionNet=courseBack+shimeiBack+optBack+extBackTotal
-      let detailRows=''
-      if(s.course_name) detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">コース: ${s.course_name}</span><span>${fmt(courseBack)}</span></div>`
-      if(s.shimei_type) detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">指名: ${s.shimei_type}</span><span>${fmt(shimeiBack)}</span></div>`
-      if(s.options&&s.options.length) s.options.forEach(o=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">OP: ${o.name}</span><span>${fmt(o.back||0)}</span></div>`})
-      if(s.extensions&&s.extensions.length) s.extensions.forEach((e,ei)=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--blue)">延長${s.extensions.length>1?ei+1+'回目':''}（30分）</span><span>${fmt(e.back||0)}</span></div>`})
-      if(s.discounts&&s.discounts.length) s.discounts.forEach(d=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--rtx)">割引: ${d.name}</span><span style="color:var(--rtx)">-${fmt(d.amount||0)}</span></div>`})
-      if(s.pay_course||s.pay_shimei||s.pay_option||(s.extensions&&s.extensions.length)){
-        const pc=s.pay_course||'現金',ps=s.pay_shimei||'現金',po=s.pay_option||'現金'
-        const extPayStr=(s.extensions&&s.extensions.length)?` / 延長${s.extensions.length>1?s.extensions.map((e,ei)=>`${ei+1}回目:${e.pay||'現金'}`).join('・'):s.extensions[0]?.pay||'現金'}`:''
-        detailRows+=`<div style="font-size:.7rem;color:var(--text3);padding:.1rem 0">支払: コース${pc} / 指名${ps} / OP${po}${extPayStr}</div>`
-      }
-      sessionLines+=`<div style="padding:.3rem 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
-          <span style="font-size:.8rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
+      const hasShimei=s.shimei_type&&s.shimei_type!=='フリー'
+      const opts=(s.options||[]).map(o=>o.name).filter(Boolean)
+      const exts=(s.extensions||[])
+      const payMethod=s.pay_course||'現金'
+      sessionLines+=`<div style="border:1px solid var(--border);border-radius:10px;padding:.65rem .75rem;margin-bottom:.45rem">
+        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:start">
+          <div style="min-width:2.8rem">
+            <div style="font-size:.75rem;font-weight:700">${i+1}本目</div>
+            <div style="font-size:.7rem;color:var(--text3);margin-top:.1rem">${s.checkin_time||''}</div>
+          </div>
+          <div style="border-left:1px solid var(--border);padding-left:.6rem">
+            <div style="font-size:.85rem;font-weight:700;margin-bottom:.1rem">${s.customer_name||''}<span style="font-weight:400;font-size:.73rem"> 様</span></div>
+            <div style="font-size:.73rem;color:var(--text2);margin-bottom:.2rem">${s.course_name||''}</div>
+            ${hasShimei?`<span style="font-size:.62rem;background:var(--accent-f);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:.05rem .3rem;font-weight:600;margin-right:.25rem">指名あり</span><span style="font-size:.62rem;background:rgba(184,137,58,.12);color:var(--accent);border-radius:4px;padding:.05rem .3rem;font-weight:600">${s.shimei_type}</span>`:`<span style="font-size:.62rem;background:var(--surface2);color:var(--text3);border-radius:4px;padding:.05rem .3rem">指名なし</span>`}
+            ${opts.length?`<div style="font-size:.7rem;color:var(--text3);margin-top:.25rem">${opts.map(o=>'・'+o).join('<br>')}</div>`:''}
+            ${exts.length?`<div style="font-size:.7rem;color:var(--blue);margin-top:.2rem">・延長×${exts.length}（${fmt(extBackTotal)}）</div>`:''}
+          </div>
+          <div style="text-align:right;min-width:4.2rem">
+            <div style="font-size:.62rem;color:var(--text3);margin-bottom:.1rem">支払い方法</div>
+            <div style="font-size:.75rem;font-weight:600;margin-bottom:.2rem">${payMethod}</div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--accent)">${fmt(sessionNet)}</div>
+          </div>
+        </div>
+      </div>`
           <span style="font-size:.8rem;font-weight:700">${fmt(sessionNet)}</span>
         </div>
         ${detailRows}
@@ -1562,25 +1586,50 @@ async function loadMySalary(){
     const totalCardBase=sessionsForCalc.reduce((s,ss)=>s+(ss.card_base||0),0)
     const totalCardSales=totalCardBase>0?Math.round(totalCardBase*1.1):0
     const totalCashSales=(w.sales||0)-totalCardSales
-    const detailBody=`<div class="sal-hero" style="margin-bottom:.4rem">
-        <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
-        ${totalCardBase>0?`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:var(--text3)">└ 現金</span><span class="sal-rv" style="font-size:.78rem">${fmt(totalCashSales)}</span></div><div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:#1565c0">└ カード(10%込)</span><span class="sal-rv" style="font-size:.78rem;color:#1565c0">${fmt(totalCardSales)}</span></div>`:''}
-        <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv" style="color:#c62828">${fmt(w.back||0)}</span></div>
-        ${w.misc?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(w.misc)}</span></div>`:''}
-        <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv tot" style="color:#c62828">${fmt(w.net||w.back)}</span></div>
-        <div class="sal-row"><span class="sal-rl">店落ち</span><span class="sal-rv">${fmt((w.sales||0)-(w.net||w.back||0))}</span></div>
-        <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}本</span></div>
+    // サマリー行
+    const summaryBar=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem">
+      <div style="background:var(--surface2);border-radius:10px;padding:.6rem .4rem;text-align:center">
+        <div style="font-size:.62rem;color:var(--text3);margin-bottom:.15rem">本数</div>
+        <div style="font-size:1.3rem;font-weight:700">${w.count||0}<span style="font-size:.75rem;font-weight:600">本</span></div>
       </div>
-      <div>${sessionLines}</div>`
-    dailyHtml+=`<div class="card" style="margin-bottom:.4rem;padding:.6rem 1rem" id="${cardId}">
+      <div style="background:var(--surface2);border-radius:10px;padding:.6rem .4rem;text-align:center">
+        <div style="font-size:.62rem;color:var(--text3);margin-bottom:.15rem">売上合計</div>
+        <div style="font-size:.85rem;font-weight:700">${fmt(w.sales||0)}</div>
+      </div>
+      <div style="background:var(--surface2);border-radius:10px;padding:.6rem .4rem;text-align:center">
+        <div style="font-size:.62rem;color:var(--text3);margin-bottom:.15rem">バック合計</div>
+        <div style="font-size:.85rem;font-weight:700;color:var(--accent)">${fmt(w.net||w.back)}</div>
+      </div>
+    </div>`
+    // バック内訳
+    const shimeiBack=(w.sessions||[]).reduce((s,ss)=>s+(ss.shimei_back||0),0)
+    const optBackTotal=(w.sessions||[]).reduce((s,ss)=>s+(ss.opt_back||0),0)
+    const courseBackTotal=(w.sessions||[]).reduce((s,ss)=>s+(ss.course_back||0),0)
+    const extBackTotal2=(w.sessions||[]).reduce((s,ss)=>s+((ss.extensions||[]).reduce((a,e)=>a+(e.back||0),0)),0)
+    const backBreakdown=`<div style="display:flex;gap:.5rem;margin-top:.6rem;padding-top:.6rem;border-top:1px solid var(--border)">
+      <div style="flex:1;text-align:center">
+        <div style="font-size:.62rem;color:var(--text3)">指名バック</div>
+        <div style="font-size:.82rem;font-weight:600">${fmt(shimeiBack)}</div>
+      </div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:.62rem;color:var(--text3)">OPバック</div>
+        <div style="font-size:.82rem;font-weight:600">${fmt(optBackTotal)}</div>
+      </div>
+      <div style="flex:1;text-align:center">
+        <div style="font-size:.62rem;color:var(--text3)">基本バック</div>
+        <div style="font-size:.82rem;font-weight:600">${fmt(courseBackTotal+extBackTotal2)}</div>
+      </div>
+    </div>`
+    const detailBody=summaryBar+sessionLines+backBreakdown
+    dailyHtml+=`<div class="card" style="margin-bottom:.5rem;padding:.7rem 1rem" id="${cardId}">
       <div onclick="salDayToggle('${detailId}')" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none">
-        <div style="display:flex;align-items:center;gap:.4rem">
-          <span style="font-size:.85rem;font-weight:700">${dateLabel}</span>
-          <span style="font-size:.8rem;color:var(--text3)">${fmt(w.net||w.back)}</span>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span style="font-size:.88rem;font-weight:700">${dateLabel}</span>
+          <span style="font-size:.78rem;color:var(--accent);font-weight:600">${fmt(w.net||w.back)}</span>
         </div>
-        <span id="${detailId}-icon" style="font-size:.8rem;color:var(--text3);transition:transform .2s">›</span>
+        <span id="${detailId}-icon" style="font-size:.9rem;color:var(--text3);transition:transform .2s">›</span>
       </div>
-      <div id="${detailId}" style="display:none;margin-top:.5rem">
+      <div id="${detailId}" style="display:none;margin-top:.6rem">
         ${detailBody}
       </div>
     </div>`
