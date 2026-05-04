@@ -5778,7 +5778,8 @@ alert("subscribePush呼ばれた! castId=" + castId);
   if (!castId) { console.error("[Push] castIdがnull！中止"); return; }
   
   console.log("[Push] 通知許可結果:", permission);
-  if (permission !== "granted") { console.warn("[Push] 通知許可されず:", permission); return; }  function urlBase64ToUint8Array(b64) {
+  if (permission !== "granted") { console.warn("[Push] 通知許可されず:", permission); return; }
+  function urlBase64ToUint8Array(b64) {
     const pad = "=".repeat((4 - b64.length % 4) % 4);
     const base64 = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
     const raw = atob(base64);
