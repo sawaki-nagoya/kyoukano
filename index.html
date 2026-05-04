@@ -1131,7 +1131,12 @@ function startApp(){
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
-    subscribePush(me.id)
+    // Push通知ボタンを表示
+    const pushBtn = document.createElement('button');
+    pushBtn.textContent = '🔔 通知を有効にする';
+    pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
+    pushBtn.onclick = function() { pushBtn.remove(); subscribePush(me.id); };
+    document.body.appendChild(pushBtn);
   }
 }
 
