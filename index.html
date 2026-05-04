@@ -1131,9 +1131,7 @@ function startApp(){
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
-    // Push通知ボタンを表示（DB登録済みなら非表示）
-    const {data:existSub} = await sb.from('push_subscriptions').select('id').eq('cast_id', me.id).maybeSingle();
-    if(!existSub){
+    // Push通知ボタンを表示
     const pushBtn = document.createElement('button');
     pushBtn.id='push-notify-btn';
     pushBtn.textContent = '🔔 通知を有効にする';
@@ -1158,7 +1156,6 @@ function startApp(){
       }
     };
     document.body.appendChild(pushBtn);
-    }
   }
 }
 
