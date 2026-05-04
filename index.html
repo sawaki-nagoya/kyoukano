@@ -5774,7 +5774,7 @@ async function runImport(){
 <script>
 async function subscribePush(castId) {
 alert("subscribePush呼ばれた! castId=" + castId);
-  console.log("[Push] 開始 castId:", castId);  if (!("PushManager" in window)) { console.warn("[Push] PushManager未対応"); return; }
+  console.log("[Push] 開始 castId:", castId);  alert("PushManager確認: " + ("PushManager" in window)); if (!("PushManager" in window)) { alert("PushManager未対応！"); return; }
   if (!castId) { console.error("[Push] castIdがnull！中止"); return; }
   
   console.log("[Push] 通知許可結果:", permission);
