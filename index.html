@@ -1523,33 +1523,23 @@ async function loadMySalary(){
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}本</span></div>
       </div>
       <div>${sessionLines}</div>`
-    if(isLatest){
-      // 最新日：常に展開
-      dailyHtml+=`<div class="card" style="margin-bottom:.55rem" id="${cardId}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-          <div>
-            <div style="font-size:.72rem;color:var(--accent);font-weight:700">${dateLabel}</div>
-            <div style="font-size:1.6rem;font-weight:700;line-height:1.2">${fmt(w.net||w.back)}</div>
-          </div>
-          <span style="font-size:.7rem;color:var(--accent);background:rgba(184,137,58,.12);padding:.15rem .6rem;border-radius:99px;font-weight:600">最新</span>
+    // 全日付：アコーディオン形式（最新日はデフォルト展開）
+    const isOpen = isLatest
+    const iconStyle = isOpen ? 'font-size:.8rem;color:var(--accent);transform:rotate(90deg);transition:transform .2s' : 'font-size:.8rem;color:var(--text3);transition:transform .2s'
+    const latestBadge = isLatest ? `<span style="font-size:.7rem;color:var(--accent);background:rgba(184,137,58,.12);padding:.15rem .6rem;border-radius:99px;font-weight:600;margin-left:.5rem">最新</span>` : ''
+    dailyHtml+=`<div class="card" style="margin-bottom:.4rem;padding:.6rem 1rem" id="${cardId}">
+      <div onclick="salDayToggle('${detailId}')" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:.2rem">
+          <span style="font-size:.85rem;font-weight:700">${dateLabel}</span>
+          <span style="font-size:.8rem;color:var(--text3);margin-left:.4rem">${fmt(w.net||w.back)}</span>
+          ${latestBadge}
         </div>
+        <span id="${detailId}-icon" style="${iconStyle}">›</span>
+      </div>
+      <div id="${detailId}" style="display:${isOpen?'block':'none'};margin-top:.5rem">
         ${detailBody}
-      </div>`
-    } else {
-      // 過去分：日付行のみ、タップで展開
-      dailyHtml+=`<div class="card" style="margin-bottom:.4rem;padding:.6rem 1rem" id="${cardId}">
-        <div onclick="salDayToggle('${detailId}')" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none">
-          <div>
-            <span style="font-size:.85rem;font-weight:700">${dateLabel}</span>
-            <span style="font-size:.8rem;color:var(--text3);margin-left:.6rem">${fmt(w.net||w.back)}</span>
-          </div>
-          <span id="${detailId}-icon" style="font-size:.8rem;color:var(--text3);transition:transform .2s">›</span>
-        </div>
-        <div id="${detailId}" style="display:none;margin-top:.5rem">
-          ${detailBody}
-        </div>
-      </div>`
-    }
+      </div>
+    </div>`
   })
   if(dailyArea) dailyArea.innerHTML=dailyHtml
   // 書き込み後に現在のタブモードで表示切り替え
