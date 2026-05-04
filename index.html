@@ -5772,36 +5772,38 @@ async function runImport(){
 </div>
 
 <script>
+function urlBase64ToUint8Array(b64) {
+  const pad = "=".repeat((4 - b64.length % 4) % 4);
+  const base64 = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
+}
+
 async function subscribePush(castId) {
-alert("subscribePush呼ばれた! castId=" + castId);
-  console.log("[Push] 開始 castId:", castId);  alert("PushManager確認: " + ("PushManager" in window)); if (!("PushManager" in window)) { alert("PushManager未対応！"); return; }
-  if (!castId) { console.error("[Push] castIdがnull！中止"); return; }
-  
+  alert("subscribePush呼ばれた! castId=" + castId);
+  if (!("PushManager" in window)) { alert("PushManager未対応"); return; }
+  if (!castId) { alert("castIdがnull"); return; }
+
   const permission = "granted";
-  console.log("[Push] 通知許可結果:", permission);
-  if (permission !== "granted") { console.warn("[Push] 通知許可されず:", permission); return; }
-  function urlBase64ToUint8Array(b64) {
-    const pad = "=".repeat((4 - b64.length % 4) % 4);
-    const base64 = (b64 + pad).replace(/-/g, "+").replace(/_/g, "/");
-    const raw = atob(base64);
-    return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
-  }
-  navigator.serviceWorker.register("/kyoukano/sw.js").then(function(reg) {
+  if (permission !== "granted") { alert("通知許可されず"); return; }
+
+  try {
+    const reg = await navigator.serviceWorker.register("/kyoukano/sw.js");
     alert("SW登録成功: " + reg.scope);
-    reg.pushManager.getSubscription().then(function(oldSub) {
-      var p = oldSub ? oldSub.unsubscribe() : Promise.resolve();
-      p.then(function() {
-        reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array("BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw")
-        }).then(function(sub) {
-          var subJson = sub.toJSON();
-          alert("subscription取得: " + subJson.endpoint);
-          sb.from("push_subscriptions").delete().eq("cast_id", castId).then(function() {
-            sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson }).then(function(res) {
-    if (insErr) { console.error("[Push] insert失敗:", insErr); alert("失敗: " + JSON.stringify(insErr)); } else { console.log("[Push] ✅ 保存成功！"); alert("Push登録成功！"); }  } catch (e) {
-    console.error("[Push] エラー:", e.name, e.message);
-    alert("Pushエラー: " + e.name + " / " + e.message);  }
+    const oldSub = await reg.pushManager.getSubscription();
+    if (oldSub) await oldSub.unsubscribe();
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array("BP2UoB7-Rd0v4lTwqlPibFd7d4aqVxtEinDG73nW_uFr4Ka614Y-OLk8jID22BgGP3bytTF_tNscBl3WViFbLFw")
+    });
+    const subJson = sub.toJSON();
+    alert("subscription取得: " + subJson.endpoint);
+    await sb.from("push_subscriptions").delete().eq("cast_id", castId);
+    const { error: insErr } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+    if (insErr) { alert("insert失敗: " + JSON.stringify(insErr)); } else { alert("Push登録成功！"); }
+  } catch(e) {
+    alert("Pushエラー: " + e.name + " / " + e.message);
+  }
 }</script>
 </body>
 </html>
