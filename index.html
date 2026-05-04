@@ -5785,7 +5785,7 @@ alert("subscribePush呼ばれた! castId=" + castId);
     return new Uint8Array([...raw].map(c => c.charCodeAt(0)));
   }
   try {
-    const reg = await navigator.serviceWorker.register("/kyoukano/sw.js"); alert("SW準備完了");
+    let reg; try { reg = await navigator.serviceWorker.register("/kyoukano/sw.js"); alert("SW登録成功: " + reg.scope); } catch(swErr) { alert("SW登録失敗: " + swErr.message); return; }
     console.log("[Push] SW ready:", reg.scope);
     const oldSub = await reg.pushManager.getSubscription();
     if (oldSub) { await oldSub.unsubscribe(); console.log("[Push] 旧subscription解除"); }
