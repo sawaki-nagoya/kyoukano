@@ -1133,7 +1133,6 @@ function startApp(){
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
     // Push通知ボタンを表示
     const pushBtn = document.createElement('button');
-    pushBtn.id='push-notify-btn';
     pushBtn.textContent = '🔔 通知を有効にする';
     pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
     pushBtn.onclick = async function() {
@@ -1160,7 +1159,6 @@ function startApp(){
 }
 
 function doLogout(){
-  const existBtn=document.getElementById('push-notify-btn');if(existBtn)existBtn.remove();
   me=null; myShifts=[]
   sessionStorage.removeItem('kyoukano_me')
   sessionStorage.removeItem('kyoukano_tab')
@@ -2205,19 +2203,6 @@ async function saveReservation(){
     if(visitErr) console.error('来店記録エラー:',visitErr.message)
   }
   toast('予約を登録しました')
-  // Push通知：担当セラピストに通知
-  try {
-    const shiftId=parseInt(document.getElementById('rv-shift-id').value)
-    const {data:shiftData}=await sb.from('shifts').select('cast_id').eq('id',shiftId).single()
-    if(shiftData?.cast_id){
-      const rvName=document.getElementById('rv-name').value.trim()||'お客様'
-      await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({cast_id:shiftData.cast_id,title:'新しい予約が入りました📅',body:rvName+'様の予約が登録されました。'})
-      })
-    }
-  } catch(e){console.error('通知エラー',e)}
   closeSheet('reservation')
   loadToday()
 }
