@@ -1485,12 +1485,17 @@ async function loadMySalary(){
       const ob=opDetails.reduce((s,x)=>s+x.back,0)
       return{cb,sb2,ob,opDetails,total:cb+sb2+ob}
     }
-    // 今日のシフトを取得
-    const{data:todayShifts}=await sb.from('shifts').select('id').eq('cast_id',me.id).eq('date',todayStr).eq('status','approved')
+    // 今日のシフトを取得（ステータス問わず）
+    const{data:todayShifts}=await sb.from('shifts').select('id').eq('cast_id',me.id).eq('date',todayStr)
     let todayHtml=''
+    const todayRvs_all=[]
     if(todayShifts&&todayShifts.length){
       const sids=todayShifts.map(s=>s.id)
-      const{data:todayRvs}=await sb.from('reservations').select('*').in('shift_id',sids).order('checkin_time')
+      const{data:_rvs}=await sb.from('reservations').select('*').in('shift_id',sids).order('checkin_time')
+      ;(_rvs||[]).forEach(r=>todayRvs_all.push(r))
+    }
+    {
+      const todayRvs=todayRvs_all
       // customer_noからcustomer_nameを補完
       const custNos=[...new Set((todayRvs||[]).map(r=>r.customer_no).filter(Boolean))]
       let custMap={}
