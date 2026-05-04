@@ -1563,10 +1563,6 @@ async function loadMySalary(){
           </div>
         </div>
       </div>`
-          <span style="font-size:.8rem;font-weight:700">${fmt(sessionNet)}</span>
-        </div>
-        ${detailRows}
-      </div>`
     })
     if(!sessions.length){
       sessionLines=(w.details||[]).map(x=>`<div style="font-size:.78rem;padding:.15rem 0;border-bottom:1px solid var(--border)">${x.name}${x.count>1?'×'+x.count:''}</div>`).join('')
