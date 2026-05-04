@@ -1575,7 +1575,13 @@ async function loadMySalary(){
 
             </div>
             <div style="padding:.55rem 1rem .75rem">
-              <table style="width:100%;border-collapse:collapse">
+              <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+                <colgroup>
+                  <col style="width:22%">
+                  <col style="width:36%">
+                  <col style="width:20%">
+                  <col style="width:22%">
+                </colgroup>
                 <thead><tr style="border-bottom:1.5px solid rgba(0,0,0,.08)">
                   <th style="${cellP};font-size:.65rem;color:var(--text3);font-weight:500;text-align:left">項目</th>
                   <th style="${cellP};font-size:.65rem;color:var(--text3);font-weight:500;text-align:left">内容</th>
@@ -1606,6 +1612,22 @@ async function loadMySalary(){
     if(dailyArea){dailyArea.innerHTML='';dailyArea.style.display=salTabMode==='daily'?'block':'none'}
     return
   }
+  // 過去分のお客様名をreservationsから取得（shift_id→date→順番で引く）
+  const workDates=works.map(w=>w.date)
+  const{data:workShifts}=await sb.from('shifts').select('id,date').eq('cast_id',me.id).in('date',workDates)
+  let rvByDateMap={}
+  if(workShifts&&workShifts.length){
+    const wsids=workShifts.map(s=>s.id)
+    const{data:pastRvs}=await sb.from('reservations').select('shift_id,customer_name,customer_no,checkin_time').in('shift_id',wsids).order('checkin_time')
+    const shiftDateMap={}
+    workShifts.forEach(s=>shiftDateMap[s.id]=s.date)
+    ;(pastRvs||[]).forEach(r=>{
+      const d=shiftDateMap[r.shift_id]
+      if(!d) return
+      if(!rvByDateMap[d]) rvByDateMap[d]=[]
+      rvByDateMap[d].push(r)
+    })
+  }
   const totalBack=works.reduce((s,w)=>s+(w.back||0),0)
   const totalMisc=works.reduce((s,w)=>s+(w.misc||0),0)
   const totalNet=works.reduce((s,w)=>s+(w.net||w.back||0),0)
@@ -1623,7 +1645,7 @@ async function loadMySalary(){
     <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${count}件</span></div>
   </div>`
   // 日別明細：最新日は展開、過去分はアコーディオン
-  function buildSessionLines(w){
+  function buildSessionLines(w,dateRvs=[]){
     const sessions=w.sessions||[]
     let sessionLines=''
     sessions.forEach((s,i)=>{
@@ -1638,7 +1660,11 @@ async function loadMySalary(){
       const payMethod=s.pay_course||'現金'
       const sliceT=t=>t?t.slice(0,5):''
       const timeStr=s.checkin_time&&s.checkout_time?`${sliceT(s.checkin_time)}〜${sliceT(s.checkout_time)}`:s.checkin_time?`${sliceT(s.checkin_time)}〜`:''
-      const custN=(s.customer_name||'').replace(/様\s*$/,'')
+      // customer_nameをsessionsから、なければreservationsから順番で補完
+      let custN=(s.customer_name||'').replace(/様\s*$/,'')
+      if(!custN&&dateRvs[i]){
+        custN=(dateRvs[i].customer_name||'').replace(/様\s*$/,'')
+      }
       const payLbl=p=>p==='カード'?'カード払い':'現金'
       const sRows=[]
       sRows.push({cat:'コース料金',name:s.course_name||'',amt:courseBack,pay:payLbl(s.pay_course)})
@@ -1647,10 +1673,10 @@ async function loadMySalary(){
       ;(s.extensions||[]).forEach((e,ei)=>{sRows.push({cat:'延長',name:exts.length>1?`${ei+1}回目（30分）`:'30分',amt:e.back||0,pay:payLbl(e.pay)})})
       ;(s.discounts||[]).forEach(d=>{sRows.push({cat:'割引',name:d.name,amt:-(d.amount||0),pay:''})})
       const sTblRows=sRows.map(r=>`<tr style="border-top:1px solid rgba(0,0,0,.06)">
-        <td style="padding:.5rem .4rem;font-size:.72rem;color:var(--text3);white-space:nowrap">${r.cat}</td>
-        <td style="padding:.5rem .4rem;font-size:.75rem;color:var(--text)">${r.name}</td>
-        <td style="padding:.5rem .4rem;font-size:.75rem;font-weight:500;text-align:right;white-space:nowrap">${r.amt<0?'-':''}${fmt(Math.abs(r.amt))}</td>
-        <td style="padding:.5rem .4rem;text-align:right">${r.pay?`<span style="background:var(--surface2);border-radius:6px;padding:.15rem .5rem;font-size:.67rem;color:var(--text2);border:1px solid var(--border)">${r.pay}</span>`:''}</td>
+        <td style="padding:.5rem .4rem;font-size:.72rem;color:var(--text3);white-space:nowrap;width:22%">${r.cat}</td>
+        <td style="padding:.5rem .4rem;font-size:.75rem;color:var(--text);width:36%">${r.name}</td>
+        <td style="padding:.5rem .4rem;font-size:.75rem;font-weight:500;text-align:right;white-space:nowrap;width:20%">${r.amt<0?'-':''}${fmt(Math.abs(r.amt))}</td>
+        <td style="padding:.5rem .4rem;text-align:right;width:22%">${r.pay?`<span style="background:var(--surface2);border-radius:6px;padding:.15rem .5rem;font-size:.67rem;color:var(--text2);border:1px solid var(--border)">${r.pay}</span>`:''}</td>
       </tr>`).join('')
       sessionLines+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:.6rem;box-shadow:0 1px 4px rgba(0,0,0,.04)">
         <div style="display:flex;justify-content:space-between;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border)">
@@ -1661,7 +1687,13 @@ async function loadMySalary(){
           </div>
         </div>
         <div style="padding:.55rem 1rem .75rem">
-          <table style="width:100%;border-collapse:collapse">
+          <table style="width:100%;border-collapse:collapse;table-layout:fixed">
+            <colgroup>
+              <col style="width:22%">
+              <col style="width:36%">
+              <col style="width:20%">
+              <col style="width:22%">
+            </colgroup>
             <thead><tr style="border-bottom:1.5px solid rgba(0,0,0,.08)">
               <th style="padding:.3rem .4rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:left">項目</th>
               <th style="padding:.3rem .4rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:left">内容</th>
@@ -1690,7 +1722,7 @@ async function loadMySalary(){
     const dateLabel=jpDate(w.date)+'（'+dn+'）'
     const cardId='sal-day-'+w.date.replace(/-/g,'')
     const detailId='sal-detail-'+w.date.replace(/-/g,'')
-    const sessionLines=buildSessionLines(w)
+    const sessionLines=buildSessionLines(w,rvByDateMap[w.date]||[])
     const sessionsForCalc=w.sessions||[]
     const totalCardBase=sessionsForCalc.reduce((s,ss)=>s+(ss.card_base||0),0)
     const totalCardSales=totalCardBase>0?Math.round(totalCardBase*1.1):0
