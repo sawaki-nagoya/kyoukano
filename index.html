@@ -1585,10 +1585,16 @@ async function loadMySalary(){
                   <th style="${cellP};font-size:.65rem;color:var(--text3);font-weight:500;text-align:center">支払い方法</th>
                 </tr></thead>
                 <tbody>${tblRows}</tbody>
-                <tfoot><tr style="border-top:1.5px solid rgba(0,0,0,.08)">
-                  <td colspan="2" style="${cellP};font-size:.77rem;font-weight:600">合計</td>
-                  <td colspan="2" style="${cellP};font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(est.total)}</td>
-                </tr></tfoot>
+                <tfoot>
+                  <tr style="border-top:1.5px solid rgba(0,0,0,.08)">
+                    <td colspan="2" style="${cellP};font-size:.77rem;font-weight:600">合計</td>
+                    <td colspan="2" style="${cellP};font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(est.total)}</td>
+                  </tr>
+                  <tr style="border-top:1px solid rgba(0,0,0,.06);background:rgba(0,0,0,.02)">
+                    <td colspan="2" style="${cellP};font-size:.72rem;color:var(--text3)">店舗利益（参考）</td>
+                    <td colspan="2" style="${cellP};font-size:.77rem;font-weight:600;color:var(--text3);text-align:right">${fmt(rows.reduce((s,r)=>s+r.amt,0)-est.total)}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>`
@@ -1650,6 +1656,8 @@ async function loadMySalary(){
       const optBack=s.opt_back||0
       const extBackTotal=(s.extensions||[]).reduce((sum,e)=>sum+(e.back||0),0)
       const sessionNet=courseBack+shimeiBack+optBack+extBackTotal
+      const sessionSalesAmt=s.sales||0
+      const sessionProfit=sessionSalesAmt-sessionNet
       const hasShimei=s.shimei_type&&s.shimei_type!=='フリー'
       const opts=(s.options||[]).map(o=>o.name).filter(Boolean)
       const exts=(s.extensions||[])
@@ -1696,10 +1704,16 @@ async function loadMySalary(){
               <th style="padding:.3rem .5rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:center">支払い方法</th>
             </tr></thead>
             <tbody>${sTblRows}</tbody>
-            <tfoot><tr style="border-top:1.5px solid rgba(0,0,0,.08)">
-              <td colspan="2" style="padding:.5rem .5rem;font-size:.77rem;font-weight:600">合計</td>
-              <td colspan="2" style="padding:.5rem .5rem;font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(sessionNet)}</td>
-            </tr></tfoot>
+            <tfoot>
+              <tr style="border-top:1.5px solid rgba(0,0,0,.08)">
+                <td colspan="2" style="padding:.5rem .5rem;font-size:.77rem;font-weight:600">合計</td>
+                <td colspan="2" style="padding:.5rem .5rem;font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(sessionNet)}</td>
+              </tr>
+              ${sessionSalesAmt>0?`<tr style="border-top:1px solid rgba(0,0,0,.06);background:rgba(0,0,0,.02)">
+                <td colspan="2" style="padding:.4rem .5rem;font-size:.72rem;color:var(--text3)">店舗利益</td>
+                <td colspan="2" style="padding:.4rem .5rem;font-size:.77rem;font-weight:600;color:var(--text3);text-align:right">${fmt(sessionProfit)}</td>
+              </tr>`:''}
+            </tfoot>
           </table>
         </div>
       </div>`
