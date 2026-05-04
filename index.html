@@ -2185,6 +2185,18 @@ async function saveReservation(){
     })
     if(visitErr) console.error('来店記録エラー:',visitErr.message)
   }
+  // Push通知送信（担当セラピストへ）
+  try {
+    const {data:shiftData} = await sb.from('shifts').select('cast_id').eq('id',shiftId).single();
+    if(shiftData?.cast_id){
+      const timeStr = checkin ? `（${checkin}〜）` : '';
+      await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({cast_id:shiftData.cast_id, title:'予約が入りました📋', body:`${finalName}様 ${course}${timeStr}`})
+      });
+    }
+  } catch(e) { console.error('通知エラー',e); }
   toast('予約を登録しました')
   closeSheet('reservation')
   loadToday()
