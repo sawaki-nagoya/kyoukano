@@ -1500,19 +1500,43 @@ async function loadMySalary(){
       }
       const dn=['日','月','火','水','木','金','土'][new Date(todayStr).getDay()]
       const rvCount=todayRvs?todayRvs.length:0
-      // サマリーバー
-      todayHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem">
-        <div style="background:var(--surface);border-radius:12px;padding:.7rem .5rem;text-align:center;border:1px solid var(--border)">
-          <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">本数</div>
-          <div style="font-size:1.4rem;font-weight:700">${rvCount}<span style="font-size:.8rem;font-weight:600">本</span></div>
+      // 予約データから売上・バックを計算
+      let todaySalesTotal=0,todayCashTotal=0,todayCardTotal=0,todayBackTotal=0
+      ;(todayRvs||[]).forEach(r=>{
+        const est2=calcBack(r.course,r.shimei_type,r.options?r.options.split(',').filter(Boolean):[])
+        const courseObj=courses.find(c=>c.name===r.course)
+        const coursePrice=courseObj?.price||0
+        let pj2={};try{pj2=JSON.parse(r.payment||'{}')}catch(e){}
+        // オプション合計
+        const optTotal=(r.options?r.options.split(',').filter(Boolean):[]).reduce((s,o)=>{
+          const op=opts.find(x=>x.name===o);return s+(op?.price||0)
+        },0)
+        // 指名料
+        const shimeiPrice=r.shimei_type==='本指名'?(storeSettings.shop_shimei_hon||2000):r.shimei_type==='ネット指名'?(storeSettings.shop_shimei_net||1000):0
+        const sessionSales=coursePrice+shimeiPrice+optTotal
+        todaySalesTotal+=sessionSales
+        if(pj2.course==='カード') todayCardTotal+=coursePrice; else todayCashTotal+=coursePrice
+        if(pj2.shimei==='カード') todayCardTotal+=shimeiPrice; else todayCashTotal+=shimeiPrice
+        if(pj2.option==='カード') todayCardTotal+=optTotal; else todayCashTotal+=optTotal
+        todayBackTotal+=est2.total
+      })
+      // サマリーバー：本数 / 現金・カード・合計 / バック合計（4列）
+      todayHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
+        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
+          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">本数</div>
+          <div style="font-size:1.3rem;font-weight:700">${rvCount}<span style="font-size:.75rem;font-weight:600">本</span></div>
         </div>
-        <div style="background:var(--surface);border-radius:12px;padding:.7rem .5rem;text-align:center;border:1px solid var(--border)">
-          <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">売上合計</div>
-          <div style="font-size:.95rem;font-weight:700">¥-</div>
+        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
+          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">現金</div>
+          <div style="font-size:.85rem;font-weight:700">${rvCount?fmt(todayCashTotal):'¥-'}</div>
         </div>
-        <div style="background:var(--surface);border-radius:12px;padding:.7rem .5rem;text-align:center;border:1px solid var(--border)">
-          <div style="font-size:.65rem;color:var(--text3);margin-bottom:.2rem">バック合計</div>
-          <div style="font-size:.95rem;font-weight:700">¥-</div>
+        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
+          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">カード</div>
+          <div style="font-size:.85rem;font-weight:700">${rvCount?fmt(todayCardTotal):'¥-'}</div>
+        </div>
+        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
+          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">バック</div>
+          <div style="font-size:.85rem;font-weight:700;color:var(--accent)">${rvCount?fmt(todayBackTotal):'¥-'}</div>
         </div>
       </div>`
       if(!todayRvs||!todayRvs.length){
