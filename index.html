@@ -1496,15 +1496,18 @@ async function loadMySalary(){
       const courseBack=s.course_back||0
       const shimeiBack=s.shimei_back||0
       const optBack=s.opt_back||0
-      const sessionNet=courseBack+shimeiBack+optBack
+      const extBackTotal=(s.extensions||[]).reduce((sum,e)=>sum+(e.back||0),0)
+      const sessionNet=courseBack+shimeiBack+optBack+extBackTotal
       let detailRows=''
       if(s.course_name) detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">コース: ${s.course_name}</span><span>${fmt(courseBack)}</span></div>`
       if(s.shimei_type) detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">指名: ${s.shimei_type}</span><span>${fmt(shimeiBack)}</span></div>`
       if(s.options&&s.options.length) s.options.forEach(o=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--text3)">OP: ${o.name}</span><span>${fmt(o.back||0)}</span></div>`})
+      if(s.extensions&&s.extensions.length) s.extensions.forEach((e,ei)=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--blue)">延長${s.extensions.length>1?ei+1+'回目':''}（30分）</span><span>${fmt(e.back||0)}</span></div>`})
       if(s.discounts&&s.discounts.length) s.discounts.forEach(d=>{detailRows+=`<div style="display:flex;justify-content:space-between;font-size:.75rem;padding:.1rem 0"><span style="color:var(--rtx)">割引: ${d.name}</span><span style="color:var(--rtx)">-${fmt(d.amount||0)}</span></div>`})
-      if(s.pay_course||s.pay_shimei||s.pay_option){
+      if(s.pay_course||s.pay_shimei||s.pay_option||(s.extensions&&s.extensions.length)){
         const pc=s.pay_course||'現金',ps=s.pay_shimei||'現金',po=s.pay_option||'現金'
-        detailRows+=`<div style="font-size:.7rem;color:var(--text3);padding:.1rem 0">支払: コース${pc} / 指名${ps} / OP${po}</div>`
+        const extPayStr=(s.extensions&&s.extensions.length)?` / 延長${s.extensions.length>1?s.extensions.map((e,ei)=>`${ei+1}回目:${e.pay||'現金'}`).join('・'):s.extensions[0]?.pay||'現金'}`:''
+        detailRows+=`<div style="font-size:.7rem;color:var(--text3);padding:.1rem 0">支払: コース${pc} / 指名${ps} / OP${po}${extPayStr}</div>`
       }
       sessionLines+=`<div style="padding:.3rem 0;border-bottom:1px solid var(--border)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
