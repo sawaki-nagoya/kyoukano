@@ -2203,6 +2203,19 @@ async function saveReservation(){
     if(visitErr) console.error('来店記録エラー:',visitErr.message)
   }
   toast('予約を登録しました')
+  // Push通知：担当セラピストに通知
+  try {
+    const shiftId=parseInt(document.getElementById('rv-shift-id').value)
+    const {data:shiftData}=await sb.from('shifts').select('cast_id').eq('id',shiftId).single()
+    if(shiftData?.cast_id){
+      const rvName=document.getElementById('rv-name').value.trim()||'お客様'
+      await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({cast_id:shiftData.cast_id,title:'新しい予約が入りました📅',body:rvName+'様の予約が登録されました。'})
+      })
+    }
+  } catch(e){console.error('通知エラー',e)}
   closeSheet('reservation')
   loadToday()
 }
