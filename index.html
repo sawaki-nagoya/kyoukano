@@ -1131,7 +1131,10 @@ function startApp(){
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
-    // Push通知ボタンを表示
+    // Push通知ボタンを表示（登録済みなら非表示）
+    const _reg = await navigator.serviceWorker.getRegistration('/kyoukano/sw.js');
+    const _sub = _reg ? await _reg.pushManager.getSubscription() : null;
+    if(!_sub){
     const pushBtn = document.createElement('button');
     pushBtn.id='push-notify-btn';
     pushBtn.textContent = '🔔 通知を有効にする';
@@ -1156,6 +1159,7 @@ function startApp(){
       }
     };
     document.body.appendChild(pushBtn);
+    }
   }
 }
 
