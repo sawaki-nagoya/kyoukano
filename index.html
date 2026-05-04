@@ -1474,27 +1474,25 @@ async function loadMySalary(){
         todayHtml+=`<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の予約はまだありません</div>`
       } else {
         todayRvs.forEach((r,i)=>{
-          const timeStr=r.checkin_time||''
+          const timeStr=r.checkin_time&&r.checkout_time?`${r.checkin_time}〜${r.checkout_time}`:r.checkin_time?`${r.checkin_time}〜`:''
           const opts=r.options?r.options.split(',').filter(Boolean):[]
           let pj={};try{pj=JSON.parse(r.payment||'{}')}catch(e){}
           const payMethod=pj.course||'現金'
           const hasShimei=r.shimei_type&&r.shimei_type!=='フリー'
+          const badge=(val,gold)=>`<span style="font-size:.62rem;background:${gold?'rgba(184,137,58,.12)':'var(--surface2)'};color:${gold?'var(--accent)':'var(--text3)'};border:1px solid ${gold?'var(--accent)':'var(--border)'};border-radius:4px;padding:.08rem .35rem;font-weight:600;white-space:nowrap">${val}</span>`
           todayHtml+=`<div class="card" style="margin-bottom:.5rem;padding:.75rem 1rem">
-            <div style="display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:start">
-              <div style="min-width:2.8rem">
-                <div style="font-size:.75rem;font-weight:700;color:var(--text)">${i+1}本目</div>
-                <div style="font-size:.72rem;color:var(--text3);margin-top:.1rem">${timeStr}</div>
+            <div>
+              <div style="display:flex;align-items:baseline;gap:.4rem;margin-bottom:.1rem">
+                <span style="font-size:.75rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
+                ${timeStr?`<span style="font-size:.7rem;color:var(--text3)">${timeStr}</span>`:''}
               </div>
-              <div style="border-left:1px solid var(--border);padding-left:.6rem">
-                <div style="font-size:.88rem;font-weight:700;margin-bottom:.15rem">${r.customer_name||'お客様'} <span style="font-weight:400;font-size:.75rem">様</span></div>
-                <div style="font-size:.75rem;color:var(--text2);margin-bottom:.25rem">${r.course||''}</div>
-                ${hasShimei?`<span style="font-size:.65rem;background:var(--accent-f);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:.05rem .35rem;font-weight:600;margin-right:.3rem">指名あり</span><span style="font-size:.65rem;background:rgba(184,137,58,.12);color:var(--accent);border-radius:4px;padding:.05rem .35rem;font-weight:600">${r.shimei_type}</span>`:`<span style="font-size:.65rem;background:var(--surface2);color:var(--text3);border-radius:4px;padding:.05rem .35rem">指名なし</span>`}
-                ${opts.length?`<div style="font-size:.72rem;color:var(--text3);margin-top:.3rem">${opts.map(o=>'・'+o).join('<br>')}</div>`:''}
+              <div style="font-size:.88rem;font-weight:700;margin-bottom:.1rem">${(r.customer_name||'お客様').replace(/様\s*$/,'')} 様</div>
+              <div style="font-size:.75rem;color:var(--text2);margin-bottom:.2rem">${r.course||''}</div>
+              <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.15rem">
+                ${hasShimei?badge(r.shimei_type,true):''}
+                ${opts.map(o=>badge(o,false)).join('')}
               </div>
-              <div style="text-align:right;min-width:4rem">
-                <div style="font-size:.65rem;color:var(--text3);margin-bottom:.15rem">支払い方法</div>
-                <div style="font-size:.78rem;font-weight:600">${payMethod}</div>
-              </div>
+              <div style="font-size:.68rem;color:var(--text3)">${payMethod}</div>
             </div>
           </div>`
         })
@@ -1543,23 +1541,31 @@ async function loadMySalary(){
       const opts=(s.options||[]).map(o=>o.name).filter(Boolean)
       const exts=(s.extensions||[])
       const payMethod=s.pay_course||'現金'
+      const timeStr=s.checkin_time&&s.checkout_time?`${s.checkin_time}〜${s.checkout_time}`:s.checkin_time?`${s.checkin_time}〜`:''
+      const badge=(t,val,clr)=>`<span style="font-size:.62rem;background:${clr?'rgba(184,137,58,.12)':'var(--surface2)'};color:${clr?'var(--accent)':'var(--text3)'};border:1px solid ${clr?'var(--accent)':'var(--border)'};border-radius:4px;padding:.08rem .35rem;font-weight:600;white-space:nowrap">${val}</span>`
       sessionLines+=`<div style="border:1px solid var(--border);border-radius:10px;padding:.65rem .75rem;margin-bottom:.45rem">
-        <div style="display:grid;grid-template-columns:auto 1fr auto;gap:.5rem;align-items:start">
-          <div style="min-width:2.8rem">
-            <div style="font-size:.75rem;font-weight:700">${i+1}本目</div>
-            <div style="font-size:.7rem;color:var(--text3);margin-top:.1rem">${s.checkin_time||''}</div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:start">
+          <div>
+            <div style="display:flex;align-items:baseline;gap:.4rem;margin-bottom:.1rem">
+              <span style="font-size:.75rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
+              ${timeStr?`<span style="font-size:.7rem;color:var(--text3)">${timeStr}</span>`:''}
+            </div>
+            <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.1rem">
+              <span style="font-size:.88rem;font-weight:700">${(s.customer_name||'').replace(/様\s*$/, '')} 様</span>
+              <span style="font-size:.72rem;color:var(--text3);font-weight:500">${fmt(courseBack)}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.2rem">
+              <span style="font-size:.75rem;color:var(--text2)">${s.course_name||''}</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem">
+              ${hasShimei?`<div style="display:flex;align-items:center;gap:.25rem">${badge('shimei',s.shimei_type,true)}<span style="font-size:.7rem;color:var(--text3)">${fmt(shimeiBack)}</span></div>`:''}
+              ${opts.map(o=>`<div style="display:flex;align-items:center;gap:.2rem">${badge('opt',o,false)}<span style="font-size:.7rem;color:var(--text3)">${fmt((s.options||[]).find(x=>x.name===o)?.back||0)}</span></div>`).join('')}
+              ${exts.map((e,ei)=>`<div style="display:flex;align-items:center;gap:.2rem">${badge('ext','延長'+(exts.length>1?ei+1+'回目':''),false)}<span style="font-size:.7rem;color:var(--text3)">${fmt(e.back||0)}</span></div>`).join('')}
+            </div>
+            <div style="font-size:.68rem;color:var(--text3)">${payMethod}</div>
           </div>
-          <div style="border-left:1px solid var(--border);padding-left:.6rem">
-            <div style="font-size:.85rem;font-weight:700;margin-bottom:.1rem">${s.customer_name||''}<span style="font-weight:400;font-size:.73rem"> 様</span></div>
-            <div style="font-size:.73rem;color:var(--text2);margin-bottom:.2rem">${s.course_name||''}</div>
-            ${hasShimei?`<span style="font-size:.62rem;background:var(--accent-f);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:.05rem .3rem;font-weight:600;margin-right:.25rem">指名あり</span><span style="font-size:.62rem;background:rgba(184,137,58,.12);color:var(--accent);border-radius:4px;padding:.05rem .3rem;font-weight:600">${s.shimei_type}</span>`:`<span style="font-size:.62rem;background:var(--surface2);color:var(--text3);border-radius:4px;padding:.05rem .3rem">指名なし</span>`}
-            ${opts.length?`<div style="font-size:.7rem;color:var(--text3);margin-top:.25rem">${opts.map(o=>'・'+o).join('<br>')}</div>`:''}
-            ${exts.length?`<div style="font-size:.7rem;color:var(--blue);margin-top:.2rem">・延長×${exts.length}（${fmt(extBackTotal)}）</div>`:''}
-          </div>
-          <div style="text-align:right;min-width:4.2rem">
-            <div style="font-size:.62rem;color:var(--text3);margin-bottom:.1rem">支払い方法</div>
-            <div style="font-size:.75rem;font-weight:600;margin-bottom:.2rem">${payMethod}</div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--accent)">${fmt(sessionNet)}</div>
+          <div style="text-align:right;padding-top:.2rem">
+            <div style="font-size:.75rem;font-weight:700;color:var(--accent)">${fmt(sessionNet)}</div>
           </div>
         </div>
       </div>`
