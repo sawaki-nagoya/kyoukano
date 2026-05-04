@@ -3673,7 +3673,11 @@ async function openWorkSheet(shiftId,castName,date,castId){
           pay_shimei:payShimei,
           pay_option:payOption,
           ext_count:rvExtCount,
-          ext_pays:extPays
+          ext_pays:extPays,
+          customer_name:rv.customer_name||'',
+          customer_no:rv.customer_no||null,
+          checkin_time:rv.checkin_time||'',
+          checkout_time:rv.checkout_time||''
         })
       })
     } else {
@@ -3690,6 +3694,10 @@ function addSession(data=null){
   const div=document.createElement('div')
   div.className='session-block'
   div.id='session-'+idx
+  div.dataset.customerName=data?.customer_name||''
+  div.dataset.customerNo=data?.customer_no||''
+  div.dataset.checkinTime=data?.checkin_time||''
+  div.dataset.checkoutTime=data?.checkout_time||''
   const courseOpts='<option value="">-- コースを選択 --</option>'+courses.map(c=>`<option value="${c.id}" ${data?.course_id===c.id?'selected':''}>${c.name}</option>`).join('')
   const shimeiTypes=['フリー','ネット指名','本指名']
   const shimeiOpts='<option value="">-- 指名を選択 --</option>'+shimeiTypes.map(t=>`<option value="${t}" ${data?.shimei_type===t?'selected':''}>${t}</option>`).join('')
@@ -4136,7 +4144,7 @@ async function saveWork(){
     const sessionSalesBase=(c.price||0)+shimeiPrice+optSaleTotal+extSaleTotal-discShop-discBack
     const sessionSales=sessionSalesBase+sesCardSurcharge
     const sessionBack=cback+sback+optBack+extBackTotal-discBack
-    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,card_base:sesCardBase,card_fee:sesCardFee,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption})
+    sessions.push({course_id:cid,course_name:c.name,shimei_type:stype,course_back:cback,shimei_back:sback,options,opt_back:optBack,discounts,extensions,sales:sessionSales,card_base:sesCardBase,card_fee:sesCardFee,pay_course:payCourse,pay_shimei:payShimei,pay_option:payOption,customer_name:block.dataset.customerName||'',customer_no:block.dataset.customerNo||null,checkin_time:block.dataset.checkinTime||'',checkout_time:block.dataset.checkoutTime||''})
     totalSales+=sessionSales;totalBack+=sessionBack;totalCount++
   })
   const hoshoSave=parseInt(document.getElementById('w-hosho')?.value)||0
