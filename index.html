@@ -1454,26 +1454,33 @@ async function loadMySalary(){
       const sids=todayShifts.map(s=>s.id)
       const{data:todayRvs}=await sb.from('reservations').select('*').in('shift_id',sids).order('checkin_time')
       const dn=['日','月','火','水','木','金','土'][new Date(todayStr).getDay()]
-      todayHtml=`<div class="card" style="margin-bottom:.55rem;border:2px solid var(--accent)">
+      todayHtml=`<div class="card" style="margin-bottom:.55rem;border:1.5px solid var(--accent)">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
-          <span style="font-size:.85rem;font-weight:700">${jpDate(todayStr)}（${dn}）</span>
-          <span style="font-size:.7rem;color:var(--accent);background:rgba(184,137,58,.15);padding:.15rem .6rem;border-radius:99px;font-weight:600">本日</span>
+          <span style="font-size:.88rem;font-weight:700">${jpDate(todayStr)}（${dn}）</span>
+          <span style="font-size:.7rem;color:var(--accent);font-weight:600">${todayRvs&&todayRvs.length?todayRvs.length+'本':''}</span>
         </div>`
       if(!todayRvs||!todayRvs.length){
         todayHtml+=`<div style="font-size:.8rem;color:var(--text3);text-align:center;padding:.5rem 0">本日の予約はまだありません</div>`
       } else {
         todayRvs.forEach((r,i)=>{
-          const timeStr=r.checkin_time?`${r.checkin_time}〜`:'時間未定'
+          const timeStr=r.checkin_time?r.checkin_time+'〜':''
           const opts=r.options?r.options.split(',').filter(Boolean):[]
-          todayHtml+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
-              <span style="font-size:.8rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
+          let pj={};try{pj=JSON.parse(r.payment||'{}')}catch(e){}
+          const payParts=[]
+          if(pj.course) payParts.push('コース:'+pj.course)
+          if(pj.shimei) payParts.push('指名:'+pj.shimei)
+          if(pj.option) payParts.push('OP:'+pj.option)
+          if(pj.ext) payParts.push('延長:'+pj.ext)
+          todayHtml+=`<div style="padding:.5rem 0;${i<todayRvs.length-1?'border-bottom:1px solid var(--border)':''}">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.25rem">
+              <span style="font-size:.82rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
               <span style="font-size:.75rem;color:var(--text3)">${timeStr}</span>
             </div>
-            <div style="font-size:.78rem;color:var(--text2)">${r.customer_name||'お客様'} / ${r.course||''}</div>
-            ${r.shimei_type&&r.shimei_type!=='フリー'?`<div style="font-size:.72rem;color:var(--text3)">指名: ${r.shimei_type}</div>`:''}
+            <div style="font-size:.82rem;font-weight:600;margin-bottom:.15rem">${r.customer_name||'お客様'}</div>
+            <div style="font-size:.75rem;color:var(--text2);margin-bottom:.1rem">${r.course||''}</div>
+            ${r.shimei_type?`<div style="font-size:.72rem;color:var(--text3)">指名: ${r.shimei_type}</div>`:''}
             ${opts.length?`<div style="font-size:.72rem;color:var(--text3)">OP: ${opts.join('・')}</div>`:''}
-            ${r.payment?`<div style="font-size:.72rem;color:var(--text3)">支払: ${r.payment}</div>`:''}
+            ${payParts.length?`<div style="font-size:.7rem;color:var(--text3);margin-top:.1rem">${payParts.join(' / ')}</div>`:''}
           </div>`
         })
       }
@@ -1542,13 +1549,10 @@ async function loadMySalary(){
     }
     return sessionLines
   }
-  // worksは日付昇順で来る。最後（最新）の日を展開、それ以前はアコーディオン
-  const latestDate=works[works.length-1]?.date
+  // worksは日付昇順。古い順表示、今日分はtodayAreaで表示済みなのでスキップ
   let dailyHtml=''
-  // 新しい日付が上に来るよう逆順で表示
-  const worksDesc=[...works].reverse()
-  worksDesc.forEach((w,idx)=>{
-    const isLatest=(w.date===latestDate)
+  works.forEach((w,idx)=>{
+    if(w.date===todayStr) return
     const dn=['日','月','火','水','木','金','土'][new Date(w.date).getDay()]
     const dateLabel=jpDate(w.date)+'（'+dn+'）'
     const cardId='sal-day-'+w.date.replace(/-/g,'')
@@ -1568,20 +1572,15 @@ async function loadMySalary(){
         <div class="sal-row"><span class="sal-rl">施術件数</span><span class="sal-rv">${w.count||0}本</span></div>
       </div>
       <div>${sessionLines}</div>`
-    // 全日付：アコーディオン形式（最新日はデフォルト展開）
-    const isOpen = (w.date === today())
-    const iconStyle = isOpen ? 'font-size:.8rem;color:var(--accent);transform:rotate(90deg);transition:transform .2s' : 'font-size:.8rem;color:var(--text3);transition:transform .2s'
-    const latestBadge = isLatest ? `<span style="font-size:.7rem;color:var(--accent);background:rgba(184,137,58,.12);padding:.15rem .6rem;border-radius:99px;font-weight:600;margin-left:.5rem">最新</span>` : ''
     dailyHtml+=`<div class="card" style="margin-bottom:.4rem;padding:.6rem 1rem" id="${cardId}">
       <div onclick="salDayToggle('${detailId}')" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none">
-        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:.2rem">
+        <div style="display:flex;align-items:center;gap:.4rem">
           <span style="font-size:.85rem;font-weight:700">${dateLabel}</span>
-          <span style="font-size:.8rem;color:var(--text3);margin-left:.4rem">${fmt(w.net||w.back)}</span>
-          ${latestBadge}
+          <span style="font-size:.8rem;color:var(--text3)">${fmt(w.net||w.back)}</span>
         </div>
-        <span id="${detailId}-icon" style="${iconStyle}">›</span>
+        <span id="${detailId}-icon" style="font-size:.8rem;color:var(--text3);transition:transform .2s">›</span>
       </div>
-      <div id="${detailId}" style="display:${isOpen?'block':'none'};margin-top:.5rem">
+      <div id="${detailId}" style="display:none;margin-top:.5rem">
         ${detailBody}
       </div>
     </div>`
