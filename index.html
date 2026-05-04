@@ -1452,21 +1452,22 @@ async function loadMySalary(){
     const fee=myFee||DEFAULT_FEE
     // コース名・指名・OPのバックをcast_fees設定から正確に計算
     function calcBack(courseName,shimeiType,optNames){
-      // コースバック：coursesテーブルのdurationで判定
+      // コースバック：コース名の分数で判定
       let cb=0
-      const matchC=courses.find(c=>c.name===courseName)
-      if(matchC){
-        const dur=matchC.duration||matchC.price||0
-        if(dur>=130) cb=fee.back_130||11000
-        else if(dur>=100) cb=fee.back_100||9000
-        else if(dur>=80) cb=fee.back_80||8000
-        else cb=fee.back_50||6000
-      } else if(courseName){
+      if(courseName){
         const cn=courseName
-        if(cn.includes('130')||cn.includes('2時間')) cb=fee.back_130||11000
+        if(cn.includes('130')||cn.includes('2時間')||cn.includes('120')) cb=fee.back_130||11000
         else if(cn.includes('100')) cb=fee.back_100||9000
         else if(cn.includes('80')||cn.includes('90')) cb=fee.back_80||8000
-        else cb=fee.back_50||6000
+        else if(cn.includes('50')||cn.includes('60')||cn.includes('55')) cb=fee.back_50||6000
+        else{
+          const nums=cn.match(/\d+/)
+          const n=nums?parseInt(nums[0]):0
+          if(n>=120) cb=fee.back_130||11000
+          else if(n>=100) cb=fee.back_100||9000
+          else if(n>=70) cb=fee.back_80||8000
+          else cb=fee.back_50||6000
+        }
       }
       // 指名バック
       let sb2=0
@@ -1597,28 +1598,28 @@ async function loadMySalary(){
       const payMethod=s.pay_course||'現金'
       const sliceT=t=>t?t.slice(0,5):''
       const timeStr=s.checkin_time&&s.checkout_time?`${sliceT(s.checkin_time)}〜${sliceT(s.checkout_time)}`:s.checkin_time?`${sliceT(s.checkin_time)}〜`:''
-      const badge2=(val,amt)=>`<div style="display:inline-flex;align-items:center;gap:.2rem"><span style="font-size:.62rem;background:rgba(184,137,58,.12);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:.08rem .35rem;font-weight:600;white-space:nowrap">${val}</span>${amt?`<span style="font-size:.65rem;color:var(--text3)">${fmt(amt)}</span>`:''}</div>`
+      const badge2=(val,amt)=>`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.15rem"><span style="font-size:.65rem;background:rgba(184,137,58,.12);color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:.1rem .4rem;font-weight:600">${val}</span><span style="font-size:.72rem;color:var(--text2);font-weight:600;min-width:4rem;text-align:right">${fmt(amt)}</span></div>`
+      const custN=(s.customer_name||'').replace(/様\s*$/,'')
       sessionLines+=`<div style="border:1px solid var(--border);border-radius:10px;padding:.65rem .75rem;margin-bottom:.45rem">
         <div style="display:grid;grid-template-columns:1fr auto;gap:.5rem;align-items:start">
-          <div>
-            <div style="display:flex;align-items:baseline;gap:.4rem;margin-bottom:.1rem">
+          <div style="min-width:0">
+            <div style="display:flex;align-items:baseline;gap:.4rem;margin-bottom:.15rem">
               <span style="font-size:.75rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
               ${timeStr?`<span style="font-size:.7rem;color:var(--text3)">${timeStr}</span>`:''}
             </div>
-            <div style="display:flex;align-items:center;gap:.3rem;margin-bottom:.05rem">
-              <span style="font-size:.88rem;font-weight:700">${(s.customer_name||'').replace(/様\s*$/,'')}${s.customer_name?' 様':''}</span>
-              <span style="font-size:.7rem;color:var(--text3)">${fmt(courseBack)}</span>
+            ${custN?`<div style="font-size:.88rem;font-weight:700;margin-bottom:.05rem">${custN} 様</div>`:''}
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.1rem">
+              <span style="font-size:.75rem;color:var(--text2)">${s.course_name||''}</span>
+              <span style="font-size:.72rem;color:var(--text2);font-weight:600;min-width:4rem;text-align:right">${fmt(courseBack)}</span>
             </div>
-            <div style="font-size:.75rem;color:var(--text2);margin-bottom:.2rem">${s.course_name||''}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.2rem">
-              ${hasShimei?badge2(s.shimei_type,shimeiBack):''}
-              ${opts.map(o=>badge2(o,(s.options||[]).find(x=>x.name===o)?.back||0)).join('')}
-              ${exts.map((e,ei)=>badge2('延長'+(exts.length>1?ei+1+'回目':''),e.back||0)).join('')}
-            </div>
-            <div style="font-size:.68rem;color:var(--text3)">${payMethod}</div>
+            ${hasShimei?badge2(s.shimei_type,shimeiBack):''}
+            ${opts.map(o=>badge2(o,(s.options||[]).find(x=>x.name===o)?.back||0)).join('')}
+            ${exts.map((e,ei)=>badge2('延長'+(exts.length>1?ei+1+'回目':''),e.back||0)).join('')}
+            <div style="font-size:.68rem;color:var(--text3);margin-top:.15rem">${payMethod}</div>
           </div>
-          <div style="text-align:right;padding-top:.2rem">
-            <div style="font-size:.75rem;font-weight:700;color:var(--accent)">${fmt(sessionNet)}</div>
+          <div style="text-align:right;padding-top:.1rem;padding-left:.5rem;border-left:1px solid var(--border)">
+            <div style="font-size:.62rem;color:var(--text3);margin-bottom:.1rem">合計</div>
+            <div style="font-size:.88rem;font-weight:700;color:var(--accent)">${fmt(sessionNet)}</div>
           </div>
         </div>
       </div>`
