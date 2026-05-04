@@ -1524,7 +1524,7 @@ async function loadMySalary(){
       </div>
       <div>${sessionLines}</div>`
     // 全日付：アコーディオン形式（最新日はデフォルト展開）
-    const isOpen = isLatest
+    const isOpen = (w.date === today())
     const iconStyle = isOpen ? 'font-size:.8rem;color:var(--accent);transform:rotate(90deg);transition:transform .2s' : 'font-size:.8rem;color:var(--text3);transition:transform .2s'
     const latestBadge = isLatest ? `<span style="font-size:.7rem;color:var(--accent);background:rgba(184,137,58,.12);padding:.15rem .6rem;border-radius:99px;font-weight:600;margin-left:.5rem">最新</span>` : ''
     dailyHtml+=`<div class="card" style="margin-bottom:.4rem;padding:.6rem 1rem" id="${cardId}">
