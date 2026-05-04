@@ -1534,8 +1534,13 @@ async function loadMySalary(){
     const cardId='sal-day-'+w.date.replace(/-/g,'')
     const detailId='sal-detail-'+w.date.replace(/-/g,'')
     const sessionLines=buildSessionLines(w)
+    const sessionsForCalc=w.sessions||[]
+    const totalCardBase=sessionsForCalc.reduce((s,ss)=>s+(ss.card_base||0),0)
+    const totalCardSales=totalCardBase>0?Math.round(totalCardBase*1.1):0
+    const totalCashSales=(w.sales||0)-totalCardSales
     const detailBody=`<div class="sal-hero" style="margin-bottom:.4rem">
         <div class="sal-row"><span class="sal-rl">お客様総支払額</span><span class="sal-rv">${fmt(w.sales||0)}</span></div>
+        ${totalCardBase>0?`<div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:var(--text3)">└ 現金</span><span class="sal-rv" style="font-size:.78rem">${fmt(totalCashSales)}</span></div><div class="sal-row" style="padding-left:.5rem"><span class="sal-rl" style="font-size:.72rem;color:#1565c0">└ カード(10%込)</span><span class="sal-rv" style="font-size:.78rem;color:#1565c0">${fmt(totalCardSales)}</span></div>`:''}
         <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv" style="color:#c62828">${fmt(w.back||0)}</span></div>
         ${w.misc?`<div class="sal-row"><span class="sal-rl">雑費</span><span class="sal-rv neg">-${fmt(w.misc)}</span></div>`:''}
         <div class="sal-row"><span class="sal-rl" style="color:#c62828">委託金</span><span class="sal-rv tot" style="color:#c62828">${fmt(w.net||w.back)}</span></div>
