@@ -1444,7 +1444,7 @@ async function loadMySalary(){
   if(dailyArea) dailyArea.style.display='none'
 
   // ── 今日の予約リアルタイム表示 ──
-  const todayStr=today()
+  const todayStr=bizDay()
   const todayArea=document.getElementById('sal-today-area')
   if(todayArea && salMonth===todayStr.slice(0,7)){
     // cast_feesを取得（予想バック計算用）
