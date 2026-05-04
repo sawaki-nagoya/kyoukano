@@ -1133,6 +1133,7 @@ function startApp(){
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
     // Push通知ボタンを表示
     const pushBtn = document.createElement('button');
+    pushBtn.id='push-notify-btn';
     pushBtn.textContent = '🔔 通知を有効にする';
     pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
     pushBtn.onclick = async function() {
@@ -1159,6 +1160,7 @@ function startApp(){
 }
 
 function doLogout(){
+  const existBtn=document.getElementById('push-notify-btn');if(existBtn)existBtn.remove();
   me=null; myShifts=[]
   sessionStorage.removeItem('kyoukano_me')
   sessionStorage.removeItem('kyoukano_tab')
