@@ -5777,6 +5777,7 @@ alert("subscribePush呼ばれた! castId=" + castId);
   console.log("[Push] 開始 castId:", castId);  alert("PushManager確認: " + ("PushManager" in window)); if (!("PushManager" in window)) { alert("PushManager未対応！"); return; }
   if (!castId) { console.error("[Push] castIdがnull！中止"); return; }
   
+  const permission = "granted";
   console.log("[Push] 通知許可結果:", permission);
   if (permission !== "granted") { console.warn("[Push] 通知許可されず:", permission); return; }
   function urlBase64ToUint8Array(b64) {
