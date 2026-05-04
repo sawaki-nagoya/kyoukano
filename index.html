@@ -329,6 +329,7 @@ tr:last-child td{border-bottom:none}
         <button id="sal-tab-total" onclick="salTab('total')" style="flex:1;padding:.45rem;font-size:.8rem;font-weight:600;border:none;border-radius:9px;cursor:pointer;background:transparent;color:var(--text3)">月トータル</button>
       </div>
       <div id="sal-total-area" style="display:none"></div>
+      <div id="sal-today-area" style="display:none"></div>
       <div id="sal-daily-area"></div>
     </div>
 
@@ -1153,6 +1154,7 @@ function salTab(mode){
   document.getElementById('sal-tab-total').style.cssText=mode==='total'?on:off
   document.getElementById('sal-tab-daily').style.cssText=mode==='daily'?on:off
   document.getElementById('sal-total-area').style.display=mode==='total'?'block':'none'
+  document.getElementById('sal-today-area').style.display=mode==='daily'?'block':'none'
   document.getElementById('sal-daily-area').style.display=mode==='daily'?'block':'none'
 }
 function tab(name){
@@ -1436,11 +1438,54 @@ function salDayToggle(detailId){
 async function loadMySalary(){
   const[y,m]=salMonth.split('-').map(Number)
   document.getElementById('sal-title').textContent=y+'年'+m+'月'
-  // 先にdisplay制御（一瞬見えるバグ防止）
   const totalArea=document.getElementById('sal-total-area')
   const dailyArea=document.getElementById('sal-daily-area')
   if(totalArea) totalArea.style.display='none'
   if(dailyArea) dailyArea.style.display='none'
+
+  // ── 今日の予約リアルタイム表示 ──
+  const todayStr=today()
+  const todayArea=document.getElementById('sal-today-area')
+  if(todayArea && salMonth===todayStr.slice(0,7)){
+    // 今日のシフトを取得
+    const{data:todayShifts}=await sb.from('shifts').select('id').eq('cast_id',me.id).eq('date',todayStr).eq('status','approved')
+    let todayHtml=''
+    if(todayShifts&&todayShifts.length){
+      const sids=todayShifts.map(s=>s.id)
+      const{data:todayRvs}=await sb.from('reservations').select('*').in('shift_id',sids).order('checkin_time')
+      const dn=['日','月','火','水','木','金','土'][new Date(todayStr).getDay()]
+      todayHtml=`<div class="card" style="margin-bottom:.55rem;border:2px solid var(--accent)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+          <span style="font-size:.85rem;font-weight:700">${jpDate(todayStr)}（${dn}）</span>
+          <span style="font-size:.7rem;color:var(--accent);background:rgba(184,137,58,.15);padding:.15rem .6rem;border-radius:99px;font-weight:600">本日</span>
+        </div>`
+      if(!todayRvs||!todayRvs.length){
+        todayHtml+=`<div style="font-size:.8rem;color:var(--text3);text-align:center;padding:.5rem 0">本日の予約はまだありません</div>`
+      } else {
+        todayRvs.forEach((r,i)=>{
+          const timeStr=r.checkin_time?`${r.checkin_time}〜`:'時間未定'
+          const opts=r.options?r.options.split(',').filter(Boolean):[]
+          todayHtml+=`<div style="padding:.4rem 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.15rem">
+              <span style="font-size:.8rem;font-weight:700;color:var(--accent)">${i+1}本目</span>
+              <span style="font-size:.75rem;color:var(--text3)">${timeStr}</span>
+            </div>
+            <div style="font-size:.78rem;color:var(--text2)">${r.customer_name||'お客様'} / ${r.course||''}</div>
+            ${r.shimei_type&&r.shimei_type!=='フリー'?`<div style="font-size:.72rem;color:var(--text3)">指名: ${r.shimei_type}</div>`:''}
+            ${opts.length?`<div style="font-size:.72rem;color:var(--text3)">OP: ${opts.join('・')}</div>`:''}
+            ${r.payment?`<div style="font-size:.72rem;color:var(--text3)">支払: ${r.payment}</div>`:''}
+          </div>`
+        })
+      }
+      todayHtml+=`</div>`
+    }
+    todayArea.innerHTML=todayHtml
+    todayArea.style.display=(todayHtml&&salTabMode==='daily')?'block':'none'
+  } else if(todayArea){
+    todayArea.innerHTML=''
+    todayArea.style.display='none'
+  }
+
   const{data:works}=await sb.from('works').select('*').eq('cast_id',me.id).gte('date',salMonth+'-01').lt('date',nextYM(salMonth)+'-01').order('date')
   if(!works||!works.length){
     if(totalArea){totalArea.innerHTML='<div class="empty">この月の記録はまだありません</div>';totalArea.style.display=salTabMode==='total'?'block':'none'}
