@@ -1446,7 +1446,8 @@ async function loadMySalary(){
   // ── 今日の予約リアルタイム表示 ──
   const todayStr=today()
   const todayArea=document.getElementById('sal-today-area')
-  if(todayArea && salMonth===todayStr.slice(0,7)){
+  if(todayArea){
+    if(salMonth===todayStr.slice(0,7)){
     // cast_feesを取得（予想バック計算用）
     const{data:myFee}=await sb.from('cast_fees').select('*').eq('cast_id',me.id).single()
     const fee=myFee||DEFAULT_FEE
@@ -1525,7 +1526,7 @@ async function loadMySalary(){
         if(pj2.option==='カード') todayCardTotal+=optTotal; else todayCashTotal+=optTotal
         todayBackTotal+=est2.total
       })
-      // サマリーバー：本数 / 現金・カード・合計 / バック合計（4列）
+      // サマリーバーは常に表示（予約0本でも表示）
       todayHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
         <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
           <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">本数</div>
@@ -1607,7 +1608,11 @@ async function loadMySalary(){
       }
     }
     todayArea.innerHTML=todayHtml
-    todayArea.style.display=(todayHtml&&salTabMode==='daily')?'block':'none'
+    todayArea.style.display=salTabMode==='daily'?'block':'none'
+    } else {
+      todayArea.innerHTML=''
+      todayArea.style.display='none'
+    }
   } else if(todayArea){
     todayArea.innerHTML=''
     todayArea.style.display='none'
