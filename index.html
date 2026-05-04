@@ -2842,8 +2842,35 @@ async function confirmRoomAssign(shiftId){
   setTimeout(()=>loadOwnerCal(),2000)
 }
 
-async function approveShift(id){await sb.from('shifts').update({status:'approved'}).eq('id',id);toast('承認しました');loadOwnerCal()}
-async function rejectShift(id){if(!confirm('却下しますか？'))return;await sb.from('shifts').update({status:'rejected'}).eq('id',id);toast('却下しました');loadOwnerCal()}
+async function approveShift(id){
+  await sb.from('shifts').update({status:'approved'}).eq('id',id);
+  toast('承認しました');
+  // Push通知送信
+  try {
+    const {data:shift} = await sb.from('shifts').select('cast_id').eq('id',id).single();
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cast_id:shift.cast_id, title:'シフトが承認されました✅', body:'オーナーがあなたのシフトを承認しました。'})
+    });
+  } catch(e) { console.error('通知エラー',e); }
+  loadOwnerCal()
+}
+async function rejectShift(id){
+  if(!confirm('却下しますか？'))return;
+  await sb.from('shifts').update({status:'rejected'}).eq('id',id);
+  toast('却下しました');
+  // Push通知送信
+  try {
+    const {data:shift} = await sb.from('shifts').select('cast_id').eq('id',id).single();
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({cast_id:shift.cast_id, title:'シフトが却下されました❌', body:'オーナーがあなたのシフトを却下しました。'})
+    });
+  } catch(e) { console.error('通知エラー',e); }
+  loadOwnerCal()
+}
 
 function openShiftEdit(id,name,date,start,end,note){
   editShiftId=id
