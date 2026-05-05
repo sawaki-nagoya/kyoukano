@@ -1545,11 +1545,11 @@ async function loadMySalary(){
         todayRvs.forEach((r,i)=>{
           const sliceT=t=>t?t.slice(0,5):''
           const timeStr=r.checkin_time&&r.checkout_time?`${sliceT(r.checkin_time)}〜${sliceT(r.checkout_time)}`:r.checkin_time?`${sliceT(r.checkin_time)}〜`:''
-          const opts=r.options?r.options.split(',').filter(Boolean):[]
+          const rvOpts=r.options?r.options.split(',').filter(Boolean):[]
           let pj={};try{pj=JSON.parse(r.payment||'{}')}catch(e){}
           const payMethod=pj.course||'現金'
           const hasShimei=r.shimei_type&&r.shimei_type!=='フリー'
-          const est=calcBack(r.course,r.shimei_type,opts)
+          const est=calcBack(r.course,r.shimei_type,rvOpts)
           const custName=(r.customer_name||'').replace(/様\s*$/,'')||(r.customer_no&&custMap[r.customer_no]?custMap[r.customer_no].replace(/様\s*$/,''):'お客様')
           const payLabel=m=>m==='カード'?'カード払い':'現金'
           const optPay=pj.optPay||{}
