@@ -1520,24 +1520,17 @@ async function loadMySalary(){
         if(pj2.option==='カード') todayCardTotal+=optTotal; else todayCashTotal+=optTotal
         todayBackTotal+=est2.total
       })
-      // サマリーバー：本数 / 現金・カード・合計 / バック合計（4列）
-      todayHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:.4rem;margin-bottom:.75rem">
-        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
-          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">本数</div>
-          <div style="font-size:1.3rem;font-weight:700">${rvCount}<span style="font-size:.75rem;font-weight:600">本</span></div>
-        </div>
-        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
-          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">現金</div>
-          <div style="font-size:.85rem;font-weight:700">${rvCount?fmt(todayCashTotal):'¥-'}</div>
-        </div>
-        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
-          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">カード</div>
-          <div style="font-size:.85rem;font-weight:700">${rvCount?fmt(todayCardTotal):'¥-'}</div>
-        </div>
-        <div style="background:var(--surface);border-radius:12px;padding:.6rem .4rem;text-align:center;border:1px solid var(--border)">
-          <div style="font-size:.6rem;color:var(--text3);margin-bottom:.15rem">バック</div>
-          <div style="font-size:.85rem;font-weight:700;color:var(--accent)">${rvCount?fmt(todayBackTotal):'¥-'}</div>
-        </div>
+      // サマリーバー：3×2グリッド（本数・現金・カード / バック・雑費・店舗利益）
+      const todayMisc=0 // 当日はworks未確定なので雑費は0
+      const todayProfit=todaySalesTotal-todayBackTotal-todayMisc
+      const cell=(label,val,accent=false)=>`<div style="background:var(--surface);border-radius:10px;padding:.55rem .4rem;text-align:center;border:1px solid var(--border)"><div style="font-size:.58rem;color:var(--text3);margin-bottom:.1rem">${label}</div><div style="font-size:.82rem;font-weight:700;${accent?'color:var(--accent)':''}">${val}</div></div>`
+      todayHtml=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.75rem">
+        ${cell('本数',rvCount+'本')}
+        ${cell('現金',rvCount?fmt(todayCashTotal):'¥-')}
+        ${cell('カード',rvCount?fmt(todayCardTotal):'¥-')}
+        ${cell('バック',rvCount?fmt(todayBackTotal):'¥-',true)}
+        ${cell('雑費','¥-')}
+        ${cell('店舗利益',rvCount?fmt(todayProfit):'¥-')}
       </div>`
       if(!todayRvs||!todayRvs.length){
         todayHtml+=`<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の予約はまだありません</div>`
@@ -1561,12 +1554,12 @@ async function loadMySalary(){
           if(hasShimei) rows.push({cat:'指名料',name:r.shimei_type,sale:shimeiSale2,back:est.sb2,pay:payLabel(pj.shimei||'現金')})
           est.opDetails.forEach(o=>{const op=opts.find(x=>x.name===o.name);rows.push({cat:'オプション',name:o.name,sale:op?.price||0,back:o.back,pay:payLabel(optPay[o.name]||pj.option||'現金')})})
           const totalSale2=rows.reduce((a,r)=>a+r.sale,0)
-          const mkCardRow=(row)=>`<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:.6rem 1rem;border-bottom:.5px solid var(--border);gap:.5rem">
-            <div>
-              <div style="font-size:.82rem;color:var(--text);white-space:nowrap">${row.name}</div>
+          const mkCardRow=(row)=>`<div style="display:flex;align-items:center;padding:.6rem 1rem;border-bottom:.5px solid var(--border);gap:.5rem">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.82rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${row.name}</div>
               <div style="font-size:.68rem;color:var(--text3);margin-top:.1rem">${row.cat}</div>
             </div>
-            <div style="display:flex;gap:0;align-items:center">
+            <div style="display:flex;gap:0;align-items:center;flex-shrink:0">
               <div style="text-align:right;min-width:4.2rem">
                 <div style="font-size:.6rem;color:var(--text3)">売上</div>
                 <div style="font-size:.78rem;font-weight:500">${row.sale?fmt(row.sale):'-'}</div>
@@ -1580,7 +1573,7 @@ async function loadMySalary(){
                 <div style="font-size:.78rem;color:var(--text3)">${(row.sale&&row.back!=null)?fmt(row.sale-row.back):'-'}</div>
               </div>
             </div>
-            ${row.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${row.pay}</span>`:`<span style="display:inline-block;min-width:2.8rem"></span>`}
+            <div style="flex-shrink:0;min-width:2.8rem;text-align:right">${row.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${row.pay}</span>`:''}</div>
           </div>`
           todayHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:.6rem">
             <div style="display:flex;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border);gap:.5rem">
@@ -1683,11 +1676,11 @@ async function loadMySalary(){
           ${custN?`<span style="font-size:.85rem;font-weight:700;white-space:nowrap">${custN} 様</span>`:''}
         </div>
         ${sRows.map(r=>`<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:.6rem 1rem;border-bottom:.5px solid var(--border);gap:.5rem">
-          <div>
-            <div style="font-size:.82rem;color:var(--text);white-space:nowrap">${r.name}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.82rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.name}</div>
             <div style="font-size:.68rem;color:var(--text3);margin-top:.1rem">${r.cat}</div>
           </div>
-          <div style="display:flex;gap:0;align-items:center">
+          <div style="display:flex;gap:0;align-items:center;flex-shrink:0">
             <div style="text-align:right;min-width:4.2rem">
               <div style="font-size:.6rem;color:var(--text3)">売上</div>
               <div style="font-size:.78rem;font-weight:500">${r.sale?fmt(r.sale):'-'}</div>
@@ -1701,7 +1694,7 @@ async function loadMySalary(){
               <div style="font-size:.78rem;color:var(--text3)">${(r.sale&&r.back!=null)?fmt(r.sale-r.back):'-'}</div>
             </div>
           </div>
-          ${r.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${r.pay}</span>`:`<span style="display:inline-block;min-width:2.8rem"></span>`}
+          <div style="flex-shrink:0;min-width:2.8rem;text-align:right">${r.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${r.pay}</span>`:''}</div>
         </div>`).join('')}
         <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
           <span style="font-size:.8rem;font-weight:600">合計</span>
