@@ -1157,11 +1157,18 @@ function startApp(){
         pushBtn.remove();
         try {
           const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=6");
-          const oldSub = await reg.pushManager.getSubscription();
-          if (oldSub) await oldSub.unsubscribe();
-          const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E") });
+          // 既存のSubscriptionを再利用（unsubscribeするとendpointが変わりDBと不一致になるため）
+          let sub = await reg.pushManager.getSubscription();
+          if (!sub) {
+            sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E") });
+          }
           const subJson = sub.toJSON();
-          // オーナーは複数台対応のため削除せず追加
+          // 同じendpointが既に登録済みかチェック
+          const { data: existingSubs } = await sb.from("push_subscriptions").select("subscription").eq("cast_id", 0);
+          const alreadyExists = (existingSubs || []).some(s => {
+            try { return JSON.parse(s.subscription).endpoint === subJson.endpoint; } catch { return false; }
+          });
+          if (alreadyExists) { alert("この端末は既に登録済みです！"); return; }
           const { error } = await sb.from("push_subscriptions").insert({ cast_id: 0, subscription: subJson });
           if (error) { alert("登録失敗: " + JSON.stringify(error)); } else { alert("Push登録成功！"); }
         } catch(e) { alert("Pushエラー: " + e.name + " / " + e.message); }
