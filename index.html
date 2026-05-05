@@ -1106,9 +1106,9 @@ function startApp(){
   } else {
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
-    tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
+    tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift');
     // Push通知ボタン（登録済みの場合は非表示）
-    (async function() {
+    ;(async function() {
       const castId = me.id;
 
       // DBに登録済みか確認（エラーが起きてもボタンは表示する）
