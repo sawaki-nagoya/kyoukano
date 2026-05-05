@@ -1121,8 +1121,11 @@ function startApp(){
         const browserGranted = Notification.permission === 'granted' && !!existingSub;
 
         // ② SupabaseにDBレコードが存在するか確認
-        const { data: dbSub } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", castId).maybeSingle();
+        const { data: dbSub, error: dbErr } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", castId).maybeSingle();
         const dbRegistered = !!dbSub;
+
+        // デバッグ用（確認後削除）
+        alert(`[通知デバッグ] castId=${castId}\nNotification.permission=${Notification.permission}\nexistingSub=${!!existingSub}\ndbSub=${JSON.stringify(dbSub)}\ndbErr=${JSON.stringify(dbErr)}\nbrowserGranted=${browserGranted}\ndbRegistered=${dbRegistered}`);
 
         // ③ 両方揃っていれば登録済み → ボタン非表示
         if (browserGranted && dbRegistered) return;
