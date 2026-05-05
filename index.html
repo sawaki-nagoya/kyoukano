@@ -1563,8 +1563,8 @@ async function loadMySalary(){
           const totalSale2=rows.reduce((a,r)=>a+r.sale,0)
           const cp='.4rem .3rem'
           const tblRows=rows.map(row=>`<tr style="border-top:1px solid rgba(0,0,0,.06)">
-              <td style="padding:${cp};font-size:.7rem;color:var(--text3)">${row.cat}</td>
-              <td style="padding:${cp};font-size:.73rem;color:var(--text)">${row.name}</td>
+              <td style="padding:${cp};font-size:.7rem;color:var(--text3);white-space:nowrap">${row.cat}</td>
+              <td style="padding:${cp};font-size:.73rem;color:var(--text);white-space:nowrap">${row.name}</td>
               <td style="padding:${cp};font-size:.73rem;font-weight:500;text-align:center">${row.sale?fmt(row.sale):'-'}</td>
               <td style="padding:${cp};font-size:.73rem;font-weight:700;text-align:center;color:var(--accent)">${row.back?fmt(row.back):'-'}</td>
               <td style="padding:${cp};font-size:.73rem;font-weight:500;text-align:center;color:var(--text3)">${(row.sale&&row.back!=null)?fmt(row.sale-row.back):'-'}</td>
@@ -1663,8 +1663,8 @@ async function loadMySalary(){
       ;(s.discounts||[]).forEach(d=>{sRows.push({cat:'割引',name:d.name,sale:-(d.amount||0),back:0,pay:''})})
       const totalSale=sRows.reduce((a,r)=>a+r.sale,0)
       const sTblRows=sRows.map(r=>`<tr style="border-top:1px solid rgba(0,0,0,.06)">
-        <td style="padding:.4rem .3rem;font-size:.7rem;color:var(--text3)">${r.cat}</td>
-        <td style="padding:.4rem .3rem;font-size:.73rem;color:var(--text)">${r.name}</td>
+        <td style="padding:.4rem .3rem;font-size:.7rem;color:var(--text3);white-space:nowrap">${r.cat}</td>
+        <td style="padding:.4rem .3rem;font-size:.73rem;color:var(--text);white-space:nowrap">${r.name}</td>
         <td style="padding:.4rem .3rem;font-size:.73rem;font-weight:500;text-align:center">${r.sale?fmt(r.sale):'-'}</td>
         <td style="padding:.4rem .3rem;font-size:.73rem;font-weight:700;text-align:center;color:var(--accent)">${r.back?fmt(r.back):'-'}</td>
         <td style="padding:.4rem .3rem;font-size:.73rem;font-weight:500;text-align:center;color:var(--text3)">${(r.sale&&r.back!=null)?fmt(r.sale-r.back):'-'}</td>
