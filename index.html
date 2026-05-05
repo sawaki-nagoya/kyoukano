@@ -1735,19 +1735,18 @@ async function loadMySalary(){
     const totalCardSales=totalCardBase>0?Math.round(totalCardBase*1.1):0
     const totalCashSales=(w.sales||0)-totalCardSales
     // サマリー行
-    const summaryBar=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-bottom:.75rem">
-      <div style="background:var(--surface2);border-radius:10px;padding:.6rem .4rem;text-align:center">
-        <div style="font-size:.62rem;color:var(--text3);margin-bottom:.15rem">本数</div>
-        <div style="font-size:1.3rem;font-weight:700">${w.count||0}<span style="font-size:.75rem;font-weight:600">本</span></div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:.6rem .4rem;text-align:center">
-        <div style="font-size:.62rem;color:var(--text3);margin-bottom:.15rem">売上合計</div>
-        <div style="font-size:.85rem;font-weight:700">${fmt(w.sales||0)}</div>
-      </div>
-      <div style="background:var(--surface2);border-radius:10px;padding:.6rem .4rem;text-align:center">
-        <div style="font-size:.62rem;color:var(--text3);margin-bottom:.15rem">バック合計</div>
-        <div style="font-size:.85rem;font-weight:700;color:var(--accent)">${fmt(w.net||w.back)}</div>
-      </div>
+    const wCardBase=(w.sessions||[]).reduce((s,ss)=>s+(ss.card_base||0),0)
+    const wCardSales=wCardBase>0?Math.round(wCardBase*1.1):0
+    const wCashSales=(w.sales||0)-wCardSales
+    const wProfit=(w.sales||0)-(w.net||w.back||0)-(w.misc||0)
+    const cell2=(label,val,accent=false)=>`<div style="background:var(--surface2);border-radius:10px;padding:.55rem .4rem;text-align:center"><div style="font-size:.58rem;color:var(--text3);margin-bottom:.1rem">${label}</div><div style="font-size:.82rem;font-weight:700;${accent?'color:var(--accent)':''}">${val}</div></div>`
+    const summaryBar=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.35rem;margin-bottom:.75rem">
+      ${cell2('本数',(w.count||0)+'本')}
+      ${cell2('現金',fmt(wCashSales))}
+      ${cell2('カード',fmt(wCardSales))}
+      ${cell2('バック',fmt(w.net||w.back||0),true)}
+      ${cell2('雑費',w.misc?fmt(w.misc):'¥0')}
+      ${cell2('店舗利益',fmt(wProfit))}
     </div>`
     // バック内訳
     const shimeiBack=(w.sessions||[]).reduce((s,ss)=>s+(ss.shimei_back||0),0)
