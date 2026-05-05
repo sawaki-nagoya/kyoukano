@@ -226,7 +226,7 @@ tr:last-child td{border-bottom:none}
 .session-del{background:var(--rbg);border:1.5px solid var(--rbd);color:var(--rtx);border-radius:6px;padding:.28rem .55rem;font-size:.72rem;cursor:pointer}
 .session-label{font-size:.7rem;color:var(--text3);font-weight:600;margin-bottom:.25rem}
 </style>
-<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/kyoukano/sw.js").then(r=>console.log("[SW] 登録成功:",r)).catch(e=>console.error("[SW] 登録失敗:",e));}</script>
+<script>if("serviceWorker" in navigator){navigator.serviceWorker.register("/kyoukano/sw.js?v=5").then(r=>console.log("[SW] 登録成功:",r)).catch(e=>console.error("[SW] 登録失敗:",e));}</script>
 </head>
 <body>
 
@@ -1117,7 +1117,7 @@ function startApp(){
 
       try {
         // ① ブラウザの通知許可 + アクティブなSubscriptionを確認
-        const reg = await navigator.serviceWorker.register("/kyoukano/sw.js");
+        const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=5");
         const existingSub = await reg.pushManager.getSubscription();
         const browserGranted = Notification.permission === 'granted' && !!existingSub;
 
@@ -1143,7 +1143,7 @@ function startApp(){
       pushBtn.onclick = async function() {
         pushBtn.remove();
         try {
-          const reg = await navigator.serviceWorker.register("/kyoukano/sw.js");
+          const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=5");
           const oldSub = await reg.pushManager.getSubscription();
           if (oldSub) await oldSub.unsubscribe();
           const sub = await reg.pushManager.subscribe({
@@ -6047,7 +6047,7 @@ async function subscribePush(castId) {
   if (permission !== "granted") { alert("通知許可されず"); return; }
 
   try {
-    const reg = await navigator.serviceWorker.register("/kyoukano/sw.js");
+    const reg = await navigator.serviceWorker.register("/kyoukano/sw.js?v=5");
     alert("SW登録成功: " + reg.scope);
     const oldSub = await reg.pushManager.getSubscription();
     if (oldSub) await oldSub.unsubscribe();
