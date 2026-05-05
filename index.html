@@ -1566,16 +1566,16 @@ async function loadMySalary(){
               <div style="font-size:.82rem;color:var(--text);white-space:nowrap">${row.name}</div>
               <div style="font-size:.68rem;color:var(--text3);margin-top:.1rem">${row.cat}</div>
             </div>
-            <div style="display:flex;gap:.75rem;align-items:center">
-              <div style="text-align:right">
+            <div style="display:flex;gap:0;align-items:center">
+              <div style="text-align:right;min-width:4.2rem">
                 <div style="font-size:.6rem;color:var(--text3)">売上</div>
                 <div style="font-size:.78rem;font-weight:500">${row.sale?fmt(row.sale):'-'}</div>
               </div>
-              <div style="text-align:right">
+              <div style="text-align:right;min-width:4.2rem">
                 <div style="font-size:.6rem;color:var(--accent)">バック</div>
                 <div style="font-size:.78rem;font-weight:600;color:var(--accent)">${row.back?fmt(row.back):'-'}</div>
               </div>
-              <div style="text-align:right">
+              <div style="text-align:right;min-width:4rem">
                 <div style="font-size:.6rem;color:var(--text3)">利益</div>
                 <div style="font-size:.78rem;color:var(--text3)">${(row.sale&&row.back!=null)?fmt(row.sale-row.back):'-'}</div>
               </div>
@@ -1591,16 +1591,16 @@ async function loadMySalary(){
             ${rows.map(mkCardRow).join('')}
             <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
               <span style="font-size:.8rem;font-weight:600">合計（参考）</span>
-              <div style="display:flex;gap:.75rem">
-                <div style="text-align:right">
+              <div style="display:flex;gap:0">
+                <div style="text-align:right;min-width:4.2rem">
                   <div style="font-size:.6rem;color:var(--text3)">売上</div>
                   <div style="font-size:.82rem;font-weight:500">${fmt(totalSale2)}</div>
                 </div>
-                <div style="text-align:right">
+                <div style="text-align:right;min-width:4.2rem">
                   <div style="font-size:.6rem;color:var(--accent)">バック</div>
                   <div style="font-size:.82rem;font-weight:600;color:var(--accent)">${fmt(est.total)}</div>
                 </div>
-                <div style="text-align:right">
+                <div style="text-align:right;min-width:4rem">
                   <div style="font-size:.6rem;color:var(--text3)">店舗利益</div>
                   <div style="font-size:.82rem;color:var(--text3)">${fmt(totalSale2-est.total)}</div>
                 </div>
@@ -1686,16 +1686,16 @@ async function loadMySalary(){
             <div style="font-size:.82rem;color:var(--text);white-space:nowrap">${r.name}</div>
             <div style="font-size:.68rem;color:var(--text3);margin-top:.1rem">${r.cat}</div>
           </div>
-          <div style="display:flex;gap:.75rem;align-items:center">
-            <div style="text-align:right">
+          <div style="display:flex;gap:0;align-items:center">
+            <div style="text-align:right;min-width:4.2rem">
               <div style="font-size:.6rem;color:var(--text3)">売上</div>
               <div style="font-size:.78rem;font-weight:500">${r.sale?fmt(r.sale):'-'}</div>
             </div>
-            <div style="text-align:right">
+            <div style="text-align:right;min-width:4.2rem">
               <div style="font-size:.6rem;color:var(--accent)">バック</div>
               <div style="font-size:.78rem;font-weight:600;color:var(--accent)">${r.back?fmt(r.back):'-'}</div>
             </div>
-            <div style="text-align:right">
+            <div style="text-align:right;min-width:4rem">
               <div style="font-size:.6rem;color:var(--text3)">利益</div>
               <div style="font-size:.78rem;color:var(--text3)">${(r.sale&&r.back!=null)?fmt(r.sale-r.back):'-'}</div>
             </div>
@@ -1704,16 +1704,16 @@ async function loadMySalary(){
         </div>`).join('')}
         <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
           <span style="font-size:.8rem;font-weight:600">合計</span>
-          <div style="display:flex;gap:.75rem">
-            <div style="text-align:right">
+          <div style="display:flex;gap:0">
+            <div style="text-align:right;min-width:4.2rem">
               <div style="font-size:.6rem;color:var(--text3)">売上</div>
               <div style="font-size:.82rem;font-weight:500">${fmt(s.sales||totalSale)}</div>
             </div>
-            <div style="text-align:right">
+            <div style="text-align:right;min-width:4.2rem">
               <div style="font-size:.6rem;color:var(--accent)">バック</div>
               <div style="font-size:.82rem;font-weight:600;color:var(--accent)">${fmt(sessionNet)}</div>
             </div>
-            <div style="text-align:right">
+            <div style="text-align:right;min-width:4rem">
               <div style="font-size:.6rem;color:var(--text3)">店舗利益</div>
               <div style="font-size:.82rem;color:var(--text3)">${fmt((s.sales||totalSale)-sessionNet)}</div>
             </div>
