@@ -1582,9 +1582,9 @@ async function loadMySalary(){
               <span style="font-size:.85rem;font-weight:700;white-space:nowrap">${custName} 様</span>
             </div>
             ${rows.map(mkCardRow).join('')}
-            <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
-              <span style="font-size:.8rem;font-weight:600">合計（参考）</span>
-              <div style="display:flex;gap:0">
+            <div style="display:flex;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
+              <span style="flex:1;font-size:.8rem;font-weight:600">合計</span>
+              <div style="display:flex;gap:0;flex-shrink:0">
                 <div style="text-align:right;min-width:4.2rem">
                   <div style="font-size:.6rem;color:var(--text3)">売上</div>
                   <div style="font-size:.82rem;font-weight:500">${fmt(totalSale2)}</div>
@@ -1598,6 +1598,7 @@ async function loadMySalary(){
                   <div style="font-size:.82rem;color:var(--text3)">${fmt(totalSale2-est.total)}</div>
                 </div>
               </div>
+              <div style="flex-shrink:0;min-width:2.8rem"></div>
             </div>
           </div>`
         })
@@ -1696,9 +1697,9 @@ async function loadMySalary(){
           </div>
           <div style="flex-shrink:0;min-width:2.8rem;text-align:right">${r.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${r.pay}</span>`:''}</div>
         </div>`).join('')}
-        <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
-          <span style="font-size:.8rem;font-weight:600">合計</span>
-          <div style="display:flex;gap:0">
+        <div style="display:flex;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
+          <span style="flex:1;font-size:.8rem;font-weight:600">合計</span>
+          <div style="display:flex;gap:0;flex-shrink:0">
             <div style="text-align:right;min-width:4.2rem">
               <div style="font-size:.6rem;color:var(--text3)">売上</div>
               <div style="font-size:.82rem;font-weight:500">${fmt(s.sales||totalSale)}</div>
@@ -1712,6 +1713,7 @@ async function loadMySalary(){
               <div style="font-size:.82rem;color:var(--text3)">${fmt((s.sales||totalSale)-sessionNet)}</div>
             </div>
           </div>
+          <div style="flex-shrink:0;min-width:2.8rem"></div>
         </div>
       </div>`
     })
