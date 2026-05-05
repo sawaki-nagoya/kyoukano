@@ -1107,30 +1107,53 @@ function startApp(){
     document.querySelector('.cast-tab').classList.add('on')
     const castTabs=['shift','shift-list','salary','cast-memo']
     tab(savedTab&&castTabs.includes(savedTab)?savedTab:'shift')
-    // Push通知ボタンを表示
-    const pushBtn = document.createElement('button');
-    pushBtn.textContent = '🔔 通知を有効にする';
-    pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
-    pushBtn.onclick = async function() {
-      pushBtn.remove();
-      const castId = me.id;
+    // Push通知ボタン（登録済みの場合は非表示）
+    (async function() {
       try {
+        // Push通知が使えない環境はボタン自体不要
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+        const castId = me.id;
+
+        // ① ブラウザの通知許可 + アクティブなSubscriptionを確認
         const reg = await navigator.serviceWorker.register("/kyoukano/sw.js");
-        const oldSub = await reg.pushManager.getSubscription();
-        if (oldSub) await oldSub.unsubscribe();
-        const sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E")
-        });
-        const subJson = sub.toJSON();
-        await sb.from("push_subscriptions").delete().eq("cast_id", castId);
-        const { error } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
-        if (error) { alert("登録失敗: " + JSON.stringify(error)); } else { alert("Push登録成功！"); }
+        const existingSub = await reg.pushManager.getSubscription();
+        const browserGranted = Notification.permission === 'granted' && !!existingSub;
+
+        // ② SupabaseにDBレコードが存在するか確認
+        const { data: dbSub } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", castId).maybeSingle();
+        const dbRegistered = !!dbSub;
+
+        // ③ 両方揃っていれば登録済み → ボタン非表示
+        if (browserGranted && dbRegistered) return;
+
+        // 未登録 or 片方だけの場合はボタンを表示
+        const pushBtn = document.createElement('button');
+        pushBtn.textContent = '🔔 通知を有効にする';
+        pushBtn.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#b8a06a;color:white;border:none;padding:12px 24px;border-radius:8px;font-size:16px;z-index:9999;cursor:pointer;';
+        pushBtn.onclick = async function() {
+          pushBtn.remove();
+          try {
+            const oldSub = await reg.pushManager.getSubscription();
+            if (oldSub) await oldSub.unsubscribe();
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array("BIWgxZ65EfPhsXdHaY7_L_Pk7dd3PWTIaePCNwBUqL-gUppTf7LCvd5RqrOPbfsYfdOnc-OLrTOH1ff8h5r9n0E")
+            });
+            const subJson = sub.toJSON();
+            await sb.from("push_subscriptions").delete().eq("cast_id", castId);
+            const { error } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+            if (error) { alert("登録失敗: " + JSON.stringify(error)); } else { alert("Push登録成功！"); }
+          } catch(e) {
+            alert("Pushエラー: " + e.name + " / " + e.message);
+          }
+        };
+        document.body.appendChild(pushBtn);
       } catch(e) {
-        alert("Pushエラー: " + e.name + " / " + e.message);
+        // Push確認中にエラーが出てもアプリの起動を妨げない
+        console.warn("Push通知確認エラー:", e);
       }
-    };
-    document.body.appendChild(pushBtn);
+    })();
   }
 }
 
