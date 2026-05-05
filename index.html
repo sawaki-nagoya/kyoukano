@@ -1544,7 +1544,7 @@ async function loadMySalary(){
           const hasShimei=r.shimei_type&&r.shimei_type!=='フリー'
           const est=calcBack(r.course,r.shimei_type,rvOpts)
           const custName=(r.customer_name||'').replace(/様\s*$/,'')||(r.customer_no&&custMap[r.customer_no]?custMap[r.customer_no].replace(/様\s*$/,''):'お客様')
-          const payLabel=m=>m==='カード'?'カード払い':'現金'
+          const payLabel=m=>m==='カード'?'カード':'現金'
           const optPay=pj.optPay||{}
           const courseObj3=courses.find(c=>c.name===r.course)
           const courseSale2=courseObj3?.price||0
@@ -1573,7 +1573,7 @@ async function loadMySalary(){
                 <div style="font-size:.78rem;color:var(--text3)">${(row.sale&&row.back!=null)?fmt(row.sale-row.back):'-'}</div>
               </div>
             </div>
-            <div style="flex-shrink:0;min-width:2.8rem;text-align:right">${row.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${row.pay}</span>`:''}</div>
+            <div style="flex-shrink:0;min-width:2.8rem;text-align:right">${row.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem 0;color:var(--text3);white-space:nowrap;min-width:2.8rem;display:inline-block;text-align:center">${row.pay}</span>`:''}</div>
           </div>`
           todayHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:.6rem">
             <div style="display:flex;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border);gap:.5rem">
@@ -1650,7 +1650,7 @@ async function loadMySalary(){
       const sliceT=t=>t?t.slice(0,5):''
       const timeStr=s.checkin_time&&s.checkout_time?`${sliceT(s.checkin_time)}〜${sliceT(s.checkout_time)}`:s.checkin_time?`${sliceT(s.checkin_time)}〜`:''
       const custN=(s.customer_name||'').replace(/様\s*$/,'')
-      const payLbl=p=>p==='カード'?'カード払い':'現金'
+      const payLbl=p=>p==='カード'?'カード':'現金'
       const courseObj2=courses.find(c=>c.name===s.course_name)
       const courseSale=courseObj2?.price||0
       const shimeiSale=s.shimei_type==='本指名'?(storeSettings.shop_shimei_hon||2000):s.shimei_type==='ネット指名'?(storeSettings.shop_shimei_net||1000):0
@@ -1695,7 +1695,7 @@ async function loadMySalary(){
               <div style="font-size:.78rem;color:var(--text3)">${(r.sale&&r.back!=null)?fmt(r.sale-r.back):'-'}</div>
             </div>
           </div>
-          <div style="flex-shrink:0;min-width:2.8rem;text-align:right">${r.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${r.pay}</span>`:''}</div>
+          <div style="flex-shrink:0;min-width:2.8rem;text-align:right">${r.pay?`<span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem 0;color:var(--text3);white-space:nowrap;min-width:2.8rem;display:inline-block;text-align:center">${r.pay}</span>`:''}</div>
         </div>`).join('')}
         <div style="display:flex;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
           <span style="flex:1;font-size:.8rem;font-weight:600">合計</span>
