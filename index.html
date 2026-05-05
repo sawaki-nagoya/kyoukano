@@ -1653,7 +1653,7 @@ async function loadMySalary(){
       const extBackTotal=(s.extensions||[]).reduce((sum,e)=>sum+(e.back||0),0)
       const sessionNet=courseBack+shimeiBack+optBack+extBackTotal
       const hasShimei=s.shimei_type&&s.shimei_type!=='フリー'
-      const opts=(s.options||[]).map(o=>o.name).filter(Boolean)
+      const sOptNames=(s.options||[]).map(o=>o.name).filter(Boolean)
       const exts=(s.extensions||[])
       const payMethod=s.pay_course||'現金'
       const sliceT=t=>t?t.slice(0,5):''
