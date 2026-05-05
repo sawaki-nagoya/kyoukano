@@ -1111,10 +1111,11 @@ function startApp(){
     (async function() {
       const castId = me.id;
 
-      // DBに登録済みか確認
+      // DBに登録済みか確認（エラーが起きてもボタンは表示する）
       try {
-        const { data: dbSub } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", castId).maybeSingle();
-        if (dbSub) return; // DB登録済み → ボタン非表示
+        const { data: dbSub, error: dbErr } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", castId).maybeSingle();
+        console.log('[Push] castId=' + castId + ' data=' + JSON.stringify(dbSub) + ' error=' + JSON.stringify(dbErr));
+        if (!dbErr && dbSub) return; // DB登録済み → ボタン非表示
       } catch(e) {
         console.warn('[Push] DB確認エラー:', e);
       }
