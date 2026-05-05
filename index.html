@@ -1561,45 +1561,50 @@ async function loadMySalary(){
           if(hasShimei) rows.push({cat:'指名料',name:r.shimei_type,sale:shimeiSale2,back:est.sb2,pay:payLabel(pj.shimei||'現金')})
           est.opDetails.forEach(o=>{const op=opts.find(x=>x.name===o.name);rows.push({cat:'オプション',name:o.name,sale:op?.price||0,back:o.back,pay:payLabel(optPay[o.name]||pj.option||'現金')})})
           const totalSale2=rows.reduce((a,r)=>a+r.sale,0)
-          const cp='.4rem .3rem'
-          const tblRows=rows.map(row=>`<tr style="border-top:1px solid rgba(0,0,0,.06)">
-              <td style="padding:${cp};font-size:.7rem;color:var(--text3);white-space:nowrap">${row.cat}</td>
-              <td style="padding:${cp};font-size:.73rem;color:var(--text);white-space:nowrap">${row.name}</td>
-              <td style="padding:${cp};font-size:.73rem;font-weight:500;text-align:center">${row.sale?fmt(row.sale):'-'}</td>
-              <td style="padding:${cp};font-size:.73rem;font-weight:700;text-align:center;color:var(--accent)">${row.back?fmt(row.back):'-'}</td>
-              <td style="padding:${cp};font-size:.73rem;font-weight:500;text-align:center;color:var(--text3)">${(row.sale&&row.back!=null)?fmt(row.sale-row.back):'-'}</td>
-              <td style="padding:${cp};text-align:center"><span style="background:var(--surface2);border-radius:6px;padding:.1rem .3rem;font-size:.62rem;color:var(--text2);border:1px solid var(--border)">${row.pay}</span></td>
-            </tr>`).join('')
-          todayHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:.6rem;box-shadow:0 1px 4px rgba(0,0,0,.04)">
+          const mkCardRow=(row)=>`<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:.6rem 1rem;border-bottom:.5px solid var(--border);gap:.5rem">
+            <div>
+              <div style="font-size:.82rem;color:var(--text);white-space:nowrap">${row.name}</div>
+              <div style="font-size:.68rem;color:var(--text3);margin-top:.1rem">${row.cat}</div>
+            </div>
+            <div style="display:flex;gap:.75rem;align-items:center">
+              <div style="text-align:right">
+                <div style="font-size:.6rem;color:var(--text3)">売上</div>
+                <div style="font-size:.78rem;font-weight:500">${row.sale?fmt(row.sale):'-'}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:.6rem;color:var(--accent)">バック</div>
+                <div style="font-size:.78rem;font-weight:600;color:var(--accent)">${row.back?fmt(row.back):'-'}</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:.6rem;color:var(--text3)">利益</div>
+                <div style="font-size:.78rem;color:var(--text3)">${(row.sale&&row.back!=null)?fmt(row.sale-row.back):'-'}</div>
+              </div>
+            </div>
+            <span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${row.pay}</span>
+          </div>`
+          todayHtml+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:.6rem">
             <div style="display:flex;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border);gap:.5rem">
               <span style="font-size:.85rem;font-weight:700;white-space:nowrap">${i+1}本目</span>
               ${timeStr?`<span style="font-size:.72rem;color:var(--text3);white-space:nowrap">${timeStr}</span>`:''}
               <span style="font-size:.85rem;font-weight:700;white-space:nowrap">${custName} 様</span>
             </div>
-            <div style="padding:.5rem .75rem .75rem;overflow-x:auto">
-              <table style="width:100%;border-collapse:collapse;table-layout:fixed;min-width:320px">
-                <colgroup>
-                  <col style="width:15%"><col style="width:25%">
-                  <col style="width:13%"><col style="width:13%"><col style="width:13%">
-                  <col style="width:21%">
-                </colgroup>
-                <thead><tr style="border-bottom:1.5px solid rgba(0,0,0,.08)">
-                  <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:left">項目</th>
-                  <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:left">内容</th>
-                  <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">売上</th>
-                  <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--accent);font-weight:500;text-align:center">バック</th>
-                  <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">店舗利益</th>
-                  <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">支払い方法</th>
-                </tr></thead>
-                <tbody>${tblRows}</tbody>
-                <tfoot><tr style="border-top:1.5px solid rgba(0,0,0,.08)">
-                  <td colspan="2" style="padding:.45rem .3rem;font-size:.77rem;font-weight:600">合計（参考）</td>
-                  <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:600;text-align:center">${fmt(totalSale2)}</td>
-                  <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:700;text-align:center;color:var(--accent)">${fmt(est.total)}</td>
-                  <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:600;text-align:center;color:var(--text3)">${fmt(totalSale2-est.total)}</td>
-                  <td></td>
-                </tr></tfoot>
-              </table>
+            ${rows.map(mkCardRow).join('')}
+            <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
+              <span style="font-size:.8rem;font-weight:600">合計（参考）</span>
+              <div style="display:flex;gap:.75rem">
+                <div style="text-align:right">
+                  <div style="font-size:.6rem;color:var(--text3)">売上</div>
+                  <div style="font-size:.82rem;font-weight:500">${fmt(totalSale2)}</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:.6rem;color:var(--accent)">バック</div>
+                  <div style="font-size:.82rem;font-weight:600;color:var(--accent)">${fmt(est.total)}</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:.6rem;color:var(--text3)">店舗利益</div>
+                  <div style="font-size:.82rem;color:var(--text3)">${fmt(totalSale2-est.total)}</div>
+                </div>
+              </div>
             </div>
           </div>`
         })
@@ -1676,30 +1681,43 @@ async function loadMySalary(){
           ${timeStr?`<span style="font-size:.72rem;color:var(--text3);white-space:nowrap">${timeStr}</span>`:''}
           ${custN?`<span style="font-size:.85rem;font-weight:700;white-space:nowrap">${custN} 様</span>`:''}
         </div>
-        <div style="padding:.5rem .75rem .75rem;overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;table-layout:fixed;min-width:320px">
-            <colgroup>
-              <col style="width:15%"><col style="width:25%">
-              <col style="width:13%"><col style="width:13%"><col style="width:13%">
-              <col style="width:21%">
-            </colgroup>
-            <thead><tr style="border-bottom:1.5px solid rgba(0,0,0,.08)">
-              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:left">項目</th>
-              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:left">内容</th>
-              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">売上</th>
-              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--accent);font-weight:500;text-align:center">バック</th>
-              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">店舗利益</th>
-              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">支払い方法</th>
-            </tr></thead>
-            <tbody>${sTblRows}</tbody>
-            <tfoot><tr style="border-top:1.5px solid rgba(0,0,0,.08)">
-              <td colspan="2" style="padding:.45rem .3rem;font-size:.77rem;font-weight:600">合計</td>
-              <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:600;text-align:center">${fmt(s.sales||totalSale)}</td>
-              <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:700;text-align:center;color:var(--accent)">${fmt(sessionNet)}</td>
-              <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:600;text-align:center;color:var(--text3)">${fmt((s.sales||totalSale)-sessionNet)}</td>
-              <td></td>
-            </tr></tfoot>
-          </table>
+        ${sRows.map(r=>`<div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;padding:.6rem 1rem;border-bottom:.5px solid var(--border);gap:.5rem">
+          <div>
+            <div style="font-size:.82rem;color:var(--text);white-space:nowrap">${r.name}</div>
+            <div style="font-size:.68rem;color:var(--text3);margin-top:.1rem">${r.cat}</div>
+          </div>
+          <div style="display:flex;gap:.75rem;align-items:center">
+            <div style="text-align:right">
+              <div style="font-size:.6rem;color:var(--text3)">売上</div>
+              <div style="font-size:.78rem;font-weight:500">${r.sale?fmt(r.sale):'-'}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:.6rem;color:var(--accent)">バック</div>
+              <div style="font-size:.78rem;font-weight:600;color:var(--accent)">${r.back?fmt(r.back):'-'}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:.6rem;color:var(--text3)">利益</div>
+              <div style="font-size:.78rem;color:var(--text3)">${(r.sale&&r.back!=null)?fmt(r.sale-r.back):'-'}</div>
+            </div>
+          </div>
+          <span style="font-size:.68rem;background:var(--surface2);border:.5px solid var(--border);border-radius:6px;padding:.15rem .45rem;color:var(--text3);white-space:nowrap">${r.pay}</span>
+        </div>`).join('')}
+        <div style="display:grid;grid-template-columns:1fr auto;align-items:center;padding:.6rem 1rem;background:var(--surface2);gap:.5rem">
+          <span style="font-size:.8rem;font-weight:600">合計</span>
+          <div style="display:flex;gap:.75rem">
+            <div style="text-align:right">
+              <div style="font-size:.6rem;color:var(--text3)">売上</div>
+              <div style="font-size:.82rem;font-weight:500">${fmt(s.sales||totalSale)}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:.6rem;color:var(--accent)">バック</div>
+              <div style="font-size:.82rem;font-weight:600;color:var(--accent)">${fmt(sessionNet)}</div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:.6rem;color:var(--text3)">店舗利益</div>
+              <div style="font-size:.82rem;color:var(--text3)">${fmt((s.sales||totalSale)-sessionNet)}</div>
+            </div>
+          </div>
         </div>
       </div>`
     })
