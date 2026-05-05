@@ -1552,7 +1552,16 @@ async function loadMySalary(){
           const rows=[]
           rows.push({cat:'コース',name:(r.course||'').replace(/コース$/,'').trim(),sale:courseSale2,back:est.cb,pay:payLabel(pj.course||'現金')})
           if(r.shimei_type) rows.push({cat:'指名料',name:r.shimei_type,sale:hasShimei?shimeiSale2:0,back:hasShimei?est.sb2:0,pay:payLabel(pj.shimei||'現金')})
-          est.opDetails.forEach(o=>{const op=opts.find(x=>x.name===o.name);rows.push({cat:'オプション',name:o.name,sale:op?.price||0,back:o.back,pay:payLabel(optPay[o.name]||pj.option||'現金')})})
+          est.opDetails.forEach(o=>{
+            const op=opts.find(x=>x.name===o.name)||opts.find(x=>o.name.includes(x.name)||x.name.includes(o.name))
+            let opSale=op?.price||0
+            if(!opSale){
+              if(o.name.includes('極液')) opSale=storeSettings.shop_op_gokueki||2000
+              else if(o.name.includes('衣装')&&o.name.includes('②')) opSale=storeSettings.shop_op_isho2||3000
+              else if(o.name.includes('衣装')) opSale=storeSettings.shop_op_isho||3000
+            }
+            rows.push({cat:'オプション',name:o.name,sale:opSale,back:o.back,pay:payLabel(optPay[o.name]||pj.option||'現金')})
+          })
           const totalSale2=rows.reduce((a,r)=>a+r.sale,0)
           const mkCardRow=(row)=>`<div style="display:flex;align-items:center;padding:.6rem 1rem;border-bottom:.5px solid var(--border);gap:.5rem">
             <div style="flex:1;min-width:0">
@@ -1657,7 +1666,16 @@ async function loadMySalary(){
       const sRows=[]
       sRows.push({cat:'コース',name:(s.course_name||'').replace(/コース$/,'').trim(),sale:courseSale,back:courseBack,pay:payLbl(s.pay_course)})
       if(s.shimei_type) sRows.push({cat:'指名料',name:s.shimei_type,sale:hasShimei?shimeiSale:0,back:hasShimei?shimeiBack:0,pay:payLbl(s.pay_shimei)})
-      ;(s.options||[]).forEach(o=>{const op=opts.find(x=>x.name===o.name);sRows.push({cat:'オプション',name:o.name,sale:op?.price||0,back:o.back||0,pay:payLbl(s.pay_option)})})
+      ;(s.options||[]).forEach(o=>{
+        const op=opts.find(x=>x.name===o.name)||opts.find(x=>o.name.includes(x.name)||x.name.includes(o.name))
+        let opSale=op?.price||0
+        if(!opSale){
+          if(o.name.includes('極液')) opSale=storeSettings.shop_op_gokueki||2000
+          else if(o.name.includes('衣装')&&o.name.includes('②')) opSale=storeSettings.shop_op_isho2||3000
+          else if(o.name.includes('衣装')) opSale=storeSettings.shop_op_isho||3000
+        }
+        sRows.push({cat:'オプション',name:o.name,sale:opSale,back:o.back||0,pay:payLbl(s.pay_option)})
+      })
       ;(s.extensions||[]).forEach((e,ei)=>{const extCourse=courses.find(c=>c.name&&c.name.includes('延長'));sRows.push({cat:'延長',name:exts.length>1?`${ei+1}回目（30分）`:'30分',sale:extCourse?.price||storeSettings.shop_ext30||3000,back:e.back||0,pay:payLbl(e.pay)})})
       ;(s.discounts||[]).forEach(d=>{sRows.push({cat:'割引',name:d.name,sale:-(d.amount||0),back:0,pay:''})})
       if(w.misc&&sessions.indexOf(s)===sessions.length-1){sRows.push({cat:'雑費',name:'雑費',sale:-w.misc,back:-w.misc,pay:''})}
