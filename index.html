@@ -1646,45 +1646,53 @@ async function loadMySalary(){
       const timeStr=s.checkin_time&&s.checkout_time?`${sliceT(s.checkin_time)}〜${sliceT(s.checkout_time)}`:s.checkin_time?`${sliceT(s.checkin_time)}〜`:''
       const custN=(s.customer_name||'').replace(/様\s*$/,'')
       const payLbl=p=>p==='カード'?'カード払い':'現金'
+      const courseObj2=courses.find(c=>c.name===s.course_name)
+      const courseSale=courseObj2?.price||0
+      const shimeiSale=s.shimei_type==='本指名'?(storeSettings.shop_shimei_hon||2000):s.shimei_type==='ネット指名'?(storeSettings.shop_shimei_net||1000):0
       const sRows=[]
-      sRows.push({cat:'コース料金',name:s.course_name||'',amt:courseBack,pay:payLbl(s.pay_course)})
-      if(hasShimei) sRows.push({cat:'指名料',name:s.shimei_type,amt:shimeiBack,pay:payLbl(s.pay_shimei)})
-      ;(s.options||[]).forEach(o=>{sRows.push({cat:'オプション',name:o.name,amt:o.back||0,pay:payLbl(s.pay_option)})})
-      ;(s.extensions||[]).forEach((e,ei)=>{sRows.push({cat:'延長',name:exts.length>1?`${ei+1}回目（30分）`:'30分',amt:e.back||0,pay:payLbl(e.pay)})})
-      ;(s.discounts||[]).forEach(d=>{sRows.push({cat:'割引',name:d.name,amt:-(d.amount||0),pay:''})})
+      sRows.push({cat:'コース料金',name:s.course_name||'',sale:courseSale,back:courseBack,pay:payLbl(s.pay_course)})
+      if(hasShimei) sRows.push({cat:'指名料',name:s.shimei_type,sale:shimeiSale,back:shimeiBack,pay:payLbl(s.pay_shimei)})
+      ;(s.options||[]).forEach(o=>{const op=opts.find(x=>x.name===o.name);sRows.push({cat:'オプション',name:o.name,sale:op?.price||0,back:o.back||0,pay:payLbl(s.pay_option)})})
+      ;(s.extensions||[]).forEach((e,ei)=>{sRows.push({cat:'延長',name:exts.length>1?`${ei+1}回目（30分）`:'30分',sale:storeSettings.shop_ext30||3000,back:e.back||0,pay:payLbl(e.pay)})})
+      ;(s.discounts||[]).forEach(d=>{sRows.push({cat:'割引',name:d.name,sale:-(d.amount||0),back:0,pay:''})})
+      const totalSale=sRows.reduce((a,r)=>a+r.sale,0)
       const sTblRows=sRows.map(r=>`<tr style="border-top:1px solid rgba(0,0,0,.06)">
-        <td style="padding:.5rem .4rem;font-size:.72rem;color:var(--text3);white-space:nowrap">${r.cat}</td>
-        <td style="padding:.5rem .4rem;font-size:.75rem;color:var(--text)">${r.name}</td>
-        <td style="padding:.5rem .4rem;font-size:.75rem;font-weight:500;text-align:right;white-space:nowrap">${r.amt<0?'-':''}${fmt(Math.abs(r.amt))}</td>
-        <td style="padding:.5rem .4rem;text-align:right">${r.pay?`<span style="background:var(--surface2);border-radius:6px;padding:.15rem .5rem;font-size:.67rem;color:var(--text2);border:1px solid var(--border)">${r.pay}</span>`:''}</td>
+        <td style="padding:.4rem .3rem;font-size:.7rem;color:var(--text3)">${r.cat}</td>
+        <td style="padding:.4rem .3rem;font-size:.73rem;color:var(--text)">${r.name}</td>
+        <td style="padding:.4rem .3rem;font-size:.73rem;font-weight:500;text-align:center">${r.sale?fmt(r.sale):'-'}</td>
+        <td style="padding:.4rem .3rem;font-size:.73rem;font-weight:700;text-align:center;color:var(--accent)">${r.back?fmt(r.back):'-'}</td>
+        <td style="padding:.4rem .3rem;font-size:.73rem;font-weight:500;text-align:center;color:var(--text3)">${(r.sale&&r.back!=null)?fmt(r.sale-r.back):'-'}</td>
+        <td style="padding:.4rem .3rem;text-align:center"><span style="background:var(--surface2);border-radius:6px;padding:.1rem .3rem;font-size:.62rem;color:var(--text2);border:1px solid var(--border)">${r.pay||''}</span></td>
       </tr>`).join('')
       sessionLines+=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:.6rem;box-shadow:0 1px 4px rgba(0,0,0,.04)">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border)">
-          <div style="display:flex;align-items:baseline;gap:.5rem;min-width:0;flex:1;overflow:hidden">
-            <span style="font-size:.85rem;font-weight:700;white-space:nowrap">${i+1}本目</span>
-            ${timeStr?`<span style="font-size:.72rem;color:var(--text3);white-space:nowrap">${timeStr}</span>`:''}
-            ${custN?`<span style="font-size:.85rem;font-weight:700;white-space:nowrap">${custN} 様</span>`:''}
-          </div>
+        <div style="display:flex;align-items:center;padding:.65rem 1rem;border-bottom:1px solid var(--border);gap:.5rem">
+          <span style="font-size:.85rem;font-weight:700;white-space:nowrap">${i+1}本目</span>
+          ${timeStr?`<span style="font-size:.72rem;color:var(--text3);white-space:nowrap">${timeStr}</span>`:''}
+          ${custN?`<span style="font-size:.85rem;font-weight:700;white-space:nowrap">${custN} 様</span>`:''}
         </div>
-        <div style="padding:.55rem 1rem .75rem">
-          <table style="width:100%;border-collapse:collapse">
+        <div style="padding:.5rem .75rem .75rem;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;table-layout:fixed;min-width:320px">
+            <colgroup>
+              <col style="width:16%"><col style="width:20%">
+              <col style="width:14%"><col style="width:14%"><col style="width:14%">
+              <col style="width:22%">
+            </colgroup>
             <thead><tr style="border-bottom:1.5px solid rgba(0,0,0,.08)">
-              <th style="padding:.3rem .4rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:left">項目</th>
-              <th style="padding:.3rem .4rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:left">内容</th>
-              <th style="padding:.3rem .4rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:right">金額</th>
-              <th style="padding:.3rem .4rem;font-size:.65rem;color:var(--text3);font-weight:500;text-align:right">支払い方法</th>
+              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:left">項目</th>
+              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:left">内容</th>
+              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">売上</th>
+              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--accent);font-weight:500;text-align:center">バック</th>
+              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">店舗利益</th>
+              <th style="padding:.25rem .3rem;font-size:.6rem;color:var(--text3);font-weight:500;text-align:center">支払い方法</th>
             </tr></thead>
             <tbody>${sTblRows}</tbody>
-            <tfoot>
-              <tr style="border-top:1.5px solid rgba(0,0,0,.08)">
-                <td colspan="2" style="padding:.5rem .4rem;font-size:.77rem;font-weight:600">合計</td>
-                <td colspan="2" style="padding:.5rem .4rem;font-size:.9rem;font-weight:700;color:var(--accent);text-align:right">${fmt(sessionNet)}</td>
-              </tr>
-              ${s.sales?`<tr style="border-top:1px solid rgba(0,0,0,.05);background:rgba(0,0,0,.02)">
-                <td colspan="2" style="padding:.4rem .4rem;font-size:.7rem;color:var(--text3)">店舗利益</td>
-                <td colspan="2" style="padding:.4rem .4rem;font-size:.78rem;font-weight:600;color:var(--text3);text-align:right">${fmt((s.sales||0)-sessionNet)}</td>
-              </tr>`:''}
-            </tfoot>
+            <tfoot><tr style="border-top:1.5px solid rgba(0,0,0,.08)">
+              <td colspan="2" style="padding:.45rem .3rem;font-size:.77rem;font-weight:600">合計</td>
+              <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:600;text-align:center">${fmt(s.sales||totalSale)}</td>
+              <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:700;text-align:center;color:var(--accent)">${fmt(sessionNet)}</td>
+              <td style="padding:.45rem .3rem;font-size:.78rem;font-weight:600;text-align:center;color:var(--text3)">${fmt((s.sales||totalSale)-sessionNet)}</td>
+              <td></td>
+            </tr></tfoot>
           </table>
         </div>
       </div>`
