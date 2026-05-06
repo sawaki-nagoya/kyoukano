@@ -1144,13 +1144,14 @@ function startApp(){
     ;(async function() {
       const castId = me.id;
 
-      // DBに登録済みか確認（エラーが起きてもボタンは表示する）
+      // DBに登録済み かつ 通知許可済みの場合はボタン非表示
       try {
+        const permission = Notification.permission;
         const { data: dbSub, error: dbErr } = await sb.from("push_subscriptions").select("cast_id").eq("cast_id", castId).maybeSingle();
-        console.log('[Push] castId=' + castId + ' data=' + JSON.stringify(dbSub) + ' error=' + JSON.stringify(dbErr));
-        if (!dbErr && dbSub) return; // DB登録済み → ボタン非表示
+        console.log("[Push] castId=" + castId + " permission=" + permission + " data=" + JSON.stringify(dbSub));
+        if (!dbErr && dbSub && permission === "granted") return; // DB登録済み＆許可済み → ボタン非表示
       } catch(e) {
-        console.warn('[Push] DB確認エラー:', e);
+        console.warn("[Push] DB確認エラー:", e);
       }
 
       // ボタン表示
@@ -1188,6 +1189,25 @@ function startApp(){
   }
 }
 
+async function checkOwnerPushBtn(){
+  // オーナーの🔔ボタン：登録済み＆許可済みなら非表示
+  const btn = document.getElementById('owner-push-btn');
+  if (!btn) return;
+  try {
+    if (Notification.permission !== 'granted') return; // 未許可 → ボタン表示のまま
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (!sub) return; // 未登録 → ボタン表示のまま
+    const subJson = sub.toJSON();
+    const { data: allSubs } = await sb.from('push_subscriptions').select('subscription').eq('cast_id', 0);
+    const exists = (allSubs||[]).some(r=>{ try{return JSON.parse(r.subscription).endpoint===subJson.endpoint}catch{return false} });
+    if (exists) {
+      btn.style.display = 'none'; // 登録済み → ボタン非表示
+      console.log('[OwnerPush] 登録済みのため🔔ボタン非表示');
+    }
+  } catch(e) { console.warn('[OwnerPush] チェックエラー:', e); }
+}
+
 async function registerOwnerPush(){
   try {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
@@ -1208,6 +1228,7 @@ async function registerOwnerPush(){
     const { error } = await sb.from('push_subscriptions').insert({ cast_id: 0, subscription: subJson });
     if (error) { alert('登録失敗: ' + JSON.stringify(error)); return; }
     alert('通知登録完了！予約・シフトの通知が届きます。');
+    document.getElementById('owner-push-btn').style.display = 'none'; // 登録後に非表示
   } catch(e) { alert('エラー: ' + e.name + ' / ' + e.message); }
 }
 function doLogout(){
@@ -1248,7 +1269,7 @@ function tab(name){
   if(name==='cast-memo')     loadCastMemoList()
   if(name==='owner-customer') loadCustomers()
   if(name==='owner-salary') loadOwnerSalary()
-  if(name==='owner-cast')   loadCastMgmt()
+  if(name==='owner-cast')   { loadCastMgmt(); checkOwnerPushBtn(); }
   if(name==='owner-monthly') loadMonthly()
 }
 
@@ -1266,7 +1287,7 @@ function refreshCurrentTab(){
   else if(name==='cast-memo'){    loadCastMemoPage();loadCastMemoList()}
   else if(name==='owner-customer')loadCustomers()
   else if(name==='owner-salary')  loadOwnerSalary()
-  else if(name==='owner-cast')    loadCastMgmt()
+  else if(name==='owner-cast')    { loadCastMgmt(); checkOwnerPushBtn(); }
   else if(name==='owner-monthly')  loadMonthly()
   else tab(name)
 }
