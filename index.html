@@ -1205,7 +1205,13 @@ async function checkOwnerPushBtn(){
     if (!sub) return; // 未登録 → ボタン表示のまま
     const subJson = sub.toJSON();
     const { data: allSubs } = await sb.from('push_subscriptions').select('subscription').eq('cast_id', 0);
-    const exists = (allSubs||[]).some(r=>{ try{return JSON.parse(r.subscription).endpoint===subJson.endpoint}catch{return false} });
+    const exists = (allSubs||[]).some(r=>{
+      try {
+        // DBがJSON文字列の場合もオブジェクトの場合も両対応
+        const s = typeof r.subscription === 'string' ? JSON.parse(r.subscription) : r.subscription;
+        return s.endpoint === subJson.endpoint;
+      } catch { return false; }
+    });
     if (exists) {
       btn.textContent = '✅ 通知設定済み';
       btn.disabled = true;
@@ -1237,7 +1243,12 @@ async function registerOwnerPush(){
     });
     const subJson = sub.toJSON();
     const { data: allSubs } = await sb.from('push_subscriptions').select('subscription').eq('cast_id', 0);
-    const exists = (allSubs||[]).some(r=>{ try{return JSON.parse(r.subscription).endpoint===subJson.endpoint}catch{return false} });
+    const exists = (allSubs||[]).some(r=>{
+      try {
+        const s = typeof r.subscription === 'string' ? JSON.parse(r.subscription) : r.subscription;
+        return s.endpoint === subJson.endpoint;
+      } catch { return false; }
+    });
     if (exists) { alert('この端末は既に通知登録済みです！'); return; }
     const { error } = await sb.from('push_subscriptions').insert({ cast_id: 0, subscription: subJson });
     if (error) { alert('登録失敗: ' + JSON.stringify(error)); return; }
