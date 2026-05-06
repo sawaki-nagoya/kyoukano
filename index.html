@@ -223,6 +223,7 @@ tr:last-child td{border-bottom:none}
 .session-block{background:var(--surface2);border-radius:var(--r);padding:.85rem;margin-bottom:.65rem;border:1.5px solid var(--border)}
 .session-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
 .session-no{font-size:.78rem;font-weight:700;color:var(--accent)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .session-del{background:var(--rbg);border:1.5px solid var(--rbd);color:var(--rtx);border-radius:6px;padding:.28rem .55rem;font-size:.72rem;cursor:pointer}
 .session-label{font-size:.7rem;color:var(--text3);font-weight:600;margin-bottom:.25rem}
 </style>
@@ -380,6 +381,15 @@ if("serviceWorker" in navigator){
       <div id="cast-memo-area" style="display:none"></div>
     </div>
 
+    <!-- キャスト：本日 -->
+    <div class="panel" id="p-cast-today">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <div style="font-size:1rem;font-weight:700">🏠 本日の予約</div>
+        <div id="cast-today-clock" style="font-size:.85rem;font-weight:700;color:var(--accent)"></div>
+      </div>
+      <div id="cast-today-area"><div class="spin">読み込み中...</div></div>
+    </div>
+
     <!-- メモ用顧客検索シート -->
 
     <!-- 店舗：シフト管理 -->
@@ -506,6 +516,7 @@ if("serviceWorker" in navigator){
     <button class="tbar-btn on cast-tab" onclick="tab('shift')"><span class="tbar-icon">📅</span>シフト申請</button>
     <button class="tbar-btn cast-tab" onclick="tab('salary')"><span class="tbar-icon">💴</span>委託金確認</button>
     <button class="tbar-btn cast-tab" onclick="tab('cast-memo')"><span class="tbar-icon">📝</span>接客メモ</button>
+    <button class="tbar-btn cast-tab" onclick="tab('cast-today')"><span class="tbar-icon">🏠</span>本日</button>
     <!-- 店舗用 -->
     <button class="tbar-btn owner-tab" onclick="tab('owner-shift')"><span class="tbar-icon">📋</span>シフト管理</button>
     <button class="tbar-btn owner-tab" onclick="tab('today')"><span class="tbar-icon">🏠</span>本日</button>
@@ -1301,7 +1312,7 @@ function tab(name){
   sessionStorage.setItem('kyoukano_tab',name)
   document.querySelectorAll('.tbar-btn').forEach(b=>b.classList.remove('on'))
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'))
-  const map={'shift':'.cast-tab:nth-child(1)','salary':'.cast-tab:nth-child(2)','cast-memo':'.cast-tab:nth-child(3)','owner-shift':'.owner-tab:nth-child(1)','today':'.owner-tab:nth-child(2)','owner-salary':'.owner-tab:nth-child(3)','owner-cast':'.owner-tab:nth-child(4)','owner-customer':'.owner-tab:nth-child(5)','owner-monthly':'.owner-tab:nth-child(6)'}
+  const map={'shift':'.cast-tab:nth-child(1)','salary':'.cast-tab:nth-child(2)','cast-memo':'.cast-tab:nth-child(3)','cast-today':'.cast-tab:nth-child(4)','owner-shift':'.owner-tab:nth-child(1)','today':'.owner-tab:nth-child(2)','owner-salary':'.owner-tab:nth-child(3)','owner-cast':'.owner-tab:nth-child(4)','owner-customer':'.owner-tab:nth-child(5)','owner-monthly':'.owner-tab:nth-child(6)'}
   document.querySelector(map[name])?.classList.add('on')
   document.getElementById('p-'+name)?.classList.add('on')
   if(name==='shift')        loadCal()
@@ -1310,6 +1321,7 @@ function tab(name){
   if(name==='today')        loadToday()
   if(name==='cast-memo')      loadCastMemoPage()
   if(name==='cast-memo')     loadCastMemoList()
+  if(name==='cast-today')    loadCastToday()
   if(name==='owner-customer') loadCustomers()
   if(name==='owner-salary') loadOwnerSalary()
   if(name==='owner-cast')   { loadCastMgmt(); checkOwnerPushBtn(); }
@@ -1328,6 +1340,7 @@ function refreshCurrentTab(){
   else if(name==='owner-shift')   loadOwnerCal()
   else if(name==='today')         loadToday()
   else if(name==='cast-memo'){    loadCastMemoPage();loadCastMemoList()}
+  else if(name==='cast-today')    loadCastToday()
   else if(name==='owner-customer')loadCustomers()
   else if(name==='owner-salary')  loadOwnerSalary()
   else if(name==='owner-cast')    { loadCastMgmt(); checkOwnerPushBtn(); }
@@ -1583,6 +1596,236 @@ async function loadShiftList(){
   if(!me||me.is_owner) return
   // 統合後はrenderInlineShiftListに委譲（後方互換のため残す）
   renderInlineShiftList()
+}
+
+// ── キャスト：本日 ──
+let castTodayTimer = null;
+let castTodayClockTimer = null;
+
+async function loadCastToday() {
+  const area = document.getElementById('cast-today-area');
+  if (!area) return;
+  area.innerHTML = '<div class="spin">読み込み中...</div>';
+
+  // 時計を更新
+  startCastTodayClock();
+
+  try {
+    const today = bizDay();
+    // 自分の今日承認済みシフトを取得
+    const { data: shifts } = await sb.from('shifts')
+      .select('id,checkin,checkout')
+      .eq('cast_id', me.id)
+      .eq('date', today)
+      .eq('status', 'approved');
+
+    if (!shifts || shifts.length === 0) {
+      area.innerHTML = '<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の承認済みシフトがありません</div>';
+      return;
+    }
+
+    const sids = shifts.map(s => s.id);
+    const { data: rvs } = await sb.from('reservations')
+      .select('*')
+      .in('shift_id', sids)
+      .order('checkin_time');
+
+    if (!rvs || rvs.length === 0) {
+      area.innerHTML = '<div class="card" style="text-align:center;padding:1.5rem;color:var(--text3);font-size:.85rem">本日の予約はまだありません</div>';
+      // 定期リフレッシュ
+      clearTimeout(castTodayTimer);
+      castTodayTimer = setTimeout(loadCastToday, 60000);
+      return;
+    }
+
+    renderCastTodayCards(rvs);
+
+    // 1分ごとに再描画（時刻チェック）
+    clearTimeout(castTodayTimer);
+    castTodayTimer = setTimeout(loadCastToday, 30000);
+
+  } catch(e) {
+    area.innerHTML = '<div class="card" style="color:var(--red);padding:1rem">読み込みエラー: ' + e.message + '</div>';
+  }
+}
+
+function startCastTodayClock() {
+  const el = document.getElementById('cast-today-clock');
+  if (!el) return;
+  clearInterval(castTodayClockTimer);
+  function tick() {
+    const now = new Date();
+    el.textContent = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0') + ':' + now.getSeconds().toString().padStart(2,'0');
+  }
+  tick();
+  castTodayClockTimer = setInterval(tick, 1000);
+}
+
+function renderCastTodayCards(rvs) {
+  const area = document.getElementById('cast-today-area');
+  if (!area) return;
+  const now = new Date();
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  let html = '';
+  rvs.forEach(r => {
+    const checkinMin = r.checkin_time ? timeStrToMin2(r.checkin_time.slice(0,5)) : null;
+    const checkoutMin = r.checkout_time ? timeStrToMin2(r.checkout_time.slice(0,5)) : null;
+    const isNow = checkinMin !== null && checkoutMin !== null && nowMin >= checkinMin && nowMin < checkoutMin;
+    const isComing = checkinMin !== null && nowMin < checkinMin && checkinMin - nowMin <= 30;
+    const isPast = checkoutMin !== null && nowMin >= checkoutMin;
+
+    // オプション整形
+    const rvOpts = r.options ? r.options.split(',').filter(Boolean) : [];
+    const optNames = rvOpts.map(o => {
+      const found = opts.find(op => op.name === o || String(op.id) === o);
+      return found ? found.name : o;
+    }).join('、');
+
+    // カードの強調スタイル
+    let cardStyle = 'border-radius:14px;padding:1rem;margin-bottom:.85rem;box-shadow:0 2px 12px rgba(0,0,0,.08);border:2px solid transparent;';
+    let badge = '';
+    if (isPast) {
+      cardStyle += 'background:#f5f5f5;opacity:.65;';
+      badge = '<span style="font-size:.7rem;background:#aaa;color:white;border-radius:20px;padding:.15rem .6rem;margin-left:.5rem">終了</span>';
+    } else if (isNow) {
+      cardStyle += 'background:linear-gradient(135deg,#fff8ee,#fff3e0);border-color:var(--accent);';
+      badge = '<span style="font-size:.7rem;background:var(--accent);color:white;border-radius:20px;padding:.15rem .6rem;margin-left:.5rem;animation:pulse 1.5s infinite">● 接客中</span>';
+    } else if (isComing) {
+      cardStyle += 'background:linear-gradient(135deg,#f0f8ff,#e8f4fd);border-color:#4a9fd4;';
+      badge = '<span style="font-size:.7rem;background:#4a9fd4;color:white;border-radius:20px;padding:.15rem .6rem;margin-left:.5rem">まもなく</span>';
+    } else {
+      cardStyle += 'background:white;';
+    }
+
+    // 入退室ボタン（終了後は非表示）
+    const actionBtns = isPast ? '' : `
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem">
+        <button onclick="castRoomIn(${r.id},'${r.customer_name||''}','${r.checkin_time?.slice(0,5)||''}')" style="flex:1;min-width:80px;padding:.6rem;border:none;border-radius:10px;background:#4caf50;color:white;font-weight:700;font-size:.85rem;cursor:pointer">🚪 入室</button>
+        <button onclick="castRoomOut(${r.id},'${r.customer_name||''}','${r.checkout_time?.slice(0,5)||''}')" style="flex:1;min-width:80px;padding:.6rem;border:none;border-radius:10px;background:#f44336;color:white;font-weight:700;font-size:.85rem;cursor:pointer">🚶 退室</button>
+        <button onclick="castAddOption(${r.id},'${r.customer_name||''}')" style="flex:1;min-width:80px;padding:.6rem;border:none;border-radius:10px;background:#9c27b0;color:white;font-weight:700;font-size:.85rem;cursor:pointer">＋ OP</button>
+        <button onclick="castExtend(${r.id},'${r.customer_name||''}')" style="flex:1;min-width:80px;padding:.6rem;border:none;border-radius:10px;background:#ff9800;color:white;font-weight:700;font-size:.85rem;cursor:pointer">⏱ 延長</button>
+      </div>`;
+
+    html += `<div style="${cardStyle}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.4rem">
+        <div style="font-size:1rem;font-weight:700">${r.customer_name || '（名前なし）'}${badge}</div>
+        <div style="font-size:.9rem;font-weight:700;color:var(--accent)">${r.checkin_time?.slice(0,5)||'?'}〜${r.checkout_time?.slice(0,5)||'?'}</div>
+      </div>
+      <div style="font-size:.82rem;color:var(--text3);margin-bottom:.2rem">
+        ${r.course || ''}${r.shimei_type && r.shimei_type !== 'なし' ? '　' + r.shimei_type : ''}
+        ${optNames ? '<br>OP：' + optNames : ''}
+        ${r.note ? '<br>メモ：' + r.note : ''}
+      </div>
+      ${actionBtns}
+    </div>`;
+  });
+
+  area.innerHTML = html;
+}
+
+function timeStrToMin2(t) {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+async function castRoomIn(rvId, custName, time) {
+  if (!confirm(custName + 'さんが入室しますか？')) return;
+  // オーナーに通知
+  try {
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE' },
+      body: JSON.stringify({ cast_id: 0, title: 'お客様入室🚪', body: me.name + ' / ' + custName + 'さんが入室しました（' + time + '〜）' })
+    });
+  } catch(e) { console.error('通知エラー', e); }
+  toast('入室通知を送りました');
+}
+
+async function castRoomOut(rvId, custName, time) {
+  if (!confirm(custName + 'さんが退室しますか？')) return;
+  try {
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE' },
+      body: JSON.stringify({ cast_id: 0, title: 'お客様退室🚶', body: me.name + ' / ' + custName + 'さんが退室しました（〜' + time + '）' })
+    });
+  } catch(e) { console.error('通知エラー', e); }
+  toast('退室通知を送りました');
+}
+
+async function castAddOption(rvId, custName) {
+  // オプション選択シートを表示
+  const optList = opts.map((o, i) =>
+    `<label style="display:flex;align-items:center;gap:.5rem;padding:.5rem;border-bottom:1px solid var(--border)">
+      <input type="checkbox" value="${o.name}" style="width:18px;height:18px"> ${o.name}（¥${o.price?.toLocaleString()||0}）
+    </label>`
+  ).join('');
+
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end';
+  sheet.innerHTML = `
+    <div style="background:white;width:100%;border-radius:20px 20px 0 0;padding:1.25rem;max-height:80vh;overflow-y:auto">
+      <div style="font-weight:700;font-size:1rem;margin-bottom:1rem">＋ 追加オプション（${custName}さん）</div>
+      ${optList}
+      <div style="display:flex;gap:.75rem;margin-top:1rem">
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="flex:1;padding:.75rem;border:1.5px solid var(--border);border-radius:10px;background:white;font-weight:700;cursor:pointer">キャンセル</button>
+        <button id="add-opt-confirm" style="flex:1;padding:.75rem;border:none;border-radius:10px;background:var(--accent);color:white;font-weight:700;cursor:pointer">追加して通知</button>
+      </div>
+    </div>`;
+  document.body.appendChild(sheet);
+
+  sheet.querySelector('#add-opt-confirm').onclick = async function() {
+    const checked = [...sheet.querySelectorAll('input[type=checkbox]:checked')].map(c => c.value);
+    if (checked.length === 0) { alert('オプションを選んでください'); return; }
+
+    // DB更新：既存optionsに追加
+    const { data: rv } = await sb.from('reservations').select('options').eq('id', rvId).single();
+    const existing = rv?.options ? rv.options.split(',').filter(Boolean) : [];
+    const newOpts = [...new Set([...existing, ...checked])];
+    await sb.from('reservations').update({ options: newOpts.join(',') }).eq('id', rvId);
+
+    // オーナーに通知
+    try {
+      await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE' },
+        body: JSON.stringify({ cast_id: 0, title: '追加OP🟣', body: me.name + ' / ' + custName + 'さんに追加OP：' + checked.join('、') })
+      });
+    } catch(e) {}
+    sheet.remove();
+    toast('追加OP通知を送りました');
+    loadCastToday();
+  };
+}
+
+async function castExtend(rvId, custName) {
+  const mins = prompt('延長時間を入力（例：30）', '30');
+  if (!mins || isNaN(parseInt(mins))) return;
+  const extMin = parseInt(mins);
+
+  // checkout_timeを延長
+  const { data: rv } = await sb.from('reservations').select('checkout_time, extension_count').eq('id', rvId).single();
+  if (!rv?.checkout_time) { toast('退室時刻が設定されていません'); return; }
+
+  const [h, m] = rv.checkout_time.slice(0,5).split(':').map(Number);
+  const newMin = h * 60 + m + extMin;
+  const newTime = String(Math.floor(newMin/60)).padStart(2,'0') + ':' + String(newMin%60).padStart(2,'0') + ':00';
+  const newExtCount = (rv.extension_count || 0) + 1;
+
+  await sb.from('reservations').update({ checkout_time: newTime, extension_count: newExtCount }).eq('id', rvId);
+
+  // オーナーに通知
+  try {
+    await fetch('https://qgcgkrcrfzonmmygcdju.supabase.co/functions/v1/send-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE' },
+      body: JSON.stringify({ cast_id: 0, title: '延長⏱', body: me.name + ' / ' + custName + 'さんが' + extMin + '分延長（〜' + newTime.slice(0,5) + '）' })
+    });
+  } catch(e) {}
+  toast('延長通知を送りました');
+  loadCastToday();
 }
 
 // ── キャスト：委託金確認 ──
