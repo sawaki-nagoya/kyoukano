@@ -1189,8 +1189,10 @@ async function offerPasskeyRegistration(castId, castName){
     // 公開鍵はclientDataJSONで代用（簡易実装）
     const pubKey = bufToB64(credential.response.clientDataJSON)
 
-    const{error}=await sb.from('passkeys').upsert({ cast_id:castId, credential_id:credId, public_key:pubKey },{onConflict:'cast_id'})
-    if(error) throw new Error(error.message)
+    // 既存レコードを削除してから新規insert
+    await sb.from('passkeys').delete().eq('cast_id', castId)
+    const{error}=await sb.from('passkeys').insert({ cast_id:castId, credential_id:credId, public_key:pubKey })
+    if(error) { alert('DB保存エラー: ' + error.message + ' / ' + JSON.stringify(error)); throw new Error(error.message) }
     toast('🔐 生体認証を登録しました！次回からすぐログインできます')
   } catch(e){
     if(e.name!=='NotAllowedError') toast('登録失敗: '+e.message)
