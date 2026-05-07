@@ -1133,9 +1133,6 @@ async function offerPasskeyRegistration(castId, castName){
   // 既に登録済みならスキップ
   const{data:existing}=await sb.from('passkeys').select('id').eq('cast_id',castId).maybeSingle()
   if(existing) return
-  // 対応端末か確認
-  const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable().catch(()=>false)
-  if(!available) return
 
   if(!confirm('顔認証・指紋認証でログインできるように設定しますか？\n次回から素早くログインできます。')) return
 
