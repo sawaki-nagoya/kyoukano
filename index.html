@@ -1264,10 +1264,10 @@ async function offerPasskeyRegistration(castId, castName){
 async function doOwnerLoginSmart(){
   const pin = document.getElementById('owner-pin')?.value
   const localKey = 'passkey_registered_0'
-  alert('[DEBUG] pin="'+pin+'" localKey='+localStorage.getItem(localKey)+' PublicKeyCredential='+!!window.PublicKeyCredential)
   // PINが空 かつ 生体認証登録済みなら生体認証
   if(!pin && window.PublicKeyCredential && localStorage.getItem(localKey)==='1'){
-    const{data:pks}=await sb.from('passkeys').select('*').eq('cast_id',0)
+    const{data:pks, error:pksErr}=await sb.from('passkeys').select('*').eq('cast_id',0)
+    alert('[DEBUG2] pks='+JSON.stringify(pks)+'err='+JSON.stringify(pksErr))
     if(pks&&pks.length>0){
       try {
         const challenge = crypto.getRandomValues(new Uint8Array(32))
