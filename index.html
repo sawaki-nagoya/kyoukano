@@ -289,7 +289,6 @@ if("serviceWorker" in navigator){
     <label class="lbl">オーナーPIN（最大8桁）</label>
     <input class="linput" type="password" id="owner-pin" maxlength="8" inputmode="numeric" placeholder="••••" onkeydown="if(event.key==='Enter')doOwnerLogin()">
     <button class="btn-login" style="background:var(--accent)" onclick="doOwnerLoginSmart()" id="btn-owner">ログイン</button>
-    <button class="btn-login" id="btn-owner-passkey" style="display:none" onclick="ownerPasskeyLogin()">🔐 顔認証・指紋認証でログイン</button>
     <div class="lerr" id="owner-err"></div>
   </div>
 </div>
@@ -314,7 +313,6 @@ if("serviceWorker" in navigator){
       <label class="lbl">PIN（最大8桁）</label>
       <input class="linput" type="password" id="cast-pin" maxlength="8" inputmode="numeric" placeholder="••••" onkeydown="if(event.key='Enter')doCastLogin()">
       <button class="btn-login" style="background:linear-gradient(135deg,#b8893a,#d4a855)" onclick="doCastLoginSmart()" id="btn-cast">ログイン</button>
-      <button class="btn-login" id="btn-passkey" style="display:none" onclick="passkeyLogin()">🔐 顔認証・指紋認証でログイン</button>
     </div>
     <div class="lerr" id="cast-err"></div>
   </div>
@@ -1083,7 +1081,7 @@ async function checkOwnerPasskeyBtn(){
   const btn = document.getElementById('btn-owner-passkey')
   if(!btn||!window.PublicKeyCredential) return
   const{data:pks2}=await sb.from('passkeys').select('id').eq('cast_id',0)
-  btn.style.display = (pks2&&pks2.length) ? '' : 'none'
+  // btn.style.display = (pks2&&pks2.length) ? '' : 'none' // ボタン非表示化済み
 }
 
 function showLogin(type){
@@ -1147,7 +1145,7 @@ async function checkPasskeyBtn(castId){
   if(!btn||!castId) return
   if(!window.PublicKeyCredential){ btn.style.display='none'; return }
   const{data}=await sb.from('passkeys').select('id').eq('cast_id',castId).maybeSingle()
-  btn.style.display = data ? '' : 'none'
+  // btn.style.display = data ? '' : 'none' // ボタン非表示化済み
 }
 
 // 生体認証でログイン
@@ -1297,14 +1295,14 @@ async function doCastLoginSmart(){
   if(!cid){ document.getElementById('cast-err').textContent='名前を選んでください'; return }
   const localKey = 'passkey_registered_' + cid
   if(window.PublicKeyCredential && localStorage.getItem(localKey)==='1'){
-    const{data:pk}=await sb.from('passkeys').select('*').eq('cast_id',cid).maybeSingle()
-    if(pk){
+    const{data:pks}=await sb.from('passkeys').select('*').eq('cast_id', parseInt(cid))
+    if(pks&&pks.length>0){
       try {
         const challenge = crypto.getRandomValues(new Uint8Array(32))
         await navigator.credentials.get({
           publicKey:{
             challenge,
-            allowCredentials:[{type:'public-key', id:b64ToBuf(pk.credential_id)}],
+            allowCredentials: pks.map(pk=>({type:'public-key', id:b64ToBuf(pk.credential_id)})),
             userVerification:'required',
             timeout:60000
           }
@@ -1316,8 +1314,7 @@ async function doCastLoginSmart(){
         startApp()
         return
       } catch(e){
-        if(e.name==='NotAllowedError') return // キャンセル
-        // 失敗したらPIN認証にフォールバック
+        if(e.name==='NotAllowedError') return
       }
     }
   }
