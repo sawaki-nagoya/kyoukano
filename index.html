@@ -6735,11 +6735,11 @@ function renderMonthlyCast(area,castStats,fmt2){
     name,total:s.count||0,free:s.free||0,net_shimei:s.net_shimei||0,hon_shimei:s.hon_shimei||0,
     sales:s.sales||0,disc:s.disc||0,net:s.net||0,hosho:s.hosho||0
   })).sort((a,b)=>b.sales-a.sales)
-  const wBg='background:#fff;border-radius:6px;padding:.28rem .15rem;text-align:center;font-size:.68rem;'
   const thBase='padding:.3rem .1rem;text-align:center;font-size:.6rem;background:var(--surface2);white-space:nowrap'
-  const thM=thBase  // unused but kept for safety
   const th=(l,col='')=>`<th style="${thBase}${col?';color:'+col:''}">${l}</th>`
-  const cell=(v,bold=false,col='')=>`<td style="padding:.15rem .08rem;text-align:center"><div style="${wBg}${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
+  const CA2=(v,bold=false,col='')=>`<td style="padding:.12rem .06rem;text-align:center"><div style="background:#fff;border-radius:6px;padding:.25rem .15rem;text-align:center;font-size:.68rem;min-width:52px;${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
+  const CB2=(v,bold=false,col='')=>`<td style="padding:.12rem .06rem;text-align:center"><div style="background:#fff;border-radius:6px;padding:.25rem .15rem;text-align:center;font-size:.68rem;min-width:28px;${bold?'font-weight:700;':''}${col?'color:'+col:''}">${v}</div></td>`
+  const cell=(v,bold=false,col='')=>CA2(v,bold,col)
   const hasDisc=rows.some(r=>r.disc>0)
   const totSales=rows.reduce((s,r)=>s+r.sales,0)
   const totDisc=rows.reduce((s,r)=>s+r.disc,0)
@@ -6755,7 +6755,7 @@ function renderMonthlyCast(area,castStats,fmt2){
       <tbody>
         ${rows.map(r=>`<tr style="border-bottom:1px solid var(--border)">
           <td style="padding:.25rem .35rem;position:sticky;left:0;background:#faf6f0;font-weight:600;font-size:.7rem;white-space:nowrap;z-index:1">${r.name}</td>
-          ${cell(r.total,true)}${cell(r.free)}${cell(r.net_shimei)}${cell(r.hon_shimei)}
+          ${CB2(r.total,true)}${CB2(r.free)}${CB2(r.net_shimei)}${CB2(r.hon_shimei)}
           ${cell('¥'+(r.sales+r.disc).toLocaleString(),true)}
           ${hasDisc?cell(r.disc>0?'-¥'+r.disc.toLocaleString():'-',false,'#c62828'):''}
           ${cell('¥'+r.sales.toLocaleString())}
@@ -6765,15 +6765,15 @@ function renderMonthlyCast(area,castStats,fmt2){
       </tbody>
       <tfoot><tr style="background:var(--surface2);font-weight:700;border-top:2px solid var(--accent);font-size:.68rem">
         <td style="padding:.25rem .35rem;position:sticky;left:0;background:var(--surface2);z-index:1">合計</td>
-        <td style="text-align:center;padding:.25rem .1rem">${totTotal}</td>
-        <td style="text-align:center;padding:.25rem .1rem">${totFree}</td>
-        <td style="text-align:center;padding:.25rem .1rem">${totNetS}</td>
-        <td style="text-align:center;padding:.25rem .1rem">${totHon}</td>
-        <td style="text-align:center;padding:.25rem .1rem">¥${(totSales+totDisc).toLocaleString()}</td>
-        ${hasDisc?`<td style="text-align:center;padding:.25rem .1rem;color:#c62828">${totDisc>0?'-¥'+totDisc.toLocaleString():'-'}</td>`:''}
-        <td style="text-align:center;padding:.25rem .1rem">¥${totSales.toLocaleString()}</td>
-        <td style="text-align:center;padding:.25rem .1rem;color:#c62828">¥${totNet.toLocaleString()}</td>
-        <td style="text-align:center;padding:.25rem .1rem">${totHosho>0?'¥'+totHosho.toLocaleString():'-'}</td>
+        ${CB2(totTotal,true)}
+        ${CB2(totFree)}
+        ${CB2(totNetS)}
+        ${CB2(totHon)}
+        ${CA2('¥'+(totSales+totDisc).toLocaleString(),true)}
+        ${hasDisc?CA2(totDisc>0?'-¥'+totDisc.toLocaleString():'-',false,'#c62828'):''}
+        ${CA2('¥'+totSales.toLocaleString(),true)}
+        ${CA2('¥'+totNet.toLocaleString(),false,'#c62828')}
+        ${CA2(totHosho>0?'¥'+totHosho.toLocaleString():'-')}
       </tr></tfoot>
     </table>
   </div>
