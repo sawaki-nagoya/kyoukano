@@ -462,7 +462,10 @@ if("serviceWorker" in navigator){
     <div class="panel" id="p-owner-customer">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
         <div style="font-size:1rem;font-weight:700">顧客管理</div>
-        <button class="btn btn-gold btn-sm2" onclick="openAddCustomer()">＋ 追加</button>
+        <div style="display:flex;align-items:center;gap:.5rem">
+          <span id="customer-count-badge" style="font-size:.75rem;color:var(--text3);font-weight:600"></span>
+          <button class="btn btn-gold btn-sm2" onclick="openAddCustomer()">＋ 追加</button>
+        </div>
       </div>
       <div style="display:flex;gap:.5rem;margin-bottom:.75rem">
         <input id="customer-search" type="text" placeholder="名前・顧客番号で検索" style="flex:1;padding:.5rem .75rem;border-radius:10px;border:1.5px solid var(--border);background:var(--surface);font-size:.85rem;color:var(--text)" oninput="filterCustomers()">
@@ -2573,6 +2576,8 @@ async function loadCustomers(){
   const{data}=await sb.from('customers').select('*').order('customer_no')
   allCustomers=data||[]
   renderCustomers(allCustomers)
+  const badge=document.getElementById('customer-count-badge')
+  if(badge) badge.textContent=allCustomers.length+'名登録'
 }
 
 function filterCustomers(){
