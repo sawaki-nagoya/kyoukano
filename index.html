@@ -2026,8 +2026,8 @@ function renderCastTodayCards(rvs) {
       cardStyle += 'background:#f0ede8;opacity:.6;';
       badge = '<span style="font-size:.7rem;background:#b0a898;color:white;border-radius:20px;padding:.15rem .6rem;margin-left:.5rem;font-weight:600">終了</span>';
     } else if (isNow) {
-      cardStyle += 'background:#fffbf2;border-color:#c9a84c;';
-      badge = '<span style="font-size:.7rem;background:#c9a84c;color:white;border-radius:20px;padding:.15rem .6rem;margin-left:.5rem;font-weight:600;animation:pulse 1.5s infinite">● 接客中</span>';
+      cardStyle += 'background:#fffbf2;border-color:#ff8c00;';
+      badge = '<span style="font-size:.7rem;background:#ff8c00;color:white;border-radius:20px;padding:.15rem .6rem;margin-left:.5rem;font-weight:600;animation:pulse 1.5s infinite">● 接客中</span>';
     } else if (isComing) {
       cardStyle += 'background:#f4f8ff;border-color:#7aaee0;';
       badge = '<span style="font-size:.7rem;background:#7aaee0;color:white;border-radius:20px;padding:.15rem .6rem;margin-left:.5rem;font-weight:600">まもなく</span>';
@@ -2038,10 +2038,13 @@ function renderCastTodayCards(rvs) {
     const hasRoomIn = !!r.room_in_at;
     const hasRoomOut = !!r.room_out_at;
     const btnBase = 'padding:.6rem 0;border:none;border-radius:10px;font-weight:700;font-size:.8rem;cursor:pointer;';
-    const goldBtn = btnBase + 'background:#c9a84c;color:white;';
+    const goldBtn = btnBase + 'background:#ff8c00;color:white;';
     const doneBtn = btnBase + 'background:#d0c9b8;color:#888;cursor:default;';
 
-    const actionBtns = isPast && hasRoomOut ? '' : `
+    const histBtn = r.customer_no
+      ? `<button onclick="castOpenCustHistory(${r.customer_no},'${(r.customer_name||'').replace(/'/g,"\\'")}')" style="margin-top:.5rem;width:100%;padding:.5rem 0;border:1.5px solid var(--border);border-radius:10px;background:#fff;color:var(--text2);font-size:.78rem;font-weight:600;cursor:pointer">📋 来店履歴</button>`
+      : '';
+    const actionBtns = isPast && hasRoomOut ? histBtn : `
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.45rem;margin-top:.75rem">
         ${hasRoomIn
           ? `<button disabled style="${doneBtn}">入室済み</button>`
@@ -2051,7 +2054,8 @@ function renderCastTodayCards(rvs) {
           : `<button onclick="castRoomOut(${r.id},'${r.customer_name||''}','${r.checkout_time?.slice(0,5)||''}')" style="${goldBtn}">退室</button>`}
         <button onclick="castAddOption(${r.id},'${r.customer_name||''}')" style="${goldBtn}">＋OP</button>
         <button onclick="castExtend(${r.id},'${r.customer_name||''}')" style="${goldBtn}">延長</button>
-      </div>`;
+      </div>
+      ${histBtn}`;
 
     html += `<div style="${cardStyle}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem">
@@ -2079,6 +2083,55 @@ function sortRvsByTime(rvs) {
     const tb = timeStrToMin2(b.checkin_time?.slice(0,5)) ?? 9999;
     return ta - tb;
   });
+}
+
+// ── セラピスト：顧客の来店履歴表示 ──
+async function castOpenCustHistory(customerNo, custName) {
+  // 顧客IDを取得
+  const{data:custs}=await sb.from('customers').select('id,name,customer_no').eq('customer_no',customerNo)
+  if(!custs||!custs.length){toast('顧客情報が見つかりません');return}
+  const custId=custs[0].id
+
+  // 来店履歴取得
+  const{data:visits}=await sb.from('customer_visits')
+    .select('visit_date,course,cast_name,total_price,shimei_type,options')
+    .eq('customer_id',custId)
+    .order('visit_date',{ascending:false})
+    .limit(30)
+
+  // モーダル生成
+  let existing=document.getElementById('cast-hist-modal')
+  if(existing) existing.remove()
+
+  const fmt=n=>n!=null?'¥'+Number(n).toLocaleString():'-'
+  const visitsHtml=visits&&visits.length
+    ? visits.map(v=>{
+        // 自分のシフト以外はキャスト名を「他セラピスト」に
+        const castLabel = (v.cast_name && v.cast_name===me.name) ? me.name : '他セラピスト'
+        const opts=v.options?v.options.split(',').filter(Boolean).join('・'):''
+        return `<div style="padding:.6rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
+            <span style="font-weight:600;color:var(--text)">${v.visit_date||''}</span>
+            <span style="color:var(--text2);font-size:.75rem">${castLabel}</span>
+          </div>
+          <div style="color:var(--text3)">${v.course||''}${v.shimei_type&&v.shimei_type!=='なし'?' / '+v.shimei_type:''}${opts?' / OP:'+opts:''}</div>
+        </div>`
+      }).join('')
+    : '<div style="color:var(--text3);padding:1rem 0;text-align:center">来店記録がありません</div>'
+
+  const modal=document.createElement('div')
+  modal.id='cast-hist-modal'
+  modal.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center'
+  modal.innerHTML=`
+    <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:70vh;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.85rem 1rem;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="font-weight:700;font-size:1rem">📋 ${custName} の来店履歴</div>
+        <button onclick="document.getElementById('cast-hist-modal').remove()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:var(--text3)">✕</button>
+      </div>
+      <div style="overflow-y:auto;padding:0 1rem 1rem">${visitsHtml}</div>
+    </div>`
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove()})
+  document.body.appendChild(modal)
 }
 
 async function castRoomIn(rvId, custName, time) {
