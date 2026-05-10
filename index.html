@@ -2119,7 +2119,7 @@ async function castOpenCustHistory(customerNo, custName, directCustId) {
 
   // 来店履歴取得
   const{data:visits,error:vErr}=await sb.from('customer_visits')
-    .select('visit_date,course,cast_name,shimei_type,options')
+    .select('visit_date,course,cast_name,shimei_type,options,cast_memo')
     .eq('customer_id',custId)
     .order('visit_date',{ascending:false})
     .limit(30)
@@ -2132,12 +2132,14 @@ async function castOpenCustHistory(customerNo, custName, directCustId) {
         // 自分のシフト以外はキャスト名を「他セラピスト」に
         const castLabel = (v.cast_name && v.cast_name===me.name) ? me.name : '他セラピスト'
         const opts=v.options?v.options.split(',').filter(Boolean).join('・'):''
+        const memoHtml = v.cast_memo ? `<div style="margin-top:.3rem;font-size:.78rem;color:var(--text2);background:var(--surface2);border-radius:6px;padding:.3rem .5rem;line-height:1.5">💬 ${v.cast_memo}</div>` : ''
         return `<div style="padding:.6rem 0;border-bottom:1px solid var(--border);font-size:.8rem">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.2rem">
             <span style="font-weight:600;color:var(--text)">${v.visit_date||''}</span>
             <span style="color:var(--text2);font-size:.75rem">${castLabel}</span>
           </div>
           <div style="color:var(--text3)">${v.course||''}${v.shimei_type&&v.shimei_type!=='なし'?' / '+v.shimei_type:''}${opts?' / OP:'+opts:''}</div>
+          ${memoHtml}
         </div>`
       }).join('')
     : '<div style="color:var(--text3);padding:1rem 0;text-align:center">来店記録がありません</div>'
