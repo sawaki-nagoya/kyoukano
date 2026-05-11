@@ -2456,8 +2456,11 @@ async function loadMySalary(){
         todayBackTotal+=est2.total
       })
       // サマリーバー：3×2グリッド（本数・現金・カード / バック・雑費・店舗利益）
-      const todayMisc=0 // 当日はworks未確定なので雑費は0
-      const todayProfit=todaySalesTotal-todayBackTotal-todayMisc
+      // worksから当日の雑費を取得
+      const{data:todayWork}=await sb.from('works').select('misc').eq('cast_id',me.id).eq('date',todayStr).maybeSingle()
+      const todayMisc=todayWork?.misc||0
+      const todayNet=todayBackTotal-todayMisc
+      const todayProfit=todaySalesTotal-todayNet
       const cell=(label,val,accent=false)=>{
         const backLabels=['バック','委託金'];
         const profitLabels=['店舗利益','純利益','粗利益','利益'];
@@ -2471,8 +2474,8 @@ async function loadMySalary(){
         ${cell('本数',rvCount+'本')}
         ${cell('現金',rvCount?fmt(todayCashTotal):'¥-')}
         ${cell('カード',rvCount?fmt(todayCardTotal):'¥-')}
-        ${cell('バック',rvCount?fmt(todayBackTotal):'¥-',true)}
-        ${cell('雑費','¥-')}
+        ${cell('委託金',rvCount?fmt(todayNet):'¥-',true)}
+        ${cell('雑費',todayMisc?'-'+fmt(todayMisc):'¥-')}
         ${cell('店舗利益',rvCount?fmt(todayProfit):'¥-')}
       </div>`
       if(!todayRvs||!todayRvs.length){
@@ -2699,7 +2702,7 @@ async function loadMySalary(){
     const wCardBase=(w.sessions||[]).reduce((s,ss)=>s+(ss.card_base||0),0)
     const wCardSales=wCardBase>0?Math.round(wCardBase*1.1):0
     const wCashSales=(w.sales||0)-wCardSales
-    const wProfit=(w.sales||0)-(w.net||w.back||0)-(w.misc||0)
+    const wProfit=(w.sales||0)-(w.net!=null?w.net:(w.back||0)-(w.misc||0))
     const cell2=(label,val,accent=false)=>{
         const backLabels=['バック','委託金'];
         const profitLabels=['店舗利益','純利益','粗利益','利益'];
