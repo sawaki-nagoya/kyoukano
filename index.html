@@ -6142,7 +6142,14 @@ async function openShiftReservations(shiftId, castName){
     const payShimei = pj.shimei||'現金'
     const payOpt = pj.option||'現金'
     const payExt = pj.ext||'現金'
-    const cardAmt = (payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+(payOpt==='カード'?optTotal:0)+(payExt==='カード'?extTotal:0)
+    const optPayMap = pj.optPay||{}
+    let optCardAmt = 0
+    if(Object.keys(optPayMap).length>0){
+      opts.forEach(n=>{const o=(optList||[]).find(x=>x.name===n);if((optPayMap[n]||payOpt)==='カード') optCardAmt+=(o?.price||0)})
+    } else {
+      optCardAmt = payOpt==='カード'?optTotal:0
+    }
+    const cardAmt = (payCourse==='カード'?coursePrice:0)+(payShimei==='カード'?shimeiPrice:0)+optCardAmt+(payExt==='カード'?extTotal:0)
     const cashAmt = totalPrice - cardAmt
     const newLabel = r.is_new===true||r.is_new==='true'
       ? '<span style="font-size:.65rem;background:#4CAF50;color:#fff;padding:1px 7px;border-radius:99px;margin-left:.3rem">新規</span>'
