@@ -2902,10 +2902,11 @@ async function loadCustomers(){
 function filterCustomers(){
   const q=document.getElementById('customer-search').value.trim().toLowerCase()
   if(!q){renderCustomers(allCustomers);return}
+  const isNum=/^\d+$/.test(q)
   const filtered=allCustomers.filter(c=>
-    c.name.toLowerCase().includes(q)||
-    String(c.customer_no).includes(q)||
-    (c.phone||'').includes(q)
+    isNum
+      ? String(c.customer_no)===q
+      : c.name.toLowerCase().includes(q)||(c.phone||'').includes(q)
   )
   renderCustomers(filtered)
 }
