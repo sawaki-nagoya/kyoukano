@@ -226,7 +226,7 @@ tr:last-child td{border-bottom:none}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 .session-del{background:var(--rbg);border:1.5px solid var(--rbd);color:var(--rtx);border-radius:8px;padding:.3rem .65rem;font-size:.72rem;font-weight:600;cursor:pointer}
 .session-label{font-size:.7rem;color:var(--text3);font-weight:600;margin-bottom:.25rem}
-.session-inner{padding:.75rem 1rem}
+.session-inner{padding:0;height:0;overflow:hidden}
 .session-breakdown{margin:0!important;padding:.5rem 0!important;background:none!important;border-radius:0!important;border-top:1px solid var(--border)}
 </style>
 <script>
@@ -5184,14 +5184,14 @@ function calcTotal2(){
         </div>
         <div style="text-align:right;width:4rem;flex-shrink:0"><div style="font-size:.72rem">${fmt(billedPrice)}</div></div>
         <div style="text-align:right;width:3.8rem;flex-shrink:0"><div style="font-size:.72rem;font-weight:600;color:var(--rtx)">${fmt(back)}</div></div>
-        <div style="text-align:right;width:3.8rem;flex-shrink:0"><div style="font-size:.72rem;color:var(--text3)">${shop>0?fmt(shop):'-'}</div></div>
+        <div style="text-align:right;width:3.8rem;flex-shrink:0"><div style="font-size:.72rem;color:var(--btx)">${shop>0?fmt(shop):'-'}</div></div>
       </div>`
     }
     let brows=`<div style="display:flex;padding:.3rem .75rem;border-bottom:1px solid var(--border);font-size:.6rem;color:var(--text3);font-weight:600">
       <span style="flex:1">項目</span>
       <span style="text-align:right;width:4rem">請求額</span>
       <span style="text-align:right;width:3.8rem;color:var(--rtx)">委託金</span>
-      <span style="text-align:right;width:3.8rem">店落ち</span>
+      <span style="text-align:right;width:3.8rem;color:var(--btx)">店舗利益</span>
     </div>`
     if(c) brows+=mkRow(c.name,'コース',coursePrice,cback,payCourse2==='カード')
     if(shimeiPrice) brows+=mkRow(stype,'指名料',shimeiPrice,sback,payShimei2==='カード')
@@ -5230,7 +5230,7 @@ function calcTotal2(){
       <span style="flex:1;font-size:.8rem;font-weight:700">小計</span>
       <div style="text-align:right;width:4rem;flex-shrink:0"><div style="font-size:.8rem;font-weight:700">${fmt(blockSales)}</div></div>
       <div style="text-align:right;width:3.8rem;flex-shrink:0"><div style="font-size:.8rem;font-weight:700;color:var(--rtx)">${fmt(blockBack)}</div></div>
-      <div style="text-align:right;width:3.8rem;flex-shrink:0"><div style="font-size:.8rem;font-weight:700">${fmt(sessionShop)}</div></div>
+      <div style="text-align:right;width:3.8rem;flex-shrink:0"><div style="font-size:.8rem;font-weight:700;color:var(--btx)">${fmt(sessionShop)}</div></div>
     </div>`
     breakdown.innerHTML=brows
   })
