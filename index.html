@@ -231,8 +231,9 @@ tr:last-child td{border-bottom:none}
 .session-breakdown{margin:0!important;padding:.5rem 0!important;background:none!important;border-radius:0!important;border-top:1px solid var(--border)}
 </style>
 <script>
-const SW_VER = 'v11';
-if("serviceWorker" in navigator){
+const SW_VER = 'v12';
+const _isSaaS = new URLSearchParams(location.search).has('saas') || location.hostname === 'app.shiftlink.jp';
+if("serviceWorker" in navigator && !_isSaaS){
   // 古いSWをすべて解除してから新しいSWを登録
   navigator.serviceWorker.getRegistrations().then(function(registrations){
     var needReload = false;
@@ -269,6 +270,68 @@ if("serviceWorker" in navigator){
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
+
+<!-- ===== SAAS LOGIN (メール/パスワード) ===== -->
+<div class="screen login-wrap" id="s-saas-login">
+  <div class="login-box">
+    <div class="login-logo" style="text-align:center;margin-bottom:.5rem">
+      <div style="font-size:1.8rem;font-weight:800;letter-spacing:.08em;color:var(--text)">SHIFT LINK</div>
+      <div style="font-size:.72rem;color:var(--text3);margin-top:.25rem">店舗管理をもっとシンプルに</div>
+    </div>
+
+    <div id="saas-login-form" style="margin-top:1.5rem">
+      <label class="lbl">メールアドレス</label>
+      <input class="linput" type="email" id="saas-email" placeholder="owner@example.com" autocomplete="email">
+      <label class="lbl" style="margin-top:.75rem">パスワード</label>
+      <input class="linput" type="password" id="saas-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doSaasLogin()">
+      <button class="btn-login" style="background:var(--accent);margin-top:1rem" onclick="doSaasLogin()" id="btn-saas-login">ログイン</button>
+      <div class="lerr" id="saas-err"></div>
+      <div style="text-align:center;margin-top:1.25rem">
+        <button onclick="showSaasSignup()" style="background:none;border:none;color:var(--accent);font-size:.82rem;cursor:pointer;text-decoration:underline;font-family:inherit">新規登録はこちら</button>
+      </div>
+    </div>
+
+    <div id="saas-signup-form" style="display:none;margin-top:1.5rem">
+      <div class="login-sub">新規店舗登録</div>
+      <label class="lbl">店舗名</label>
+      <input class="linput" type="text" id="saas-store-name" placeholder="例: リラクゼーション○○">
+      <label class="lbl" style="margin-top:.75rem">店舗ID（英数字・URL用）</label>
+      <input class="linput" type="text" id="saas-store-slug" placeholder="例: relaxation-abc" pattern="[a-z0-9-]+" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'')">
+      <label class="lbl" style="margin-top:.75rem">メールアドレス</label>
+      <input class="linput" type="email" id="saas-signup-email" placeholder="owner@example.com" autocomplete="email">
+      <label class="lbl" style="margin-top:.75rem">パスワード（8文字以上）</label>
+      <input class="linput" type="password" id="saas-signup-password" placeholder="••••••••" minlength="8" autocomplete="new-password">
+      <button class="btn-login" style="background:var(--accent);margin-top:1rem" onclick="doSaasSignup()" id="btn-saas-signup">無料で始める（14日間トライアル）</button>
+      <div class="lerr" id="saas-signup-err"></div>
+      <div style="text-align:center;margin-top:1rem">
+        <button onclick="showSaasLogin()" style="background:none;border:none;color:var(--accent);font-size:.82rem;cursor:pointer;text-decoration:underline;font-family:inherit">ログインに戻る</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SaaS UPGRADE ===== -->
+<div class="screen" id="s-saas-upgrade" style="align-items:center;justify-content:center;min-height:100vh;background:#f8f8f8">
+  <div style="max-width:420px;width:90%;background:#fff;border-radius:16px;padding:2rem;box-shadow:0 4px 20px rgba(0,0,0,.08);text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:.5rem">⏰</div>
+    <h2 style="margin:0 0 .5rem;font-size:1.2rem;color:#333">トライアル期間が終了しました</h2>
+    <p style="color:#888;font-size:.85rem;margin:0 0 1.5rem;line-height:1.6" id="saas-trial-msg">引き続きShiftLinkをご利用いただくには、プランをアップグレードしてください。</p>
+    <div style="background:#fdf6ec;border-radius:12px;padding:1.2rem;margin-bottom:1.5rem;text-align:left">
+      <div style="font-weight:700;font-size:1rem;color:#333;margin-bottom:.5rem">📋 スタンダードプラン</div>
+      <div style="font-size:1.8rem;font-weight:800;color:var(--accent)">¥5,980<span style="font-size:.75rem;font-weight:400;color:#888">/月（税込）</span></div>
+      <ul style="margin:.8rem 0 0;padding-left:1.2rem;font-size:.8rem;color:#555;line-height:1.8">
+        <li>セラピスト無制限</li>
+        <li>予約・売上管理すべて利用可能</li>
+        <li>プッシュ通知</li>
+        <li>優先サポート</li>
+      </ul>
+    </div>
+    <button class="btn-login" style="background:var(--accent);width:100%" onclick="startStripeCheckout()" id="btn-stripe-checkout">アップグレードする</button>
+    <div style="margin-top:1rem">
+      <button onclick="saasLogout()" style="background:none;border:none;color:#888;font-size:.8rem;cursor:pointer;text-decoration:underline;font-family:inherit">ログアウト</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== LOGIN TOP ===== -->
 <div class="screen login-wrap on" id="s-top">
@@ -332,7 +395,8 @@ if("serviceWorker" in navigator){
     <div class="hdr-r">
       <span class="badge" id="hdr-name">-</span>
       <button class="btn-sm" id="hdr-push-btn" style="display:none;font-size:.7rem" onclick="hdrPushBtnClick()">🔔 通知設定</button>
-      <button class="btn-sm" onclick="doLogout()">ログアウト</button>
+      <button class="btn-sm" id="hdr-logout-btn" style="display:none;font-size:.7rem;background:rgba(255,255,255,.15);color:var(--text3)" onclick="saasLogout()">ログアウト</button>
+      <button class="btn-sm" id="hdr-pin-logout-btn" onclick="doLogout()">ログアウト</button>
     </div>
   </div>
   <div id="ptr-indicator" style="display:none;position:fixed;top:48px;left:50%;transform:translateX(-50%);z-index:200;background:var(--surface);border-radius:99px;padding:.3rem .8rem;box-shadow:var(--shl);font-size:.75rem;color:var(--accent);font-weight:600;align-items:center;gap:.4rem">
@@ -1008,12 +1072,32 @@ if("serviceWorker" in navigator){
 
 <script>
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
-const SUPABASE_URL = 'https://qgcgkrcrfzonmmygcdju.supabase.co'
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE'
+// SaaSモード判定: URLパラメータ ?saas=1 または app.shiftlink.jp からアクセス時
+const SAAS_MODE = new URLSearchParams(location.search).has('saas') || location.hostname === 'app.shiftlink.jp'
+
+// Supabase接続（SaaSモード時は開発用プロジェクト）
+const SUPABASE_URL = SAAS_MODE
+  ? 'https://fewuonnrgqnxtopkjudt.supabase.co'
+  : 'https://qgcgkrcrfzonmmygcdju.supabase.co'
+const SUPABASE_KEY = SAAS_MODE
+  ? 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZld3Vvbm5yZ3FueHRvcGtqdWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwMjc0MDYsImV4cCI6MjA5NDYwMzQwNn0.u3kDWsXElpR1w_WMWm-fYG-M5iPaQ3LQdSt8WlGE41U'
+  : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFnY2drcmNyZnpvbm1teWdjZGp1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTY3NDcsImV4cCI6MjA5MDc3Mjc0N30.2kTAP333XfchMUpOJQB-Ex44wdj51JqjJR9nyTboBPE'
 let OWNER_PIN = '2580' // DBから上書きされる（後方互換でlocalStorageも参照）
+// SaaS用グローバル変数
+let currentStoreId = null // ログイン後にセットされる
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+
+// SaaS用変数
+let _saasStore=null, _saasSession=null
+
+// SaaS用ヘルパー: INSERT時にstore_idを自動注入
+function withStoreId(payload){
+  if(!SAAS_MODE || !currentStoreId) return payload
+  if(Array.isArray(payload)) return payload.map(p=>({store_id:currentStoreId,...p}))
+  return {store_id:currentStoreId,...payload}
+}
 const ROOMS = ['堀田Aルーム','堀田Bルーム','堀田Cルーム','金山ルーム']
 const ROOM_COLORS = {
   '堀田Aルーム': {bg:'#fff0f6',tx:'#be185d',bd:'#fbcfe8',card:'#fce7f3'},
@@ -1138,6 +1222,25 @@ function showLogin(type){
 }
 
 async function init(){
+  console.log('[init] SAAS_MODE=', SAAS_MODE)
+  // ── SaaSモード：Supabase Auth認証 ──
+  if(SAAS_MODE){
+    console.log('[init] SaaS path entered')
+    try{
+      // 既存セッション確認
+      const{data:{session}}=await sb.auth.getSession()
+      if(session){
+        // ログイン済み → store_id取得してアプリ起動
+        await initSaasApp(session)
+        return
+      }
+    }catch(e){console.error('[SaaS] getSession error:',e)}
+    // 未ログイン → SaaSログイン画面表示
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
+    document.getElementById('s-saas-login').classList.add('on')
+    return
+  }
+  // ── 従来モード：PINログイン ──
   const{data:casts}=await sb.from('casts').select('id,name').eq('active',true).order('sort_order',{ascending:true})
   // hidden select（互換用）
   const html='<option value="">選んでください</option>'+(casts||[]).map(c=>`<option value="${c.id}">${c.name}</option>`).join('')
@@ -1297,7 +1400,7 @@ async function offerPasskeyRegistration(castId, castName){
       const{error}=await sb.from('passkeys').update({ cast_id:castId, public_key:pubKey }).eq('credential_id',credId)
       saveError=error
     } else {
-      const{error}=await sb.from('passkeys').insert({ cast_id:castId, credential_id:credId, public_key:pubKey })
+      const{error}=await sb.from('passkeys').insert(withStoreId({ cast_id:castId, credential_id:credId, public_key:pubKey }))
       saveError=error
     }
     if(saveError) { alert('DB保存エラー: ' + saveError.message); throw new Error(saveError.message) }
@@ -1439,10 +1542,166 @@ async function doCastLogin(){
   setTimeout(()=>offerPasskeyRegistration(c.id, c.name), 800)
 }
 
+// ── SaaS認証関数 ──
+function showSaasLogin(){
+  document.getElementById('saas-login-form').style.display='block'
+  document.getElementById('saas-signup-form').style.display='none'
+  document.getElementById('saas-err').textContent=''
+}
+function showSaasSignup(){
+  document.getElementById('saas-login-form').style.display='none'
+  document.getElementById('saas-signup-form').style.display='block'
+  document.getElementById('saas-signup-err').textContent=''
+}
+
+async function doSaasLogin(){
+  const email=document.getElementById('saas-email').value.trim()
+  const pass=document.getElementById('saas-password').value
+  const err=document.getElementById('saas-err')
+  const btn=document.getElementById('btn-saas-login')
+  err.textContent=''
+  if(!email||!pass){err.textContent='メールアドレスとパスワードを入力してください';return}
+  btn.disabled=true; btn.textContent='ログイン中...'
+  try{
+    const{data,error}=await sb.auth.signInWithPassword({email,password:pass})
+    if(error) throw error
+    await initSaasApp(data.session)
+  }catch(e){
+    err.textContent=e.message==='Invalid login credentials'?'メールアドレスまたはパスワードが正しくありません':e.message
+  }finally{
+    btn.disabled=false; btn.textContent='ログイン'
+  }
+}
+
+async function doSaasSignup(){
+  const storeName=document.getElementById('saas-store-name').value.trim()
+  const slug=document.getElementById('saas-store-slug').value.trim()
+  const email=document.getElementById('saas-signup-email').value.trim()
+  const pass=document.getElementById('saas-signup-password').value
+  const err=document.getElementById('saas-signup-err')
+  const btn=document.getElementById('btn-saas-signup')
+  err.textContent=''
+  if(!storeName){err.textContent='店舗名を入力してください';return}
+  if(!slug||slug.length<3){err.textContent='店舗IDは3文字以上で入力してください';return}
+  if(!email){err.textContent='メールアドレスを入力してください';return}
+  if(pass.length<8){err.textContent='パスワードは8文字以上で入力してください';return}
+  btn.disabled=true; btn.textContent='登録中...'
+  try{
+    // 1. Supabase Authでアカウント作成
+    const{data:authData,error:authErr}=await sb.auth.signUp({email,password:pass})
+    if(authErr) throw authErr
+    if(!authData.session){
+      // メール確認が必要な場合
+      err.style.color='var(--accent)'
+      err.textContent='確認メールを送信しました。メール内のリンクをクリックしてログインしてください。'
+      btn.textContent='メール確認待ち'
+      return
+    }
+    // 2. 店舗作成（DB関数を呼び出し）
+    const{data:storeId,error:storeErr}=await sb.rpc('create_store',{
+      p_name:storeName, p_slug:slug, p_email:email
+    })
+    if(storeErr) throw storeErr
+    // 3. アプリ起動
+    await initSaasApp(authData.session)
+  }catch(e){
+    err.textContent=e.message.includes('duplicate')?'この店舗IDは既に使用されています':e.message
+  }finally{
+    btn.disabled=false; btn.textContent='無料で始める（14日間トライアル）'
+  }
+}
+
+async function initSaasApp(session){
+  // store_membersからユーザーの所属店舗を取得
+  const{data:member,error:memErr}=await sb.from('store_members').select('store_id,role,cast_id').eq('user_id',session.user.id).single()
+  if(memErr||!member){
+    // 店舗に未所属 → ログアウトしてエラー表示
+    await sb.auth.signOut()
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
+    document.getElementById('s-saas-login').classList.add('on')
+    document.getElementById('saas-err').textContent='店舗に所属していません。招待を受けてください。'
+    return
+  }
+  currentStoreId=member.store_id
+  // store情報を取得
+  const{data:store}=await sb.from('stores').select('*').eq('id',currentStoreId).single()
+  // サブスクリプション状態チェック
+  if(store){
+    const status=store.subscription_status
+    const trialEnd=store.trial_ends_at?new Date(store.trial_ends_at):null
+    const now=new Date()
+    // active or trialing中で期限内 → OK
+    if(status==='active'){}
+    else if(status==='trialing'&&trialEnd&&trialEnd>now){}
+    else{
+      // 期限切れ or canceled → アップグレード画面
+      _saasStore=store
+      _saasSession=session
+      document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
+      document.getElementById('s-saas-upgrade').classList.add('on')
+      if(status==='trialing') document.getElementById('saas-trial-msg').textContent='トライアル期間が'+trialEnd.toLocaleDateString('ja-JP')+'に終了しました。引き続きご利用いただくにはアップグレードしてください。'
+      return
+    }
+  }
+  // 役割に応じてme変数を設定
+  if(member.role==='owner'||member.role==='manager'){
+    me={id:0,name:store?.name||'店舗',is_owner:true}
+  }else{
+    // castとして取得
+    if(member.cast_id){
+      const{data:c}=await sb.from('casts').select('*').eq('id',member.cast_id).single()
+      if(c) me={...c,is_owner:false}
+      else me={id:member.cast_id,name:session.user.email,is_owner:false}
+    }else{
+      me={id:0,name:session.user.email,is_owner:false}
+    }
+  }
+  // SaaS用データ読み込み
+  const{data:cs}=await sb.from('courses').select('*').order('price')
+  const{data:op}=await sb.from('options').select('*').order('id')
+  courses=cs||[]; opts=op||[]
+  storeSettings=store?.settings||{}
+  // アプリ画面へ
+  startApp()
+}
+
+async function saasLogout(){
+  await sb.auth.signOut()
+  currentStoreId=null
+  sessionStorage.removeItem('shiftlink_me')
+  location.reload()
+}
+
+async function startStripeCheckout(){
+  const btn=document.getElementById('btn-stripe-checkout')
+  btn.disabled=true; btn.textContent='処理中...'
+  try{
+    const{data:{session}}=await sb.auth.getSession()
+    if(!session) throw new Error('ログインセッションが切れました')
+    const res=await fetch(SUPABASE_URL+'/functions/v1/stripe-checkout',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+session.access_token},
+      body:JSON.stringify({store_id:currentStoreId})
+    })
+    const json=await res.json()
+    if(json.url) window.location.href=json.url
+    else throw new Error(json.error||'チェックアウトURLの取得に失敗しました')
+  }catch(e){
+    toast(e.message)
+  }finally{
+    btn.disabled=false; btn.textContent='アップグレードする'
+  }
+}
+
 function startApp(){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('on'))
   document.getElementById('s-app').classList.add('on')
   document.getElementById('hdr-name').textContent=me.is_owner?'店舗 👑':me.name
+  // SaaSモードではSaaSログアウトを表示、PINログアウトを非表示
+  if(SAAS_MODE){
+    const lb=document.getElementById('hdr-logout-btn');if(lb)lb.style.display=''
+    const plb=document.getElementById('hdr-pin-logout-btn');if(plb)plb.style.display='none'
+  }
   // タブ表示切り替え
   document.querySelectorAll('.cast-tab').forEach(b=>b.style.display=me.is_owner?'none':'flex')
   document.querySelectorAll('.owner-tab').forEach(b=>b.style.display=me.is_owner?'flex':'none')
@@ -1480,7 +1739,7 @@ function startApp(){
             if (!dbSub || browserSub.toJSON().endpoint !== dbSub?.subscription?.endpoint) {
               const subJson = browserSub.toJSON();
               await sb.from("push_subscriptions").delete().eq("cast_id", castId);
-              await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+              await sb.from("push_subscriptions").insert(withStoreId({ cast_id: castId, subscription: subJson }));
             }
           }
         } catch(e) { console.warn("[Push] 同期エラー:", e); }
@@ -1498,7 +1757,7 @@ function startApp(){
           if (!dbSub || browserEndpoint !== dbEndpoint) {
             const subJson = browserSub.toJSON();
             await sb.from("push_subscriptions").delete().eq("cast_id", castId);
-            await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+            await sb.from("push_subscriptions").insert(withStoreId({ cast_id: castId, subscription: subJson }));
           }
           localStorage.setItem('push_registered_' + castId, '1');
           btn.textContent = '✅ 設定済み';
@@ -1551,7 +1810,7 @@ async function registerCastPush(){
     }
     const subJson = sub.toJSON();
     await sb.from("push_subscriptions").delete().eq("cast_id", castId);
-    const { error } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+    const { error } = await sb.from("push_subscriptions").insert(withStoreId({ cast_id: castId, subscription: subJson }));
     if (error) {
       alert("登録失敗: " + JSON.stringify(error));
     } else {
@@ -1632,7 +1891,7 @@ async function registerOwnerPush(){
     if (staleIds.length > 0) {
       await sb.from('push_subscriptions').delete().in('id', staleIds);
     }
-    const { error } = await sb.from('push_subscriptions').insert({ cast_id: 0, subscription: subJson });
+    const { error } = await sb.from('push_subscriptions').insert(withStoreId({ cast_id: 0, subscription: subJson }));
     if (error) { alert('登録失敗: ' + JSON.stringify(error)); return; }
     alert('通知登録完了！予約・シフトの通知が届きます。');
     const btn = document.getElementById('hdr-push-btn');
@@ -1916,11 +2175,21 @@ async function submitShift(){
   const start=document.getElementById('f-start').value
   const end=document.getElementById('f-end').value
   const note=document.getElementById('f-note')?.value||''
-  const existing=myShifts.find(s=>s.date===selectedDate)
+  // キャッシュが古い可能性があるため最新DBを確認
+  const{data:dbShifts}=await sb.from('shifts').select('id,status').eq('cast_id',me.id).eq('date',selectedDate)
+  const existing=dbShifts&&dbShifts.length>0?dbShifts[0]:null
   const payload={cast_id:me.id,date:selectedDate,start_time:start,end_time:end,note,status:'requested'}
   let err
-  if(existing){const r=await sb.from('shifts').update(payload).eq('id',existing.id);err=r.error}
-  else{const r=await sb.from('shifts').insert(payload);err=r.error}
+  if(existing&&existing.status==='rejected'){
+    // 却下済みシフトは削除してから再申請（RLSでUPDATE不可の場合があるため）
+    const{error:delErr}=await sb.from('shifts').delete().eq('id',existing.id)
+    if(delErr){toast('保存エラー: '+(delErr.message||JSON.stringify(delErr)));return}
+    const r=await sb.from('shifts').insert(withStoreId(payload));err=r.error
+  } else if(existing){
+    const r=await sb.from('shifts').update(payload).eq('id',existing.id);err=r.error
+  } else {
+    const r=await sb.from('shifts').insert(withStoreId(payload));err=r.error
+  }
   if(err){
     if(err.code==='23505') toast('この日はすでにシフトが申請されています')
     else toast('保存エラー: '+(err.message||JSON.stringify(err)))
@@ -3190,7 +3459,7 @@ async function saveNewCustomer(){
   // NGキャストをチップから取得
   const ngChips=document.querySelectorAll('.ce-ng-chip[data-selected="true"]')
   const ng=Array.from(ngChips).map(x=>x.dataset.name).join(',')
-  const{error}=await sb.from('customers').insert({customer_no:no,name,phone,memo,ng_casts:ng})
+  const{error}=await sb.from('customers').insert(withStoreId({customer_no:no,name,phone,memo,ng_casts:ng}))
   if(error){toast('エラー: '+error.message);return}
   toast('登録しました')
   closeSheet('customer-edit-overlay')
@@ -3540,25 +3809,25 @@ async function saveReservation(){
     // customersテーブルに新規登録し、idも取得
     const custName2=finalName.endsWith('様')?finalName:finalName+'様'
     const phone2=document.getElementById('rv-phone')?.value.trim()||''
-    const{data:insertedCust,error:custErr}=await sb.from('customers').insert({
+    const{data:insertedCust,error:custErr}=await sb.from('customers').insert(withStoreId({
       customer_no:nextNo,
       name:custName2,
       phone:phone2,
       memo:'',
       ng_casts:'',
       is_banned:false
-    }).select('id').single()
+    })).select('id').single()
     if(custErr){toast('顧客登録エラー: '+(custErr.message||custErr.code||JSON.stringify(custErr)));return}
     allCustomers.push({id:insertedCust?.id||null,customer_no:nextNo,name:custName2})
     toast('No.'+nextNo+' で顧客登録しました！')
   }
-  const{data:newRvData,error}=await sb.from('reservations').insert({
+  const{data:newRvData,error}=await sb.from('reservations').insert(withStoreId({
     shift_id:shiftId,
     customer_name:finalName,is_new:isNew,shimei_type:shimei,
     course,options:opts.join(','),discount,payment,note:memo,
     checkin_time:checkin||null,checkout_time:checkout||null,
     customer_no:custNoInt
-  }).select('id').single()
+  })).select('id').single()
   if(error){toast('エラー: '+error.message);return}
   const newRvId=newRvData?.id||null
   // 顧客の来店記録にも追加
@@ -3579,9 +3848,9 @@ async function saveReservation(){
       } else {
         // DBにも存在しない（手動番号入力で未登録の新規顧客）→ 顧客を自動作成
         const custName2=finalName.endsWith('様')?finalName:finalName+'様'
-        const{data:newCust,error:newCustErr}=await sb.from('customers').insert({
+        const{data:newCust,error:newCustErr}=await sb.from('customers').insert(withStoreId({
           customer_no:custNoInt,name:custName2,phone:'',memo:'',ng_casts:'',is_banned:false
-        }).select('id').single()
+        })).select('id').single()
         if(!newCustErr&&newCust?.id){
           custId=newCust.id
           allCustomers.push({id:newCust.id,customer_no:custNoInt,name:custName2})
@@ -3590,9 +3859,9 @@ async function saveReservation(){
     }
   }
   if(custId){
-    const{error:visitErr}=await sb.from('customer_visits').insert({
+    const{error:visitErr}=await sb.from('customer_visits').insert(withStoreId({
       customer_id:custId,cast_name:_rvCastName||'予約',shimei_type:shimei,course,options:opts.join(','),visit_date:_rvDate||bizDay(),reservation_id:newRvId
-    })
+    }))
     if(visitErr) console.error('来店記録エラー:',visitErr.message)
   }
   // Push通知送信（担当セラピストへ）
@@ -4249,7 +4518,8 @@ async function confirmRoomAssign(shiftId){
 }
 
 async function approveShift(id){
-  await sb.from('shifts').update({status:'approved'}).eq('id',id);
+  const{error}=await sb.from('shifts').update({status:'approved'}).eq('id',id);
+  if(error){toast('エラー: '+error.message);return}
   toast('承認しました');
   // Push通知送信
   try {
@@ -5457,12 +5727,12 @@ async function saveWork(){
   const{data:ex}=await sb.from('works').select('id').eq('cast_id',sheetCastId).eq('date',sheetDate).single()
   let err
   if(ex){const r=await sb.from('works').update(payload).eq('id',ex.id);err=r.error}
-  else{const r=await sb.from('works').insert(payload);err=r.error}
+  else{const r=await sb.from('works').insert(withStoreId(payload));err=r.error}
   // hoshoカラムがない場合はhoshoを除いて再試行
   if(err&&err.message&&err.message.includes('hosho')){
     const p2={...payload};delete p2.hosho
     if(ex){const r=await sb.from('works').update(p2).eq('id',ex.id);err=r.error}
-    else{const r=await sb.from('works').insert(p2);err=r.error}
+    else{const r=await sb.from('works').insert(withStoreId(p2));err=r.error}
   }
   btn.disabled=false;btn.textContent='保存する'
   if(err){
@@ -5573,11 +5843,11 @@ async function addCast(){
   if(pin.length<1||pin.length>8||!/^\d+$/.test(pin)){err.textContent='PINは1〜8桁の数字で入力してください';return}
   const{data:maxData}=await sb.from('casts').select('sort_order').order('sort_order',{ascending:false}).limit(1)
   const nextOrder=((maxData||[])[0]?.sort_order||0)+1
-  const{error}=await sb.from('casts').insert({name,pin,sort_order:nextOrder,active:true})
+  const{error}=await sb.from('casts').insert(withStoreId({name,pin,sort_order:nextOrder,active:true}))
   if(error){err.textContent='エラー：'+error.message;return}
   const{data:newCast}=await sb.from('casts').select('id').eq('name',name).order('id',{ascending:false}).limit(1)
   if(newCast&&newCast[0]){
-    await sb.from('cast_fees').insert({cast_id:newCast[0].id,back_50:DEFAULT_FEE.back_50,back_80:DEFAULT_FEE.back_80,back_100:DEFAULT_FEE.back_100,back_130:DEFAULT_FEE.back_130,back_ext30:DEFAULT_FEE.back_ext30,shimei_free:DEFAULT_FEE.shimei_free,shimei_net:DEFAULT_FEE.shimei_net,shimei_hon:DEFAULT_FEE.shimei_hon,op_gokueki:DEFAULT_FEE.op_gokueki,op_isho:DEFAULT_FEE.op_isho,op_isho2:DEFAULT_FEE.op_isho2})
+    await sb.from('cast_fees').insert(withStoreId({cast_id:newCast[0].id,back_50:DEFAULT_FEE.back_50,back_80:DEFAULT_FEE.back_80,back_100:DEFAULT_FEE.back_100,back_130:DEFAULT_FEE.back_130,back_ext30:DEFAULT_FEE.back_ext30,shimei_free:DEFAULT_FEE.shimei_free,shimei_net:DEFAULT_FEE.shimei_net,shimei_hon:DEFAULT_FEE.shimei_hon,op_gokueki:DEFAULT_FEE.op_gokueki,op_isho:DEFAULT_FEE.op_isho,op_isho2:DEFAULT_FEE.op_isho2}))
   }
   toast('追加しました！')
   closeSheet('cast')
@@ -5725,7 +5995,7 @@ async function addFeeDisc(){
   const amount=parseInt(document.getElementById('fd-amount')?.value)||0
   const disc_type=document.getElementById('fd-type')?.value||'back'
   if(!name){toast('割引名を入力してください');return}
-  await sb.from('cast_discounts').insert({cast_id:feeCastId2,name,amount,disc_type,sort_order:99})
+  await sb.from('cast_discounts').insert(withStoreId({cast_id:feeCastId2,name,amount,disc_type,sort_order:99}))
   if(document.getElementById('fd-name')) document.getElementById('fd-name').value=''
   if(document.getElementById('fd-amount')) document.getElementById('fd-amount').value=''
   await renderFeeDiscList()
@@ -5792,7 +6062,7 @@ async function saveFee(){
     saveError=r.error
     console.log('[saveFee] update result:',r)
   } else {
-    const r=await sb.from('cast_fees').insert({cast_id:castIdNum,...dataToSave})
+    const r=await sb.from('cast_fees').insert(withStoreId({cast_id:castIdNum,...dataToSave}))
     saveError=r.error
     console.log('[saveFee] insert result:',r)
   }
@@ -5844,7 +6114,7 @@ async function saveDisc(){
   const amount=parseInt(document.getElementById('disc-amount')?.value)||0
   const disc_type=document.getElementById('disc-type')?.value||'back'
   if(!name){toast('項目名を入力してください');return}
-  await sb.from('cast_discounts').insert({cast_id:discCastId2,name,amount,disc_type,sort_order:99})
+  await sb.from('cast_discounts').insert(withStoreId({cast_id:discCastId2,name,amount,disc_type,sort_order:99}))
   if(document.getElementById('disc-name')) document.getElementById('disc-name').value=''
   if(document.getElementById('disc-amount')) document.getElementById('disc-amount').value=''
   await renderDiscList()
@@ -6115,7 +6385,7 @@ async function addStoreCourse(){
   const price=parseInt(document.getElementById('st-new-course-price')?.value)||0
   if(!name){toast('コース名を入力してください');return}
   const duration=parseInt(document.getElementById('st-new-course-duration')?.value)||null
-  const{error}=await sb.from('courses').insert({name,price,...(duration?{duration}:{})})
+  const{error}=await sb.from('courses').insert(withStoreId({name,price,...(duration?{duration}:{})}))
   if(error){toast('エラー: '+error.message);return}
   document.getElementById('st-new-course-name').value=''
   document.getElementById('st-new-course-price').value=''
@@ -6154,7 +6424,7 @@ async function addStoreOption(){
   const name=document.getElementById('st-new-opt-name')?.value.trim()
   const price=parseInt(document.getElementById('st-new-opt-price')?.value)||0
   if(!name){toast('オプション名を入力してください');return}
-  const{error}=await sb.from('options').insert({name,price})
+  const{error}=await sb.from('options').insert(withStoreId({name,price}))
   if(error){toast('エラー: '+error.message);return}
   document.getElementById('st-new-opt-name').value=''
   document.getElementById('st-new-opt-price').value=''
@@ -6223,7 +6493,7 @@ async function saveStoreSettings(){
     }
     const shimeiData={shimei_free:gv('st-shimei-free'),shimei_net:gv('st-shimei-net'),shimei_hon:gv('st-shimei-hon')}
     const{error:ssErr}=await sb.from('store_settings').upsert({id:1,...shimeiData},{onConflict:'id'})
-    if(ssErr){const{data:ssx}=await sb.from('store_settings').select('id').maybeSingle();if(ssx)await sb.from('store_settings').update(shimeiData).eq('id',ssx.id);else await sb.from('store_settings').insert(shimeiData)}
+    if(ssErr){const{data:ssx}=await sb.from('store_settings').select('id').maybeSingle();if(ssx)await sb.from('store_settings').update(shimeiData).eq('id',ssx.id);else await sb.from('store_settings').insert(withStoreId(shimeiData))}
     const{data:newOps}=await sb.from('options').select('*').order('id')
     opts=newOps||[]
     if(newOps){
@@ -6258,7 +6528,7 @@ async function addStoreDisc(){
   const name=document.getElementById('st-disc-name')?.value.trim()
   const amount=parseInt(document.getElementById('st-disc-amount')?.value)||0
   if(!name){toast('割引名を入力してください');return}
-  const{error}=await sb.from('cast_discounts').insert({cast_id:0,name,amount,disc_type:'back',sort_order:99})
+  const{error}=await sb.from('cast_discounts').insert(withStoreId({cast_id:0,name,amount,disc_type:'back',sort_order:99}))
   if(error){toast('エラー: '+error.message);return}
   document.getElementById('st-disc-name').value=''
   document.getElementById('st-disc-amount').value=''
@@ -7772,7 +8042,7 @@ async function subscribePush(castId) {
     const subJson = sub.toJSON();
     alert("subscription取得: " + subJson.endpoint);
     await sb.from("push_subscriptions").delete().eq("cast_id", castId);
-    const { error: insErr } = await sb.from("push_subscriptions").insert({ cast_id: castId, subscription: subJson });
+    const { error: insErr } = await sb.from("push_subscriptions").insert(withStoreId({ cast_id: castId, subscription: subJson }));
     if (insErr) { alert("insert失敗: " + JSON.stringify(insErr)); } else { alert("Push登録成功！"); }
   } catch(e) {
     alert("Pushエラー: " + e.name + " / " + e.message);
